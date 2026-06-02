@@ -3,6 +3,9 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import prisma from '@/lib/db/prisma'
 import { formatMontant } from '@/lib/utils/currency'
+import { deleteUtilisateur } from './utilisateurs/actions'
+
+// Removed duplicate export default function UtilisateursPage() { ... }
 
 async function getDashboardData() {
   const [totalFactures, facturesNonPayees, chiffreAffaires, totalCharges, dernieresFactures] = await Promise.all([

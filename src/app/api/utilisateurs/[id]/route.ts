@@ -2,8 +2,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db/prisma'
 import bcrypt from 'bcryptjs'
+import { getToken } from 'next-auth/jwt'
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  // Récupérer le token JWT à partir du cookie
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  })
+  
+  // Vérifier l'authentification
+  if (!token || (token.role !== 'admin' && token.sub !== params.id.toString())) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
   const u = await prisma.utilisateur.findUnique({
     where: { id: Number(params.id) },
     include: { role: true },
@@ -12,8 +24,19 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   return NextResponse.json(u)
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { nom, email, motDePasse, roleId, actif } = await req.json()
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  // Récupérer le token JWT à partir du cookie
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  })
+  
+  // Vérifier l'authentification
+  if (!token || token.role !== 'admin') {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
+  const { nom, email, motDePasse, roleId, actif } = await request.json()
   const id = Number(params.id)
 
   if (!nom?.trim()) return NextResponse.json({ error: 'Le nom est obligatoire' }, { status: 400 })
@@ -40,7 +63,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(utilisateur)
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  // Récupérer le token JWT à partir du cookie
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  })
+  
+  // Vérifier l'authentification
+  if (!token || token.role !== 'admin') {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
   const id = Number(params.id)
 
   // Ne pas supprimer le dernier admin

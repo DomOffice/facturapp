@@ -3,8 +3,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db/prisma'
 import { prochainNumeroFacture } from '@/lib/business/numerotation'
 import { calculerTotauxFacture } from '@/lib/utils/currency'
+import { canRead, canWrite } from '@/lib/utils/permissions'
 
 export async function GET(req: NextRequest) {
+  // Vérifier les permissions pour la lecture
+  const authorized = await canRead(req)
+  if (!authorized) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
   const { searchParams } = new URL(req.url)
   const clientId = searchParams.get('clientId')
   const statut = searchParams.get('statut')
@@ -25,6 +32,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Vérifier les permissions pour l'écriture
+  const authorized = await canWrite(req)
+  if (!authorized) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
   const body = await req.json()
   const { clientId, dateFacture, statut = 'brouillon', lignes = [] } = body
 
