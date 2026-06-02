@@ -1,0 +1,45 @@
+Sur ta machine dev
+
+Avant de commencer :
+
+cd C:\Users\...\Documents\facturapp
+git pull
+npm run dev
+
+Tu développes et tu testes sur :
+
+http://localhost:3000
+
+Quand tu es satisfait :
+
+git status
+git add .
+git commit -m "Description courte de la modification"
+git push
+
+Exemple :
+
+git commit -m "Ajoute filtre sur les factures"
+Sur le serveur production
+
+Quand tu veux récupérer la nouvelle version :
+
+cd C:\serveur\facturapp
+git pull
+npm install
+npm run build
+pm2 restart facturapp
+
+Puis vérifier :
+
+pm2 status
+pm2 logs facturapp --lines 50
+Règle importante
+
+Sur le serveur : ne modifie plus le code à la main.
+
+Le serveur doit seulement faire :
+
+git pull → build → restart
+
+Le développement doit se faire uniquement sur ta machine.
