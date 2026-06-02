@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-dm-sans: 'DM Sans', sans-serif;
+  --font-syne: 'Syne', sans-serif;
+
+  /* Brand */
+  --brand: #4f46e5;
+  --brand-light: #eef2ff;
+  --brand-dark: #3730a3;
+
+  /* Sidebar */
+  --sidebar-bg: #1a1a2e;
+  --sidebar-text: rgba(255,255,255,0.6);
+  --sidebar-text-active: #fff;
+  --sidebar-active-bg: rgba(99,102,241,0.2);
+  --sidebar-border: rgba(255,255,255,0.07);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-dm-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── UTILITAIRES ───────────────────────────────────────────── */
+
+.font-display {
+  font-family: var(--font-syne);
+}
+
+/* Status badges */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+.badge-success { @apply bg-emerald-100 text-emerald-700; }
+.badge-warning { @apply bg-amber-100 text-amber-700; }
+.badge-info    { @apply bg-indigo-100 text-indigo-700; }
+.badge-neutral { @apply bg-slate-100 text-slate-600; }
+.badge-danger  { @apply bg-red-100 text-red-700; }
+
+/* Tables */
+.data-table {
+  @apply w-full text-sm;
+}
+.data-table thead tr {
+  @apply border-b border-slate-100;
+}
+.data-table thead th {
+  @apply px-4 py-2.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider;
+}
+.data-table tbody tr {
+  @apply border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer;
+}
+.data-table tbody td {
+  @apply px-4 py-3 text-slate-700;
+}
+
+/* Form inputs */
+.form-input {
+  @apply w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-800
+         focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400
+         placeholder:text-slate-300 transition-all;
+}
+.form-label {
+  @apply block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wide;
+}
+.form-select {
+  @apply form-input appearance-none cursor-pointer;
+}
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
+         transition-all focus:outline-none focus:ring-2 focus:ring-offset-1;
+}
+.btn-primary {
+  @apply btn bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500;
+}
+.btn-secondary {
+  @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 focus:ring-slate-300;
+}
+.btn-danger {
+  @apply btn bg-red-500 text-white hover:bg-red-600 focus:ring-red-400;
+}
+.btn-ghost {
+  @apply btn text-slate-600 hover:bg-slate-100 focus:ring-slate-300;
+}
+.btn-sm {
+  @apply px-3 py-1.5 text-xs;
+}
+
+/* Cards */
+.card {
+  @apply bg-white rounded-xl border border-slate-100 shadow-sm;
+}
+
+/* KPI cards */
+.kpi-card {
+  @apply card p-4;
+}
+.kpi-label {
+  @apply text-xs text-slate-400 font-medium uppercase tracking-wide mb-1;
+}
+.kpi-value {
+  @apply text-2xl font-bold text-slate-800 font-display;
+}
+
+/* Page header */
+.page-header {
+  @apply flex items-center justify-between mb-6;
+}
+.page-title {
+  @apply text-xl font-semibold text-slate-800 font-display;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ─── STYLES IMPRESSION ─────────────────────────────────────── */
+@media print {
+  /* Cacher la sidebar et les boutons */
+  aside,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  nav,
+  .page-header > div:last-child {
+    display: none !important;
+  }
+
+  /* Pleine largeur */
+  main {
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Pas de coupure dans les tableaux */
+  table { page-break-inside: avoid; }
+  tr { page-break-inside: avoid; }
+
+  /* Couleurs pour impression */
+  .card {
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,407 @@
+// prisma/schema.prisma
+// FacturApp – Schéma V1 – PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTHENTIFICATION ───────────────────────────────────────────────
+
+model Role {
+  id           Int           @id @default(autoincrement())
+  code         String        @unique @db.VarChar(30)
+  nom          String        @db.VarChar(100)
+  utilisateurs Utilisateur[]
+
+  @@map("roles")
+}
+
+model Utilisateur {
+  id               Int            @id @default(autoincrement())
+  nom              String         @db.VarChar(100)
+  email            String         @unique @db.VarChar(150)
+  motDePasseHash   String         @map("mot_de_passe_hash") @db.VarChar(255)
+  roleId           Int            @map("role_id")
+  actif            Boolean        @default(true)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  role             Role           @relation(fields: [roleId], references: [id])
+  factures         Facture[]
+  journalAudit     JournalAudit[]
+
+  @@map("utilisateurs")
+}
+
+// ─── PARAMÈTRES SOCIÉTÉ ─────────────────────────────────────────────
+
+model Entreprise {
+  id           Int      @id @default(autoincrement())
+  raisonSociale String  @map("raison_sociale") @db.VarChar(150)
+  adresse      String?  @db.Text
+  codePostal   String?  @map("code_postal") @db.VarChar(20)
+  ville        String?  @db.VarChar(100)
+  telephone    String?  @db.VarChar(50)
+  email        String?  @db.VarChar(150)
+  ice          String?  @db.VarChar(50)
+  identifiantFiscal String? @map("identifiant_fiscal") @db.VarChar(50)
+  rc           String?  @db.VarChar(50)
+  patente      String?  @db.VarChar(50)
+  logoUrl      String?  @map("logo_url") @db.VarChar(255)
+  compteBancaire String? @map("compte_bancaire") @db.VarChar(100)
+  devise       String   @default("MAD") @db.VarChar(20)
+  formatDate   String   @default("DD/MM/YYYY") @map("format_date") @db.VarChar(20)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("entreprise")
+}
+
+// ─── PARAMÈTRES MÉTIER ──────────────────────────────────────────────
+
+model ParametreType {
+  id         Int         @id @default(autoincrement())
+  code       String      @unique @db.VarChar(50)
+  nom        String      @db.VarChar(100)
+  parametres Parametre[]
+
+  @@map("parametre_types")
+}
+
+model Parametre {
+  id              Int           @id @default(autoincrement())
+  typeId          Int           @map("type_id")
+  code            String        @db.VarChar(100)
+  libelle         String        @db.VarChar(150)
+  valeurNum       Decimal?      @map("valeur_num") @db.Decimal(10, 2)
+  ordreAffichage  Int?          @map("ordre_affichage")
+  actif           Boolean       @default(true)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  type            ParametreType @relation(fields: [typeId], references: [id])
+
+  // Relations inverses
+  clients          Client[]       @relation("TypeClient")
+  fournisseurs     Fournisseur[]  @relation("TypeFournisseur")
+  produits         Produit[]      @relation("TypeProduit")
+  produitsUnite    Produit[]      @relation("UniteProduit")
+  produitsTva      Produit[]      @relation("TvaProduit")
+  prixTva          PrixProduit[]  @relation("TvaPrix")
+  paiementsMode    Paiement[]     @relation("ModeReglement")
+  charges          Charge[]       @relation("TypeCharge")
+
+  @@map("parametres")
+}
+
+// ─── TIERS ──────────────────────────────────────────────────────────
+
+model Client {
+  id            Int       @id @default(autoincrement())
+  typeClientId  Int?      @map("type_client_id")
+  raisonSociale String    @map("raison_sociale") @db.VarChar(150)
+  adresse       String?   @db.Text
+  codePostal    String?   @map("code_postal") @db.VarChar(20)
+  telephone     String?   @db.VarChar(50)
+  ville         String?   @db.VarChar(100)
+  ice           String?   @db.VarChar(50)
+  email         String?   @db.VarChar(150)
+  echeanceJours Int?      @map("echeance_jours")
+  actif         Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  typeClient    Parametre? @relation("TypeClient", fields: [typeClientId], references: [id])
+  factures      Facture[]
+  avoirs        Avoir[]
+  devis         Devis[]
+
+  @@index([raisonSociale])
+  @@index([telephone])
+  @@index([ville])
+  @@map("clients")
+}
+
+model Fournisseur {
+  id                  Int         @id @default(autoincrement())
+  typeFournisseurId   Int?        @map("type_fournisseur_id")
+  raisonSociale       String      @map("raison_sociale") @db.VarChar(150)
+  adresse             String?     @db.Text
+  codePostal          String?     @map("code_postal") @db.VarChar(20)
+  telephone           String?     @db.VarChar(50)
+  ville               String?     @db.VarChar(100)
+  ice                 String?     @db.VarChar(50)
+  email               String?     @db.VarChar(150)
+  actif               Boolean     @default(true)
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  typeFournisseur     Parametre?  @relation("TypeFournisseur", fields: [typeFournisseurId], references: [id])
+  produits            Produit[]
+  prixProduits        PrixProduit[]
+  charges             Charge[]
+
+  @@index([raisonSociale])
+  @@index([telephone])
+  @@map("fournisseurs")
+}
+
+// ─── PRODUITS ───────────────────────────────────────────────────────
+
+model Produit {
+  id                   Int           @id @default(autoincrement())
+  typeProduitId        Int?          @map("type_produit_id")
+  reference            String        @db.VarChar(100)
+  description          String        @db.VarChar(255)
+  uniteId              Int?          @map("unite_id")
+  fournisseurId        Int?          @map("fournisseur_id")
+  tauxTvaId            Int?          @map("taux_tva_id")
+  dernierPrixAchatHt   Decimal       @default(0) @map("dernier_prix_achat_ht") @db.Decimal(14, 2)
+  dernierPrixAchatTtc  Decimal       @default(0) @map("dernier_prix_achat_ttc") @db.Decimal(14, 2)
+  prixVenteHt          Decimal       @default(0) @map("prix_vente_ht") @db.Decimal(14, 2)
+  prixVenteTtc         Decimal       @default(0) @map("prix_vente_ttc") @db.Decimal(14, 2)
+  margeHt              Decimal       @default(0) @map("marge_ht") @db.Decimal(14, 2)
+  actif                Boolean       @default(true)
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  typeProduit          Parametre?    @relation("TypeProduit", fields: [typeProduitId], references: [id])
+  unite                Parametre?    @relation("UniteProduit", fields: [uniteId], references: [id])
+  tauxTva              Parametre?    @relation("TvaProduit", fields: [tauxTvaId], references: [id])
+  fournisseur          Fournisseur?  @relation(fields: [fournisseurId], references: [id])
+  prixHistorique       PrixProduit[]
+  factureLignes        FactureLigne[]
+  avoirLignes          AvoirLigne[]
+  devisLignes          DevisLigne[]
+
+  @@index([reference])
+  @@index([description])
+  @@map("produits")
+}
+
+model PrixProduit {
+  id            Int          @id @default(autoincrement())
+  produitId     Int          @map("produit_id")
+  dateAchat     DateTime     @map("date_achat") @db.Date
+  prixAchatHt   Decimal      @map("prix_achat_ht") @db.Decimal(14, 2)
+  prixAchatTtc  Decimal      @map("prix_achat_ttc") @db.Decimal(14, 2)
+  prixVenteHt   Decimal      @map("prix_vente_ht") @db.Decimal(14, 2)
+  prixVenteTtc  Decimal      @map("prix_vente_ttc") @db.Decimal(14, 2)
+  margeHt       Decimal      @map("marge_ht") @db.Decimal(14, 2)
+  tauxTvaId     Int?         @map("taux_tva_id")
+  fournisseurId Int?         @map("fournisseur_id")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  produit       Produit      @relation(fields: [produitId], references: [id])
+  tauxTva       Parametre?   @relation("TvaPrix", fields: [tauxTvaId], references: [id])
+  fournisseur   Fournisseur? @relation(fields: [fournisseurId], references: [id])
+
+  @@index([produitId])
+  @@map("prix_produits")
+}
+
+// ─── FACTURES ───────────────────────────────────────────────────────
+
+model Facture {
+  id               Int            @id @default(autoincrement())
+  annee            Int
+  numeroSequence   Int            @map("numero_sequence")
+  numeroFacture    String         @unique @map("numero_facture") @db.VarChar(30)
+  clientId         Int            @map("client_id")
+  dateFacture      DateTime       @map("date_facture") @db.Date
+  statut           String         @default("brouillon") @db.VarChar(30)
+  totalLignes      Int            @default(0) @map("total_lignes")
+  totalArticles    Decimal        @default(0) @map("total_articles") @db.Decimal(14, 2)
+  totalHt          Decimal        @default(0) @map("total_ht") @db.Decimal(14, 2)
+  totalTva         Decimal        @default(0) @map("total_tva") @db.Decimal(14, 2)
+  totalTtc         Decimal        @default(0) @map("total_ttc") @db.Decimal(14, 2)
+  totalAchatHt     Decimal        @default(0) @map("total_achat_ht") @db.Decimal(14, 2)
+  margeHt          Decimal        @default(0) @map("marge_ht") @db.Decimal(14, 2)
+  impressionStatut String?        @map("impression_statut") @db.VarChar(30)
+  aUnAvoir         Boolean        @default(false) @map("a_un_avoir")
+  creePar          Int?           @map("cree_par")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  client           Client         @relation(fields: [clientId], references: [id])
+  createur         Utilisateur?   @relation(fields: [creePar], references: [id])
+  lignes           FactureLigne[]
+  paiement         Paiement?
+  avoirs           Avoir[]
+
+  @@unique([annee, numeroSequence])
+  @@index([clientId])
+  @@index([dateFacture])
+  @@map("factures")
+}
+
+model FactureLigne {
+  id                 Int      @id @default(autoincrement())
+  factureId          Int      @map("facture_id")
+  ordreLigne         Int      @map("ordre_ligne")
+  produitId          Int?     @map("produit_id")
+  designation        String   @db.VarChar(255)
+  quantite           Decimal  @db.Decimal(14, 2)
+  prixAchatHt        Decimal  @default(0) @map("prix_achat_ht") @db.Decimal(14, 2)
+  prixUnitaireHt     Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
+  remisePourcentage  Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
+  montantRemiseHt    Decimal  @default(0) @map("montant_remise_ht") @db.Decimal(14, 2)
+  tauxTva            Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantHt          Decimal  @map("montant_ht") @db.Decimal(14, 2)
+  montantTva         Decimal  @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc         Decimal  @map("montant_ttc") @db.Decimal(14, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  facture            Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  produit            Produit? @relation(fields: [produitId], references: [id])
+
+  @@index([factureId])
+  @@map("facture_lignes")
+}
+
+// ─── PAIEMENTS ──────────────────────────────────────────────────────
+
+model Paiement {
+  id               Int        @id @default(autoincrement())
+  factureId        Int        @unique @map("facture_id")
+  datePaiement     DateTime?  @map("date_paiement") @db.Date
+  modeReglementId  Int?       @map("mode_reglement_id")
+  numeroPiece      String?    @map("numero_piece") @db.VarChar(100)
+  remarque         String?    @db.VarChar(255)
+  justificatifUrl  String?    @map("justificatif_url") @db.VarChar(255)
+  montantHt        Decimal    @default(0) @map("montant_ht") @db.Decimal(14, 2)
+  montantTtc       Decimal    @default(0) @map("montant_ttc") @db.Decimal(14, 2)
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  facture          Facture    @relation(fields: [factureId], references: [id])
+  modeReglement    Parametre? @relation("ModeReglement", fields: [modeReglementId], references: [id])
+
+  @@index([datePaiement])
+  @@map("paiements")
+}
+
+// ─── CHARGES ────────────────────────────────────────────────────────
+
+model Charge {
+  id             Int          @id @default(autoincrement())
+  dateCharge     DateTime     @map("date_charge") @db.Date
+  numeroFacture  String?      @map("numero_facture") @db.VarChar(100)
+  emetteur       String       @db.VarChar(150)
+  typeChargeId   Int          @map("type_charge_id")
+  montantHt      Decimal      @default(0) @map("montant_ht") @db.Decimal(14, 2)
+  tauxTva        Decimal      @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantTva     Decimal      @default(0) @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc     Decimal      @default(0) @map("montant_ttc") @db.Decimal(14, 2)
+  fournisseurId  Int?         @map("fournisseur_id")
+  remarque       String?      @db.VarChar(255)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  typeCharge     Parametre    @relation("TypeCharge", fields: [typeChargeId], references: [id])
+  fournisseur    Fournisseur? @relation(fields: [fournisseurId], references: [id])
+
+  @@index([dateCharge])
+  @@index([typeChargeId])
+  @@map("charges")
+}
+
+// ─── AVOIRS ─────────────────────────────────────────────────────────
+
+model Avoir {
+  id              Int          @id @default(autoincrement())
+  annee           Int
+  numeroSequence  Int          @map("numero_sequence")
+  numeroAvoir     String       @unique @map("numero_avoir") @db.VarChar(30)
+  factureId       Int          @map("facture_id")
+  clientId        Int          @map("client_id")
+  dateAvoir       DateTime     @map("date_avoir") @db.Date
+  totalHt         Decimal      @default(0) @map("total_ht") @db.Decimal(14, 2)
+  totalTva        Decimal      @default(0) @map("total_tva") @db.Decimal(14, 2)
+  totalTtc        Decimal      @default(0) @map("total_ttc") @db.Decimal(14, 2)
+  statut          String       @default("valide") @db.VarChar(30)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  facture         Facture      @relation(fields: [factureId], references: [id])
+  client          Client       @relation(fields: [clientId], references: [id])
+  lignes          AvoirLigne[]
+
+  @@map("avoirs")
+}
+
+model AvoirLigne {
+  id                 Int      @id @default(autoincrement())
+  avoirId            Int      @map("avoir_id")
+  produitId          Int?     @map("produit_id")
+  designation        String   @db.VarChar(255)
+  quantite           Decimal  @db.Decimal(14, 2)
+  prixUnitaireHt     Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
+  remisePourcentage  Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
+  montantHt          Decimal  @map("montant_ht") @db.Decimal(14, 2)
+  tauxTva            Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantTva         Decimal  @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc         Decimal  @map("montant_ttc") @db.Decimal(14, 2)
+  avoir              Avoir    @relation(fields: [avoirId], references: [id], onDelete: Cascade)
+  produit            Produit? @relation(fields: [produitId], references: [id])
+
+  @@map("avoir_lignes")
+}
+
+
+// ─── DEVIS ──────────────────────────────────────────────────────────
+
+model Devis {
+  id              Int           @id @default(autoincrement())
+  annee           Int
+  numeroSequence  Int           @map("numero_sequence")
+  numeroDevis     String        @unique @map("numero_devis") @db.VarChar(30)
+  clientId        Int           @map("client_id")
+  dateDevis       DateTime      @map("date_devis") @db.Date
+  dateValidite    DateTime?     @map("date_validite") @db.Date
+  statut          String        @default("brouillon") @db.VarChar(30)
+  totalHt         Decimal       @default(0) @map("total_ht") @db.Decimal(14, 2)
+  totalTva        Decimal       @default(0) @map("total_tva") @db.Decimal(14, 2)
+  totalTtc        Decimal       @default(0) @map("total_ttc") @db.Decimal(14, 2)
+  remarque        String?       @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  client          Client        @relation(fields: [clientId], references: [id])
+  lignes          DevisLigne[]
+
+  @@unique([annee, numeroSequence])
+  @@index([clientId])
+  @@map("devis")
+}
+
+model DevisLigne {
+  id                 Int      @id @default(autoincrement())
+  devisId            Int      @map("devis_id")
+  ordreLigne         Int      @map("ordre_ligne")
+  produitId          Int?     @map("produit_id")
+  designation        String   @db.VarChar(255)
+  quantite           Decimal  @db.Decimal(14, 2)
+  prixUnitaireHt     Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
+  remisePourcentage  Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
+  montantRemiseHt    Decimal  @default(0) @map("montant_remise_ht") @db.Decimal(14, 2)
+  tauxTva            Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantHt          Decimal  @map("montant_ht") @db.Decimal(14, 2)
+  montantTva         Decimal  @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc         Decimal  @map("montant_ttc") @db.Decimal(14, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+  devis              Devis    @relation(fields: [devisId], references: [id], onDelete: Cascade)
+  produit            Produit? @relation(fields: [produitId], references: [id])
+
+  @@index([devisId])
+  @@map("devis_lignes")
+}
+
+// ─── JOURNAL D'AUDIT ────────────────────────────────────────────────
+
+model JournalAudit {
+  id            Int          @id @default(autoincrement())
+  utilisateurId Int?         @map("utilisateur_id")
+  module        String       @db.VarChar(50)
+  action        String       @db.VarChar(50)
+  entiteId      Int?         @map("entite_id")
+  details       Json?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  utilisateur   Utilisateur? @relation(fields: [utilisateurId], references: [id])
+
+  @@map("journal_audit")
+}
