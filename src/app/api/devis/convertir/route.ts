@@ -3,8 +3,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db/prisma'
 import { prochainNumeroFacture } from '@/lib/business/numerotation'
+import { canWrite } from '@/lib/utils/permissions'
 
-export async function POST(_: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  // Vérifier les permissions pour l'écriture
+  const authorized = await canWrite(req)
+  if (!authorized) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
   const devis = await prisma.devis.findUnique({
     where: { id: Number(params.id) },
     include: { lignes: true },

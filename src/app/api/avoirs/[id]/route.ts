@@ -2,8 +2,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db/prisma'
 import { calculerTotauxFacture } from '@/lib/utils/currency'
+import { canRead, canWrite } from '@/lib/utils/permissions'
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  // Vérifier les permissions pour la lecture
+  const authorized = await canRead(req)
+  if (!authorized) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
   const avoir = await prisma.avoir.findUnique({
     where: { id: Number(params.id) },
     include: { client: true, lignes: { orderBy: { id: 'asc' } } },
@@ -13,6 +20,12 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  // Vérifier les permissions pour l'écriture
+  const authorized = await canWrite(req)
+  if (!authorized) {
+    return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
+  }
+  
   const { clientId, dateAvoir, lignes = [] } = await req.json()
   const id = Number(params.id)
 
