@@ -38,7 +38,7 @@ export default async function FacturesFournisseursPage() {
       {/* En-tête */}
       <div className="mb-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-          <Link href="/dashboard" className="hover:text-gray-700">
+          <Link href="/" className="hover:text-gray-700">
             Tableau de bord
           </Link>
           <span>/</span>
@@ -56,9 +56,9 @@ export default async function FacturesFournisseursPage() {
           </div>
 
           <Link
-            href="/charges/nouveau" // Changed link to match existing charges feature
+            href="/factures-fournisseurs/nouveau"
             className="btn-primary text-sm"
-          >
+              >
             <svg
               width="14"
               height="14"

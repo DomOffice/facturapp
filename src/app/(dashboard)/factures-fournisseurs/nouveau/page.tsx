@@ -11,11 +11,11 @@ export const dynamic = 'force-dynamic'
 export default async function NouvelleFactureFournisseurPage() {
   const session = await auth()
 
-  if (!session?.user) redirect('/login')
+  if (!session?.user) redirect('/connexion')
  // Extraire le rôle de manière sécurisée en traitant session.user comme un objet pouvant avoir un attribut role
-  const userRole = (session.user as { role?: string }).role
   
-  if (!['ADMIN', 'SAISIE'].includes(userRole || '')) redirect('/dashboard') 
+  const userRole = String((session.user as { role?: string }).role || '').toLowerCase()
+  if (!['admin', 'saisie'].includes(userRole)) redirect('/') 
 
   // Récupération des fournisseurs actifs pour le select
   const fournisseurs = await prisma.fournisseur.findMany({
@@ -37,7 +37,7 @@ export default async function NouvelleFactureFournisseurPage() {
       {/* En-tête */}
       <div className="mb-6">
         <nav className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-          <Link href="/dashboard" className="hover:text-gray-700">Tableau de bord</Link>
+          <Link href="/" className="hover:text-gray-700">Tableau de bord</Link>
           <span>/</span>
           <Link href="/factures-fournisseurs" className="hover:text-gray-700">Factures fournisseurs</Link>
           <span>/</span>
