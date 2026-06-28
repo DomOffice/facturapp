@@ -1,306 +1,167 @@
-# 02_Base_de_donnees.md — Documentation Prisma et relations
+# 02 — Base de données FacturApp
 
-Dernière mise à jour : 28/06/2026
+Dernière mise à jour : 2026-06-28
 
-## 1. Vue générale
+## 1. Principe général
 
-La base de données est définie dans :
+FacturApp utilise PostgreSQL comme base applicative TS. La base historique MariaDB reste la source de vérité tant que l'application VB6 est pleinement opérationnelle.
 
-```txt
-prisma/schema.prisma
+```text
+MariaDB VB6
+    │
+    │ Synchronisation
+    ▼
+PostgreSQL FacturApp
 ```
 
-Le provider cible est :
+Les données synchronisées depuis MariaDB ne doivent pas être mélangées sans contrôle avec les tables propres à FacturApp.
 
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+## 2. Rôle de PostgreSQL
+
+PostgreSQL contient :
+
+- les données synchronisées utiles à FacturApp ;
+- les utilisateurs et rôles web ;
+- les tables métier Next.js ;
+- les tables spécifiques au module OCR, notamment `documents_importes`.
+
+## 3. Table `documents_importes`
+
+### Rôle
+
+La table `documents_importes` sert de registre documentaire pour les fichiers importés dans FacturApp.
+
+Elle permet de suivre :
+
+- le fournisseur lié ;
+- le fichier d'origine ;
+- le fichier stocké ;
+- le chemin relatif ;
+- le statut de traitement ;
+- le texte OCR ;
+- les données extraites JSON ;
+- l'utilisateur ayant importé le document.
+
+## 4. Cycle d'un document importé
+
+```text
+Upload fichier
+    │
+    ▼
+DocumentImporte créé
+    statut = brouillon
+    │
+    ▼
+OCR lancé
+    statut = en_traitement
+    │
+    ▼
+OCR terminé
+    statut = ocr_termine
+    │
+    ▼
+Extraction des champs
+    statut = extraction_terminee
+    │
+    ▼
+Validation utilisateur
+    statut = valide
+    │
+    ▼
+Création facture fournisseur
+```
+
+## 5. Statuts recommandés
+
+| Statut | Signification |
+|---|---|
+| `brouillon` | Document importé, aucun OCR encore terminé |
+| `en_traitement` | OCR ou traitement en cours |
+| `ocr_termine` | Texte OCR récupéré |
+| `extraction_terminee` | Champs structurés extraits |
+| `valide` | Document validé par l'utilisateur |
+| `rejete` | Document rejeté ou traitement impossible |
+
+## 6. Données OCR
+
+Deux niveaux sont distingués :
+
+### Texte OCR brut
+
+Stocké dans un champ texte.
+
+Exemple :
+
+```text
+BL/ FACTURE N°: FV2026-01642
+Date facturation: 25/03/2026
+Total HT 70,83
+Total TVA 20% 14,17
+Total TTC 85,00
+```
+
+### Données OCR structurées JSON
+
+Stockées dans un champ JSON.
+
+Exemple :
+
+```json
+{
+  "success": true,
+  "texte": "...",
+  "pages": [
+    {
+      "page": 1,
+      "texte": "...",
+      "lignes": []
+    }
+  ]
 }
 ```
 
-Le schéma utilise `@@map` pour conserver des noms de tables SQL en snake_case.
+## 7. Relation fournisseur
 
-## 2. Authentification et utilisateurs
+Chaque document importé est rattaché à un fournisseur sélectionné par l'utilisateur lors de l'upload.
 
-### Role
-
-Table : `roles`
-
-Champs principaux :
-
-- `id`
-- `code` unique
-- `nom`
-
-Relation :
-
-- un rôle possède plusieurs utilisateurs.
-
-### Utilisateur
-
-Table : `utilisateurs`
-
-Champs principaux :
-
-- `id`
-- `nom`
-- `email` unique
-- `motDePasseHash`
-- `roleId`
-- `actif`
-- timestamps
-
-Relations :
-
-- appartient à un `Role` ;
-- peut créer des `Facture` ;
-- peut avoir des entrées `JournalAudit` ;
-- peut être lié à des `DocumentImporte`.
-
-## 3. Paramètres société et métier
-
-### Entreprise
-
-Table : `entreprise`
-
-Contient les informations société : raison sociale, adresse, téléphone, email, ICE, IF, RC, patente, logo, compte bancaire, devise, format date.
-
-### ParametreType / Parametre
-
-Tables :
-
-- `parametre_types`
-- `parametres`
-
-Utilisées pour :
-
-- types client ;
-- types fournisseur ;
-- types produit ;
-- unités ;
-- TVA ;
-- modes de règlement ;
-- types de charges.
-
-## 4. Tiers
-
-### Client
-
-Table : `clients`
-
-Relations :
-
-- un client possède plusieurs factures ;
-- plusieurs avoirs ;
-- plusieurs devis.
-
-Index :
-
-- raison sociale ;
-- téléphone ;
-- ville.
-
-### Fournisseur
-
-Table : `fournisseurs`
-
-Relations :
-
-- produits ;
-- prix produits ;
-- charges ;
-- documents importés.
-
-Index :
-
-- raison sociale ;
-- téléphone.
-
-## 5. Produits et prix
-
-### Produit
-
-Table : `produits`
-
-Champs importants :
-
-- `reference`
-- `description`
-- `dernierPrixAchatHt`
-- `dernierPrixAchatTtc`
-- `prixVenteHt`
-- `prixVenteTtc`
-- `margeHt`
-
-Relations :
-
-- fournisseur ;
-- type produit ;
-- unité ;
-- TVA ;
-- historique prix ;
-- lignes factures/devis/avoirs ;
-- lignes importées.
-
-### PrixProduit
-
-Table : `prix_produits`
-
-Permet de conserver l'historique d'achat/vente par produit, date, fournisseur et TVA.
-
-## 6. Facturation client
-
-### Facture
-
-Table : `factures`
-
-Champs importants :
-
-- année ;
-- numéro de séquence ;
-- numéro facture unique ;
-- client ;
-- date ;
-- statut ;
-- totaux ;
-- marge ;
-- impression ;
-- avoir associé ou non.
-
-Contraintes :
-
-- `numeroFacture` unique ;
-- couple `annee + numeroSequence` unique.
-
-Relations :
-
-- client ;
-- créateur ;
-- lignes ;
-- paiement ;
-- avoirs.
-
-### FactureLigne
-
-Table : `facture_lignes`
-
-Détail des produits/prestations facturés.
-
-Suppression en cascade si la facture est supprimée.
-
-## 7. Paiements
-
-### Paiement
-
-Table : `paiements`
-
-Relation 1-1 avec `Facture` via `factureId` unique.
-
-Champs :
-
-- date paiement ;
-- mode règlement ;
-- numéro pièce ;
-- justificatif ;
-- montants.
-
-## 8. Charges
-
-### Charge
-
-Table : `charges`
-
-Modèle actuel pour les charges/factures fournisseurs simples.
-
-Champs :
-
-- date charge ;
-- numéro facture ;
-- émetteur ;
-- type charge ;
-- montants HT/TVA/TTC ;
-- fournisseur facultatif ;
-- remarque.
-
-Limite : ce modèle ne contient pas de lignes de facture fournisseur.
-
-## 9. Avoirs
-
-### Avoir / AvoirLigne
-
-Tables :
-
-- `avoirs`
-- `avoir_lignes`
-
-Liés à une facture et un client.
-
-## 10. Devis
-
-### Devis / DevisLigne
-
-Tables :
-
-- `devis`
-- `devis_lignes`
-
-Structure proche des factures.
-
-## 11. Import OCR fournisseurs
-
-### DocumentImporte
-
-Table : `documents_importes`
-
-Rôle : représenter un fichier importé avant/après OCR.
-
-Champs importants :
-
-- fournisseurId ;
-- nomFichierOriginal ;
-- nomFichierStocke ;
-- cheminFichier ;
-- typeMime ;
-- tailleFichier ;
-- texteOcr ;
-- statut ;
-- dateImport ;
-- utilisateurId ;
-- donneesExtraites JSON.
-
-Statuts prévus par commentaire :
-
-```txt
-brouillon | en_traitement | valide | rejete
+```text
+Fournisseur 1 ─── n DocumentImporte
 ```
 
-### LigneImportee
+Ce lien est nécessaire même si l'OCR peut retrouver un fournisseur dans le texte. La sélection utilisateur reste la première source de rattachement à cette étape.
 
-Table : `lignes_importees`
+## 8. Chemin fichier
 
-Rôle : représenter les lignes détectées depuis l'OCR.
+La table ne doit pas stocker un BLOB PDF.
 
-Champs :
+Elle stocke uniquement le chemin relatif ou logique du document.
 
-- documentImporteId ;
-- designation ;
-- quantite ;
-- prixUnitaire ;
-- tauxTva ;
-- montantTotal ;
-- referenceDetectee ;
-- produitId facultatif ;
-- statut.
+Exemple :
 
-## 12. Recommandations BDD
+```text
+2026/06/20260628_sans-numero_casinfo_cde99d5b.pdf
+```
 
-Priorités :
+Le chemin complet est reconstruit avec `UPLOAD_DIR`.
 
-1. Ajouter ou confirmer les migrations Prisma.
-2. Remplacer certains statuts `String` par enums Prisma.
-3. Ajouter une entité `FactureFournisseur` si le besoin dépasse la simple charge.
-4. Ajouter un lien entre `DocumentImporte` et `Charge` ou `FactureFournisseur` après validation.
-5. Indexer les recherches fréquentes du module OCR : fournisseur, statut, date, numéro facture détecté.
-6. Ne pas stocker uniquement le chemin absolu local : prévoir aussi un chemin relatif/clé de stockage.
+## 9. Champs recommandés à ajouter plus tard
+
+À envisager quand le module sera stabilisé :
+
+- `checksum` : détection des doublons ;
+- `ocrProvider` : `local`, `azure`, `google`, etc. ;
+- `ocrDurationMs` : mesure performance ;
+- `factureFournisseurId` : lien final vers la facture créée ;
+- `erreurTraitement` : détail exploitable en cas d'échec.
+
+## 10. Synchronisation MariaDB → PostgreSQL
+
+Les tables propres à FacturApp comme `documents_importes` ne doivent pas être écrasées par la synchronisation.
+
+Règle :
+
+```text
+MariaDB alimente PostgreSQL pour les données historiques.
+PostgreSQL reste maître pour les modules propres à FacturApp TS.
+```
 

@@ -1,217 +1,96 @@
-# 04_Bugs_connus.md — Suivi des anomalies FacturApp
+# 04 — Bugs connus FacturApp
 
-Dernière mise à jour : 28/06/2026
+Dernière mise à jour : 2026-06-28
 
-## BUG-001 — 404 sur Nouvelle facture fournisseur
+## 1. Bugs corrigés
 
-### Statut
+### Mauvais lien Nouvelle facture fournisseur
 
-Ouvert.
+Symptôme : clic sur `Nouvelle facture` depuis `factures-fournisseurs` menait à une page 404.
 
-### Symptôme
+Cause : lien vers `/charges/nouveau` au lieu de `/factures-fournisseurs/nouveau`.
 
-Depuis :
+Statut : corrigé.
 
-```txt
-/factures-fournisseurs
-```
+### Redirections incorrectes
 
-Le clic sur **Nouvelle facture** mène à une page 404.
+Symptôme : redirections vers `/login` ou `/dashboard` alors que l'application utilise `/connexion` et `/`.
 
-### Cause identifiée
+Statut : corrigé ou à surveiller dans les nouveaux modules.
 
-Le bouton pointe vers :
+### Test OCR via curl redirigé vers `/connexion`
 
-```txt
-/charges/nouveau
-```
+Symptôme : appel direct `curl.exe -X POST` retourne `/connexion`.
 
-Or la route existante est :
+Cause : curl ne transmet pas la session navigateur. La route API est protégée par authentification.
 
-```txt
-/factures-fournisseurs/nouveau
-```
+Statut : comportement normal.
 
-Il n'existe pas de :
+### PaddleOCR `cls=True`
 
-```txt
-src/app/(dashboard)/charges/nouveau/page.tsx
-```
+Symptôme : erreur `unexpected keyword argument 'cls'`.
 
-### Correction
+Cause : changement d'API dans les versions récentes de PaddleOCR.
 
-Dans :
+Correction : utiliser `ocr.predict(...)` et `use_textline_orientation`.
 
-```txt
-src/app/(dashboard)/factures-fournisseurs/page.tsx
-```
+Statut : corrigé.
 
-remplacer :
+### Erreur PaddlePaddle oneDNN / PIR
 
-```tsx
-href="/charges/nouveau"
-```
+Symptôme : `ConvertPirAttribute2RuntimeAttribute not support`.
 
-par :
+Cause : incompatibilité rencontrée avec une version récente de PaddlePaddle en inférence CPU Windows.
 
-```tsx
-href="/factures-fournisseurs/nouveau"
-```
+Correction : utiliser `paddlepaddle==3.2.2`.
 
-## BUG-002 — Redirect vers `/login` inexistant
+Statut : corrigé.
 
-### Statut
+### Environnement virtuel Python cassé après renommage
 
-Ouvert.
+Symptôme : `Fatal error in launcher` après renommage `ocr-service` → `ocr`.
 
-### Symptôme
+Cause : le `.venv` conserve l'ancien chemin interne.
 
-La page d'import fournisseur redirige vers `/login` si l'utilisateur n'est pas connecté.
+Correction : supprimer et recréer `.venv` dans `ocr/`.
 
-### Cause
+Statut : corrigé.
 
-La route de connexion réelle est :
+## 2. Points à surveiller
 
-```txt
-/connexion
-```
+### Timeout OCR
 
-### Correction
+Les gros documents peuvent dépasser le délai de traitement HTTP.
 
-Dans :
+Recommandation : file d'attente OCR si le volume augmente.
 
-```txt
-src/app/(dashboard)/factures-fournisseurs/nouveau/page.tsx
-```
+### Doublons documentaires
 
-remplacer :
+Actuellement, le même PDF peut être importé plusieurs fois.
 
-```tsx
-redirect('/login')
-```
+Recommandation : ajouter un checksum.
 
-par :
+### Sécurité fichier
 
-```tsx
-redirect('/connexion')
-```
+Le contrôle MIME ne suffit pas toujours.
 
-## BUG-003 — Redirect/lien vers `/dashboard` inexistant
+Recommandation : validation plus stricte du contenu fichier.
 
-### Statut
+### Chemins Windows
 
-Ouvert.
+Les chemins absolus doivent rester dans `.env`, jamais en dur dans le code.
 
-### Symptôme
+### Synchronisation
 
-Plusieurs liens ou redirects utilisent `/dashboard`.
+La synchronisation MariaDB → PostgreSQL ne doit pas supprimer ni écraser les tables propres à FacturApp, notamment `documents_importes`.
 
-### Cause
+## 3. Bugs ouverts
 
-Le dashboard est probablement exposé via :
+Aucun bug bloquant connu à ce stade pour :
 
-```txt
-/
-```
-
-car le fichier est :
-
-```txt
-src/app/(dashboard)/page.tsx
-```
-
-### Correction
-
-Remplacer les redirections `/dashboard` par `/`, ou créer explicitement une route `/dashboard`.
-
-Recommandation actuelle : remplacer par `/`.
-
-## BUG-004 — Chemin upload Windows codé en dur
-
-### Statut
-
-Ouvert.
-
-### Symptôme
-
-La route d'upload contient un fallback local :
-
-```ts
-C:\Users\Berrada\Documents\facturapp_uploads
-```
-
-### Risque
-
-- Non portable.
-- Peut échouer en production Linux.
-- Peut exposer des chemins locaux.
-
-### Correction recommandée
-
-Utiliser :
-
-```ts
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')
-```
-
-## BUG-005 — Import `getToken` inutilisé
-
-### Statut
-
-Ouvert.
-
-### Fichier
-
-```txt
-src/app/api/factures-fournisseurs/upload/route.ts
-```
-
-### Cause
-
-`getToken` est importé mais non utilisé.
-
-### Correction
-
-Supprimer l'import pour éviter warnings et confusion.
-
-## BUG-006 — Upload ne crée pas encore DocumentImporte
-
-### Statut
-
-À traiter pour suite OCR.
-
-### Symptôme
-
-Le fichier est écrit sur disque, mais l'import n'est pas persisté dans la table `documents_importes`.
-
-### Impact
-
-Impossible de suivre proprement :
-
-- statut OCR ;
-- texte extrait ;
-- données extraites ;
-- lignes détectées ;
-- validation ;
-- rejet.
-
-### Correction recommandée
-
-Créer un `prisma.documentImporte.create()` dans la route upload.
-
-## BUG-007 — Module factures fournisseurs affiche actuellement des charges
-
-### Statut
-
-Choix d'architecture à trancher.
-
-### Description
-
-La page `/factures-fournisseurs` récupère :
-
-```ts
-prisma.charge.findMany()
-```
-
-Cela peut être acceptable provisoirement, mais le module OCR devrait plutôt s'appuyer sur `DocumentImporte` puis créer une charge/facture fournisseur après validation.
+- upload document ;
+- stockage fichier ;
+- OCR local ;
+- affichage OCR ;
+- mise à jour `ocr_termine`.
 

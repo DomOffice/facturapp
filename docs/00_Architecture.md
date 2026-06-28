@@ -1,160 +1,180 @@
-# 00_Architecture.md — Vue d'ensemble FacturApp
+# 00 — Architecture FacturApp
 
-Dernière mise à jour : 28/06/2026
+Dernière mise à jour : 2026-06-28
 
 ## 1. Objectif du projet
 
-FacturApp est une application web de gestion commerciale orientée facturation, devis, avoirs, paiements, clients, fournisseurs, produits, charges et import de factures fournisseurs.
+FacturApp est l'application web TypeScript / Next.js destinée à reprendre progressivement les fonctions métier actuellement assurées par l'application historique VB6. L'application couvre la gestion commerciale, la facturation, les devis, les avoirs, les fournisseurs, les charges, les paiements et le nouveau module d'import des factures fournisseurs avec OCR.
 
-Le module en cours de travail concerne l'import de factures fournisseurs au format PDF/image, avec objectif futur :
+Le principe directeur reste : faire évoluer FacturApp progressivement sans casser l'existant VB6.
 
-1. télécharger/importer la facture fournisseur ;
-2. stocker le fichier ;
-3. extraire les informations via OCR ;
-4. permettre une validation manuelle ;
-5. intégrer les éléments validés dans la base de données ;
-6. éventuellement alimenter le stock, les prix d'achat et les charges.
+## 2. Architecture générale
 
-## 2. Stack technique identifiée
-
-- Framework : Next.js 14 App Router
-- Langage : TypeScript
-- UI : React 18 + Tailwind CSS
-- ORM : Prisma
-- Base cible : PostgreSQL
-- Authentification : NextAuth v5 beta
-- Exports : jsPDF, xlsx
-- Scripts migration/synchronisation : Prisma + mysql2 + pg
-
-## 3. Structure générale
-
-```txt
-src/
-  app/
-    (dashboard)/
-      clients/
-      fournisseurs/
-      produits/
-      factures/
-      devis/
-      avoirs/
-      paiements/
-      charges/
-      factures-fournisseurs/
-      parametres/
-      utilisateurs/
-      admin/sync/
-    api/
-      clients/
-      fournisseurs/
-      produits/
-      factures/
-      devis/
-      avoirs/
-      paiements/
-      charges/
-      factures-fournisseurs/upload/
-      auth/[...nextauth]/
-      admin/sync-mariadb/
-    connexion/
-  components/
-    forms/
-    layout/
-    ocr/
-    ui/
-  lib/
-    auth/
-    business/
-    db/
-    exports/
-    utils/
-prisma/
-  schema.prisma
-  seed.ts
-  migrate-*.ts
-  sync-*.ts
+```text
+Application VB6 existante
+        │
+        │ Base opérationnelle historique
+        ▼
+MariaDB
+        │
+        │ Synchronisation VB6 → FacturApp
+        ▼
+PostgreSQL FacturApp
+        │
+        ├── Next.js / TypeScript
+        ├── Prisma ORM
+        ├── NextAuth
+        ├── Module facturation
+        ├── Module fournisseurs / charges
+        └── Module documents importés / OCR
 ```
 
-## 4. Organisation fonctionnelle
+## 3. Rôle des bases de données
 
-### Modules principaux
+### MariaDB
 
-- **Clients** : création, liste, consultation via API.
-- **Fournisseurs** : création, liste, consultation via API.
-- **Produits** : gestion catalogue, prix, fournisseurs, TVA.
-- **Factures clients** : création, liste, détail, PDF, actions de validation/dévalidation.
-- **Devis** : création, liste, détail, conversion en facture.
-- **Avoirs** : création/consultation liée aux factures.
-- **Paiements** : suivi des paiements liés aux factures.
-- **Charges** : saisie des charges et factures fournisseurs simples.
-- **Factures fournisseurs** : module en construction pour import PDF/OCR.
-- **Paramètres** : entreprise, TVA, types, modes de règlement.
-- **Administration** : utilisateurs, synchronisation MariaDB/PostgreSQL.
+MariaDB reste la base de vérité tant que l'application VB6 tourne à 100 % en production.
 
-## 5. Routage Next.js
+Elle conserve les données métier historiques et opérationnelles.
 
-L'application utilise le route group `(dashboard)`, donc les routes sont exposées sans le segment `(dashboard)` dans l'URL.
+### PostgreSQL
 
-Exemples :
+PostgreSQL est la base utilisée par FacturApp TS. Elle est alimentée par synchronisation depuis MariaDB et contient aussi des tables spécifiques au développement web, notamment `documents_importes` pour l'import documentaire et l'OCR.
 
-```txt
-src/app/(dashboard)/factures/page.tsx                 -> /factures
-src/app/(dashboard)/factures/nouvelle/page.tsx        -> /factures/nouvelle
-src/app/(dashboard)/factures-fournisseurs/page.tsx    -> /factures-fournisseurs
-src/app/(dashboard)/factures-fournisseurs/nouveau/page.tsx -> /factures-fournisseurs/nouveau
+Cette séparation permet de développer FacturApp sans perturber l'application VB6.
+
+## 4. Frontend
+
+FacturApp utilise Next.js avec l'App Router.
+
+Organisation fonctionnelle :
+
+```text
+src/app
+├── (auth)
+├── (dashboard)
+│   ├── factures
+│   ├── devis
+│   ├── avoirs
+│   ├── fournisseurs
+│   ├── charges
+│   └── factures-fournisseurs
+└── api
+    ├── auth
+    ├── admin
+    └── factures-fournisseurs
 ```
 
-La route `/dashboard` n'est pas présente comme page réelle. La page d'accueil dashboard semble être `src/app/(dashboard)/page.tsx`, donc l'URL correspondante est `/`.
+Les pages métier sont protégées par session et par rôle.
 
-## 6. Architecture données
+## 5. Backend applicatif
 
-Le schéma Prisma est relativement complet et couvre :
+Le backend est assuré par les routes API Next.js.
 
-- authentification interne : `Utilisateur`, `Role` ;
-- paramètres : `Entreprise`, `ParametreType`, `Parametre` ;
-- tiers : `Client`, `Fournisseur` ;
-- produits et prix : `Produit`, `PrixProduit` ;
-- ventes : `Facture`, `FactureLigne`, `Paiement`, `Avoir`, `AvoirLigne`, `Devis`, `DevisLigne` ;
-- charges : `Charge` ;
-- import OCR : `DocumentImporte`, `LigneImportee` ;
-- audit : `JournalAudit`.
+Pour le module factures fournisseurs :
 
-## 7. Flux module factures fournisseurs
-
-État actuel observé :
-
-```txt
-/factures-fournisseurs
-  liste des factures fournisseurs simulée via prisma.charge.findMany()
-
-/factures-fournisseurs/nouveau
-  page d'import avec composant UploadFacture
-
+```text
 /api/factures-fournisseurs/upload
-  réception FormData
-  validation MIME/taille
-  stockage fichier disque
-  réponse JSON
+/api/factures-fournisseurs/ocr/[id]
 ```
 
-Flux cible recommandé :
+La route `upload` gère l'import physique du document et la création de la ligne `DocumentImporte`.
+La route `ocr/[id]` déclenche le traitement OCR local via Python / PaddleOCR puis met à jour PostgreSQL.
 
-```txt
-Upload fichier
-  -> création DocumentImporte statut = brouillon ou en_traitement
-  -> stockage fichier
-  -> OCR
-  -> stockage texteOcr + donneesExtraites
-  -> écran validation
-  -> création charge / lignes importées / mise à jour produits/prix
+## 6. Stockage documentaire
+
+Les fichiers PDF et images importés ne sont pas stockés dans le projet Next.js.
+
+Chemin retenu en production Windows :
+
+```text
+C:/serveur/Factures_achats
 ```
 
-## 8. Principes d'évolution
+Arborescence retenue :
 
-- Ne pas tout réécrire.
-- Corriger d'abord les bugs bloquants.
-- Stabiliser les chemins et l'authentification.
-- Centraliser progressivement les validations et permissions.
-- Documenter chaque décision technique.
-- Avancer module par module.
+```text
+C:/serveur/Factures_achats
+└── YYYY
+    └── MM
+        └── date_numeroFacture_fournisseur_hash.pdf
+```
+
+Exemple :
+
+```text
+C:/serveur/Factures_achats/2026/06/20260628_sans-numero_casinfo_cde99d5b.pdf
+```
+
+Le chemin complet n'est pas codé en dur dans le code applicatif. Il passe par la variable d'environnement `UPLOAD_DIR`.
+
+## 7. Architecture OCR
+
+Décision retenue : architecture hybride.
+
+Implémentation actuelle :
+
+```text
+Next.js
+  │
+  ├── Upload PDF/image
+  │
+  ▼
+DocumentImporte créé en PostgreSQL
+  │
+  ▼
+API OCR Next.js
+  │
+  ▼
+Service Python local
+  │
+  ▼
+PaddleOCR
+  │
+  ▼
+Texte OCR + JSON stockés dans PostgreSQL
+```
+
+Le moteur actuel est local : Python + PaddleOCR.
+
+L'architecture doit rester compatible avec un futur provider cloud : Azure Document Intelligence, Google Document AI, Mistral OCR ou autre.
+
+## 8. Dossier OCR
+
+Organisation retenue :
+
+```text
+ocr/
+├── .venv/              # non versionné
+├── ocr_document.py     # script OCR local
+├── requirements.txt    # dépendances Python
+└── README.md           # documentation d'installation OCR
+```
+
+Le dossier `.venv` est ignoré par Git.
+
+## 9. Variables d'environnement importantes
+
+```env
+DATABASE_URL=
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=
+UPLOAD_DIR=
+OCR_PROVIDER=local
+PYTHON_OCR_PATH=
+OCR_SCRIPT_PATH=
+OCR_API_URL=
+OCR_API_KEY=
+```
+
+## 10. Principe d'évolution
+
+FacturApp doit évoluer par étapes :
+
+1. stabiliser une fonctionnalité ;
+2. tester localement ;
+3. valider le build ;
+4. pousser Git ;
+5. mettre à jour la documentation ;
+6. déployer ensuite en production.
 

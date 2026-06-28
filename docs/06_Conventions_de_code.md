@@ -1,205 +1,145 @@
-# 06_Conventions_de_code.md — Conventions de développement FacturApp
+# 06 — Conventions de code FacturApp
 
-Dernière mise à jour : 28/06/2026
+Dernière mise à jour : 2026-06-28
 
-## 1. Philosophie générale
+## 1. Principes généraux
 
 - Ne pas casser l'existant.
-- Avancer par petites modifications testables.
-- Corriger les bugs bloquants avant les refactorings lourds.
-- Documenter les choix structurants.
-- Préférer la clarté à l'abstraction excessive.
+- Privilégier les évolutions incrémentales.
+- Garder MariaDB comme base de vérité tant que VB6 reste opérationnel.
+- Ne pas mélanger logique UI, logique métier et accès disque.
+- Documenter chaque décision importante.
 
-## 2. Nommage des routes
+## 2. TypeScript / Next.js
 
-### Routes publiques applicatives
+### Pages
 
-Utiliser des chemins relatifs, jamais des URLs absolues avec `localhost`.
+Les pages doivent rester lisibles et déléguer la logique complexe à des composants ou services.
 
-Correct :
+### Routes API
+
+Les routes API doivent :
+
+- vérifier la session ;
+- vérifier les rôles ;
+- valider les entrées ;
+- retourner des erreurs explicites ;
+- ne jamais exposer de chemin physique complet inutilement.
+
+### Redirections
+
+Utiliser des chemins relatifs :
 
 ```ts
 redirect('/connexion')
-router.push('/factures-fournisseurs')
-fetch('/api/factures-fournisseurs/upload')
+redirect('/')
 ```
 
-Incorrect :
+Ne jamais utiliser `http://localhost:3000` dans le code applicatif.
+
+## 3. Rôles
+
+Les rôles sont à traiter en minuscules :
 
 ```ts
-redirect('http://localhost:3000/connexion')
-fetch('http://localhost:3000/api/...')
+admin
+saisie
+consultation
 ```
 
-### Convention `nouveau` / `nouvelle`
+Recommandation : centraliser les contrôles d'autorisation dans un helper.
 
-À stabiliser :
+## 4. Prisma
 
-- garder `/factures/nouvelle` si déjà utilisé ;
-- utiliser `/factures-fournisseurs/nouveau` comme route existante ;
-- éviter d'ajouter des variantes inutiles.
+- Utiliser Prisma pour PostgreSQL FacturApp.
+- Ne jamais utiliser Prisma pour modifier MariaDB VB6.
+- Les tables propres à FacturApp peuvent exister uniquement dans PostgreSQL.
+- Valider le schéma avant commit :
 
-## 3. Redirections
-
-Route connexion officielle :
-
-```txt
-/connexion
+```bash
+npx prisma validate
 ```
 
-Dashboard actuel :
+## 5. Fichiers et uploads
 
-```txt
-/
+Les documents métier ne doivent pas être stockés dans :
+
+```text
+public/
+src/
 ```
 
-Éviter :
+Ils doivent être stockés hors projet via :
 
-```txt
-/login
-/dashboard
+```env
+UPLOAD_DIR=C:/serveur/Factures_achats
 ```
 
-sauf si ces routes sont explicitement créées.
+Le code doit stocker de préférence un chemin relatif en base.
 
-## 4. Authentification et permissions
+## 6. OCR
 
-Ne pas dupliquer la logique de rôle dans chaque page.
+### Organisation
 
-Objectif recommandé :
-
-```txt
-src/lib/auth/guards.ts
+```text
+ocr/
+├── .venv/              # ignoré Git
+├── ocr_document.py
+├── requirements.txt
+└── README.md
 ```
 
-Avec :
+### Règles
 
-```ts
-requireUser()
-requireRole(['ADMIN', 'SAISIE'])
+- Aucun environnement virtuel ne doit être versionné.
+- Les modèles PaddleOCR téléchargés localement ne doivent pas être versionnés.
+- Le frontend ne doit pas appeler Python directement.
+- Next.js appelle Python via une route API serveur.
+- Les chemins Python doivent venir de `.env`.
+
+## 7. Variables d'environnement
+
+Toujours documenter dans `.env.example` les variables nécessaires.
+
+Ne jamais versionner :
+
+```text
+.env
+.env.local
+.env.production.local
 ```
 
-Rôles observés :
+## 8. Git
 
-```txt
-ADMIN
-SAISIE
+Avant chaque push important :
+
+```bash
+npm run build
+npx prisma validate
+git status
 ```
 
-Les comparaisons de rôles doivent être normalisées en majuscules.
+Vérifier que les éléments suivants ne sont pas inclus :
 
-## 5. Appels API
+- `.env` ;
+- `.venv` ;
+- fichiers uploadés ;
+- caches PaddleOCR ;
+- `.next` ;
+- `node_modules`.
 
-Depuis le client React :
+## 9. Documentation
 
-```ts
-fetch('/api/...')
-```
+Le dossier `docs/` doit être mis à jour à chaque étape importante.
 
-Ne jamais utiliser `localhost` dans le code client.
+Documents de référence :
 
-Toujours gérer :
-
-- réponse non OK ;
-- erreur réseau ;
-- message utilisateur ;
-- état de chargement.
-
-## 6. Upload fichiers
-
-Centraliser :
-
-- taille max ;
-- MIME autorisés ;
-- extensions ;
-- dossier de stockage.
-
-Recommandation :
-
-```txt
-src/lib/config/upload.ts
-```
-
-Formats actuels :
-
-```txt
-PDF, JPEG, PNG
-```
-
-Taille actuelle :
-
-```txt
-10 Mo
-```
-
-## 7. Base de données
-
-- Toute modification métier durable doit passer par Prisma.
-- Éviter les valeurs de statut libres si possible.
-- Préférer enums ou constantes partagées.
-- Utiliser des transactions pour les opérations multi-tables.
-
-Exemple : validation facture fournisseur OCR.
-
-```ts
-await prisma.$transaction(async (tx) => {
-  // créer charge/facture fournisseur
-  // créer lignes
-  // mettre à jour document
-  // journaliser
-})
-```
-
-## 8. Gestion des montants
-
-- Toujours garder les calculs HT/TVA/TTC côté serveur pour la validation finale.
-- Le client peut prévisualiser mais ne doit pas être source de vérité.
-- Convertir correctement les `Decimal` Prisma pour affichage.
-
-## 9. Composants React
-
-- Les pages serveur chargent les données.
-- Les composants `page-client.tsx` gèrent l'interactivité.
-- Les formulaires réutilisables restent dans `src/components/forms`.
-- Les composants OCR restent dans `src/components/ocr`.
-
-## 10. Commentaires
-
-Utiliser les commentaires pour expliquer une décision métier ou technique, pas pour décrire une ligne évidente.
-
-À éviter :
-
-```ts
-// Added null check...
-// Changed link...
-```
-
-À préférer :
-
-```ts
-// Les imports fournisseurs doivent être validés avant impact stock.
-```
-
-## 11. Production
-
-Avant production :
-
-- pas de chemin local utilisateur ;
-- pas de secret dans le code ;
-- pas d'URL localhost en runtime ;
-- variables `.env` complètes ;
-- uploads hors dépôt ;
-- droits fichiers limités ;
-- sauvegardes prévues.
-
-## 12. Méthode de travail avec l'assistant
-
-Pour chaque évolution :
-
-1. fournir le lien GitHub ou ZIP à jour ;
-2. analyser la branche concernée ;
-3. identifier fichiers impactés ;
-4. proposer patch ou code précis ;
-5. tester localement ;
-6. mettre à jour ces documents si nécessaire.
+- `00_Architecture.md`
+- `01_Audit_Technique.md`
+- `02_Base_de_donnees.md`
+- `03_Ameliorations.md`
+- `04_Bugs_connus.md`
+- `05_Feuille_de_route.md`
+- `06_Conventions_de_code.md`
+- `07_Journal_des_decisions.md`
 

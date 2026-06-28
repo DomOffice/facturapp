@@ -43,3 +43,6 @@ Le serveur doit seulement faire :
 git pull → build → restart
 
 Le développement doit se faire uniquement sur ta machine.
+
+Accès à la BDD :
+npx prisma studio

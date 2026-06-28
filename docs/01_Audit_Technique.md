@@ -1,186 +1,158 @@
-# 01_Audit_Technique.md — Audit technique FacturApp
+# 01 — Audit technique FacturApp
 
-Dernière mise à jour : 28/06/2026
+Dernière mise à jour : 2026-06-28
 
-## Synthèse
+## 1. Synthèse
 
-FacturApp dispose déjà d'une base solide : Next.js App Router, TypeScript, Prisma, architecture par modules, schéma métier riche, début de module OCR. Le projet est exploitable, mais plusieurs points doivent être sécurisés avant d'aller plus loin : routes incohérentes, redirects obsolètes, duplication possible, validation API à renforcer, stratégie claire pour l'import fournisseur/OCR.
+FacturApp repose sur une architecture moderne Next.js / TypeScript / Prisma / PostgreSQL. Le projet est maintenant organisé autour d'un socle web en développement, connecté indirectement à l'écosystème VB6 via synchronisation MariaDB → PostgreSQL.
 
-## 1. Architecture globale
+Le module prioritaire actuellement validé est le chargement des factures fournisseurs avec stockage documentaire et OCR local PaddleOCR.
 
-### Points positifs
-
-- Bonne séparation générale entre `src/app`, `src/components`, `src/lib`, `prisma`.
-- Modules métiers clairement identifiables.
-- Utilisation du route group `(dashboard)` correcte dans l'ensemble.
-- Le schéma Prisma couvre déjà les besoins essentiels.
-
-### Points à améliorer
-
-- Certaines routes pointent vers des chemins inexistants : `/dashboard`, `/login`, `/charges/nouveau`.
-- Les conventions de nommage ne sont pas toujours homogènes : `nouveau` vs `nouvelle`.
-- Le module `factures-fournisseurs` est actuellement hybride : il affiche des `charges` mais commence à gérer des `documents_importes`.
-
-### Recommandation
-
-Créer une convention claire :
-
-- `/factures/nouvelle` pour facture client ;
-- `/factures-fournisseurs/nouveau` pour import fournisseur ;
-- `/charges` pour charges simples ;
-- éviter de mélanger `/charges` et `/factures-fournisseurs` dans les liens.
-
-## 2. Qualité du code
+## 2. Architecture globale
 
 ### Points positifs
 
-- Code lisible dans les pages principales.
-- Usage de composants dédiés pour certains formulaires.
-- Composant `UploadFacture` déjà isolé.
+- Séparation claire entre l'application historique VB6 et FacturApp TS.
+- PostgreSQL dédié à FacturApp.
+- Prisma utilisé comme couche d'accès aux données.
+- Dossier `docs/` désormais présent dans le dépôt.
+- Dossier `ocr/` séparé du code Next.js.
+- Stockage documentaire hors du projet.
 
-### Points à améliorer
+### Points de vigilance
 
-- Certaines pages contiennent encore des commentaires temporaires.
-- Les règles de rôle sont répétées dans plusieurs fichiers.
-- Les constantes métier sont dispersées.
-- Certaines redirections sont codées en dur.
+- La synchronisation MariaDB → PostgreSQL doit rester maîtrisée.
+- Les tables propres à FacturApp ne doivent pas être écrasées par la synchronisation.
+- Les traitements OCR peuvent être longs ; il faudra évoluer vers une file de traitement si le volume augmente.
 
-### Recommandation
-
-Créer progressivement :
-
-```txt
-src/lib/routes.ts
-src/lib/auth/guards.ts
-src/lib/config/upload.ts
-src/lib/validation/
-```
-
-## 3. Performances
+## 3. Qualité du code
 
 ### Points positifs
 
-- Les pages serveur récupèrent les données côté serveur.
-- Prisma est correctement centralisé via `src/lib/db/prisma.ts`.
+- Le module upload/OCR a été découpé en deux routes distinctes.
+- Le frontend déclenche l'OCR après upload sans tout mélanger dans une seule logique serveur.
+- Les chemins système passent par `.env`.
 
-### Risques
+### À améliorer
 
-- Certaines listes peuvent devenir lentes si elles grossissent sans pagination.
-- Les imports complets avec `include` peuvent être coûteux à long terme.
-- `force-dynamic` est utile mais empêche certains bénéfices de cache.
+- Factoriser les contrôles de rôle `admin` / `saisie`.
+- Centraliser les constantes de statuts documentaires.
+- Créer un service applicatif pour les documents importés.
+- Éviter que les routes API deviennent trop volumineuses.
 
-### Recommandation
+## 4. Performances
 
-- Ajouter pagination et recherche serveur sur les grandes listes.
-- Limiter les `include` aux champs utiles.
-- Indexer les champs de recherche fréquents.
+### État actuel
 
-## 4. Sécurité
+- Upload validé avec limite de taille.
+- OCR PaddleOCR fonctionnel mais consommateur CPU.
+- PDF converti en image avant reconnaissance.
+
+### Risques futurs
+
+- Timeout HTTP sur gros PDF.
+- Blocage CPU si plusieurs OCR sont lancés en même temps.
+- Répétition inutile de l'OCR si le même document est traité plusieurs fois.
+
+### Recommandations
+
+- Ajouter un mécanisme de file d'attente.
+- Ajouter un checksum SHA-256 pour détecter les doublons.
+- Limiter le nombre de traitements OCR concurrents.
+- Journaliser les durées d'exécution OCR.
+
+## 5. Sécurité
+
+### Points validés
+
+- Les routes upload et OCR nécessitent une session.
+- Les rôles autorisés sont limités à `admin` et `saisie`.
+- Les fichiers sont stockés hors du dossier public.
+- `.env` et `.venv` sont ignorés par Git.
+
+### À renforcer
+
+- Vérifier réellement le contenu du fichier et pas seulement le MIME.
+- Refuser les extensions dangereuses.
+- Ajouter un scan antivirus si le module devient exposé à plusieurs utilisateurs.
+- Ne jamais exposer directement les chemins physiques au frontend.
+
+## 6. Base de données
 
 ### Points positifs
 
-- Présence d'une authentification NextAuth.
-- Certaines pages vérifient `session?.user`.
-- La route d'upload vérifie rôle et authentification.
+- `DocumentImporte` sert de point d'entrée pour tous les documents OCR.
+- Le texte OCR et les données JSON sont stockés en base.
+- Le statut permet de suivre le cycle du document.
 
-### Risques
+### À améliorer
 
-- Les permissions sont répétées et non centralisées.
-- Les routes API doivent toutes être auditées une par une.
-- L'upload accepte PDF/JPEG/PNG mais doit être durci avant production.
-- Le chemin local Windows par défaut doit être remplacé par une variable d'environnement fiable.
+- Normaliser les statuts : `brouillon`, `en_traitement`, `ocr_termine`, `extraction_terminee`, `valide`, `rejete`.
+- Ajouter éventuellement un champ `checksum`.
+- Ajouter éventuellement un champ `providerOcr`.
+- Prévoir la liaison finale avec la facture fournisseur créée.
 
-### Recommandation prioritaire
+## 7. Maintenabilité
 
-Créer un helper serveur :
+### Bonnes pratiques déjà en place
+
+- Documentation Markdown dans `docs/`.
+- OCR isolé dans `ocr/`.
+- Dépendances Python figées dans `requirements.txt`.
+
+### Recommandations
+
+- Maintenir les fichiers `docs/` à chaque sprint.
+- Ajouter `07_Journal_des_decisions.md` pour tracer les décisions structurantes.
+- Centraliser les règles métier dans des services plutôt que dans les composants React.
+
+## 8. Évolutivité
+
+Le choix d'une architecture OCR hybride est pertinent.
+
+Aujourd'hui : PaddleOCR local.
+Demain : possibilité d'ajouter un provider cloud via `OCR_PROVIDER`.
+
+Il faudra prévoir une interface technique du type :
 
 ```ts
-requireUser()
-requireRole(['ADMIN', 'SAISIE'])
+interface OcrProvider {
+  extract(documentPath: string): Promise<OcrResult>
+}
 ```
 
-Puis l'utiliser partout.
+Puis implémenter :
 
-## 5. Base de données
-
-### Points positifs
-
-- Schéma Prisma riche et cohérent.
-- Relations principales présentes.
-- Tables dédiées à l'import OCR déjà prévues.
-
-### Risques
-
-- `DocumentImporte` impose `fournisseurId`, ce qui est cohérent si le fournisseur est toujours sélectionné avant upload.
-- Il manque possiblement une entité spécifique `FactureFournisseur` si l'objectif dépasse les charges simples.
-- Les statuts sont des `String`, donc risque de valeurs incohérentes.
-
-### Recommandation
-
-À moyen terme, introduire des enums Prisma pour les statuts critiques : facture, devis, document importé, ligne importée.
-
-## 6. Maintenabilité
-
-### Points positifs
-
-- Dossiers bien séparés.
-- Fonctions métier déjà amorcées dans `src/lib/business`.
-
-### Points à améliorer
-
-- Centraliser les routes.
-- Centraliser les rôles.
-- Centraliser les limites upload.
-- Centraliser les formats MIME.
-- Centraliser les calculs HT/TVA/TTC.
-
-## 7. Évolutivité
-
-Le projet peut évoluer, mais il faut clarifier le rôle du module fournisseurs :
-
-Option A — Factures fournisseurs = charges enrichies.
-
-- Plus simple.
-- Suffisant si l'objectif est comptable/charge.
-- Limité pour stock et lignes articles.
-
-Option B — Factures fournisseurs = documents importés + lignes + validation.
-
-- Plus adapté à l'OCR.
-- Permet reconnaissance articles.
-- Peut alimenter produits/prix/stock.
-- Demande plus d'architecture.
-
-Recommandation : partir sur l'option B, tout en générant une `Charge` uniquement après validation.
-
-## 8. Refactoring prioritaire
-
-Ordre recommandé :
-
-1. Corriger les liens bloquants.
-2. Corriger les redirects `/login` et `/dashboard`.
-3. Ajouter `UPLOAD_DIR` propre.
-4. Créer helper permissions.
-5. Modifier upload pour créer un `DocumentImporte` en BDD.
-6. Ajouter page de validation import.
-7. Ajouter OCR.
-8. Ajouter intégration stock/prix.
+```text
+LocalPaddleOcrProvider
+AzureOcrProvider
+GoogleDocumentAiProvider
+MistralOcrProvider
+```
 
 ## 9. Préparation production
 
-### À faire avant mise en production
+### Points validés
 
-- Remplacer tous les chemins locaux par variables d'environnement.
-- Configurer `NEXTAUTH_URL` avec le vrai domaine.
-- Configurer `NEXTAUTH_SECRET` robuste.
-- Vérifier la taille maximale acceptée par reverse proxy.
-- Stocker les fichiers dans un dossier persistant hors code source.
-- Ajouter stratégie de sauvegarde des fichiers uploadés.
-- Ajouter logs serveur propres.
-- Vérifier permissions OS du dossier upload.
-- Prévoir nettoyage des imports rejetés.
+- Pas de stockage dans `public/`.
+- `UPLOAD_DIR` configurable.
+- `.env.example` doit documenter les variables nécessaires.
+- `.gitignore` protège les fichiers sensibles et volumineux.
 
-### Références observées
+### Points à vérifier avant production
 
-Les références à `localhost` sont présentes dans `.env.example`, `README.md` et un script Prisma, ce qui est normal pour le développement. Elles ne doivent pas être utilisées dans le code runtime production.
+- Droits Windows sur `C:/serveur/Factures_achats`.
+- Existence du dossier au démarrage.
+- Accès en lecture/écriture pour l'utilisateur Node/PM2.
+- Chemins `PYTHON_OCR_PATH` et `OCR_SCRIPT_PATH` corrects sur serveur.
+- Installation Python et dépendances OCR sur serveur.
+
+## 10. Priorités techniques actuelles
+
+1. Finaliser l'extraction structurée des données depuis le texte OCR.
+2. Préremplir un formulaire de validation utilisateur.
+3. Créer la facture fournisseur finale après validation.
+4. Gérer les doublons.
+5. Ajouter une file de traitement OCR.
+6. Renforcer la sécurité fichier.
 

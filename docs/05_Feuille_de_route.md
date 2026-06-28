@@ -1,143 +1,118 @@
-# 05_Feuille_de_route.md — Roadmap FacturApp
+# 05 — Feuille de route FacturApp
 
-Dernière mise à jour : 28/06/2026
+Dernière mise à jour : 2026-06-28
 
-## Phase 0 — Stabilisation immédiate
+## 1. Vision
 
-Objectif : supprimer les erreurs bloquantes et incohérences de routes.
+FacturApp doit devenir progressivement l'application principale de gestion commerciale, en remplacement ou complément de l'application VB6 existante.
 
-Tâches :
+Le développement doit rester incrémental : chaque étape doit être testée, documentée et validée avant la suivante.
 
-- corriger le lien Nouvelle facture fournisseur ;
-- remplacer `/login` par `/connexion` ;
-- remplacer `/dashboard` par `/` ou créer route dédiée ;
-- rendre `UPLOAD_DIR` portable ;
-- nettoyer imports inutilisés ;
-- vérifier que le build passe.
+## 2. État actuel
 
-Critère de réussite :
+### Réalisé
 
-```txt
-/factures-fournisseurs -> fonctionne
-/factures-fournisseurs/nouveau -> fonctionne
-upload fichier autorisé -> réponse succès
-```
+- Architecture Next.js / TypeScript / Prisma.
+- PostgreSQL local FacturApp.
+- Synchronisation VB6 → PostgreSQL disponible.
+- Module factures fournisseurs accessible.
+- Upload PDF/image validé.
+- Stockage hors projet validé.
+- Table `documents_importes` créée.
+- OCR PaddleOCR local validé.
+- OCR lancé depuis interface web.
+- Texte OCR stocké en base.
+- Documentation technique structurée dans `docs/`.
 
-## Phase 1 — Upload fournisseur propre
+## 3. Roadmap module factures fournisseurs
 
-Objectif : transformer l'upload en vrai objet métier traçable.
+### Phase 1 — Upload documentaire
 
-Tâches :
+Statut : terminé.
 
-- créer `DocumentImporte` au moment de l'upload ;
-- enregistrer fournisseur, utilisateur, nom original, nom stocké, chemin, MIME, taille ;
-- retourner `documentId` ;
-- afficher l'historique des documents importés ;
-- ajouter statut : brouillon / en_traitement / valide / rejete.
+- Sélection fournisseur.
+- Upload PDF / image.
+- Stockage dans `UPLOAD_DIR`.
+- Création `DocumentImporte`.
 
-Critère de réussite :
+### Phase 2 — OCR
 
-Chaque upload apparaît dans la BDD et peut être retrouvé dans une liste.
+Statut : terminé.
 
-## Phase 2 — OCR
+- Service Python local.
+- PaddleOCR.
+- Route API OCR.
+- Lancement depuis l'interface.
+- Stockage du texte OCR.
 
-Objectif : extraire le texte de la facture fournisseur.
+### Phase 3 — Extraction intelligente
 
-Tâches :
+Statut : prochaine étape.
 
-- choisir le moteur OCR ;
-- extraire le texte du PDF si possible ;
-- appliquer OCR image si PDF scanné ;
-- stocker le résultat dans `texteOcr` ;
-- stocker un premier JSON dans `donneesExtraites`.
+Objectif : extraire automatiquement les champs principaux.
 
-Critère de réussite :
+Champs :
 
-Une facture importée affiche un texte brut exploitable.
-
-## Phase 3 — Extraction structurée
-
-Objectif : transformer le texte OCR en données métier.
-
-Données à extraire :
-
-- fournisseur ;
 - numéro facture ;
 - date facture ;
+- fournisseur ;
+- ICE ;
 - total HT ;
-- total TVA ;
-- total TTC ;
-- lignes article ;
-- quantités ;
-- prix unitaires ;
 - TVA ;
-- références détectées.
+- total TTC ;
+- lignes articles.
 
-Critère de réussite :
+### Phase 4 — Validation utilisateur
 
-Le système propose une pré-saisie cohérente à partir du document.
+Statut : à faire.
 
-## Phase 4 — Écran de validation
+Créer une page permettant de valider ou corriger les données extraites.
 
-Objectif : donner le contrôle à l'utilisateur avant intégration.
+### Phase 5 — Création facture fournisseur
 
-Tâches :
+Statut : à faire.
 
-- page détail import ;
-- affichage du fichier ;
-- affichage OCR ;
-- formulaire de correction ;
-- mapping lignes vers produits existants ;
-- création produit si inconnu ;
-- validation/rejet.
+Créer la facture fournisseur finale après validation.
 
-Critère de réussite :
+### Phase 6 — Archivage et consultation
 
-L'utilisateur peut corriger une facture fournisseur avant insertion définitive.
+Statut : à faire.
 
-## Phase 5 — Intégration BDD métier
+Permettre de rechercher et consulter les documents importés.
 
-Objectif : alimenter les modules existants.
+## 4. Roadmap technique
 
-Tâches :
+### Court terme
 
-- créer une charge ou facture fournisseur validée ;
-- créer les lignes importées ;
-- mettre à jour prix d'achat ;
-- préparer intégration stock si validée ;
-- journaliser l'action.
+- Ajouter extraction structurée par règles.
+- Créer une page validation OCR.
+- Centraliser les statuts documents.
+- Mettre à jour les documents de référence.
 
-Critère de réussite :
+### Moyen terme
 
-Après validation, la facture fournisseur impacte les modules concernés.
+- Ajouter checksum anti-doublon.
+- Ajouter une file d'attente OCR.
+- Ajouter logs d'exécution OCR.
+- Ajouter prévisualisation PDF.
 
-## Phase 6 — Stock
+### Long terme
 
-Objectif : connecter achats fournisseurs et stock.
+- Ajouter provider OCR cloud optionnel.
+- Ajouter IA d'interprétation documentaire.
+- Généraliser le moteur documentaire à d'autres pièces : BL, BC, devis, justificatifs.
+- Préparer migration progressive hors VB6.
 
-À confirmer selon spécification stock.
+## 5. Jalons proposés
 
-Tâches possibles :
-
-- mouvements de stock entrants ;
-- quantité disponible ;
-- historique par produit ;
-- valorisation ;
-- alerte seuil ;
-- lien achat -> stock -> vente.
-
-## Phase 7 — Production
-
-Objectif : rendre l'application déployable proprement.
-
-Tâches :
-
-- variables environnement complètes ;
-- dossier upload persistant ;
-- sauvegardes ;
-- logs ;
-- sécurité routes API ;
-- reverse proxy ;
-- documentation installation ;
-- tests minimum.
+| Jalons | Statut |
+|---|---|
+| Import PDF/image | Terminé |
+| OCR local PaddleOCR | Terminé |
+| Extraction champs facture | À faire |
+| Validation utilisateur | À faire |
+| Création facture fournisseur | À faire |
+| Détection doublons | À faire |
+| File OCR | À faire |
+| OCR cloud hybride | Optionnel futur |
 
