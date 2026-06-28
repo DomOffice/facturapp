@@ -1,4 +1,4 @@
-# Résumé Complet du Projet FacturApp
+# Résumé Complet du Projet FacturApp - Module Stock
 
 ## Structure Générale du Projet
 
@@ -16,25 +16,27 @@ FacturApp est une application de gestion de facturation développée avec **Next
 - **Runtime**: Node.js (Windows Server)
 - **Process Management**: PM2
 
-## Modèle de Données Principal
+## Modèle de Données Principal (PostgreSQL - Actuel)
 
-Le modèle de données comprend:
+Le modèle de données PostgreSQL actuel comprend:
 - **Utilisateurs** avec rôles (ADMIN, SAISIE, CONSULTATION)
 - **Entreprise** (informations société)
 - **Clients/Fournisseurs** avec types
-- **Produits** (référence, description, prix d'achat/vente, TVA)
+- **Produits** (référence, description, prix d'achat/vente, TVA) - *sans gestion de stock*
 - **Factures** avec lignes de facture
 - **Devis** et **Avoirs**
 - **Paiements** avec modes de règlement
 - **Charges** avec types
 - **Paramètres** catégorisés (unités, TVA, modes règlement, etc.)
 
-## Fonctionnalités Actuelles
+## Analyse Comparative - Existant vs. À Développer
+
+### Fonctionnalités Actuellement Implémentées
 
 1. **Gestion des utilisateurs** avec rôles et permissions
 2. **Gestion des clients et fournisseurs**
-3. **Gestion des produits** (référence, prix, TVA)
-4. **Gestion des factures** (création, validation, paiement)
+3. **Gestion des produits** (référence, prix, TVA) - *sans suivi de stock*
+4. **Gestion des factures** (création, validation, paiement) - *quantités utilisées uniquement pour calculs*
 5. **Gestion des devis** (conversion en facture)
 6. **Gestion des avoirs**
 7. **Gestion des paiements** (suivi, encaissement)
@@ -42,27 +44,29 @@ Le modèle de données comprend:
 9. **Exports PDF/Excel** pour divers documents
 10. **Synchronisation bidirectionnelle** MariaDB ↔ PostgreSQL
 
-## Sécurité et Authentification
+### État Actuel des Données de Stock
+
+**Important**: L'analyse du code révèle que les champs liés au stock existent **dans la base MariaDB (VB6)** mais **NE sont PAS présents dans le schéma PostgreSQL actuel** :
+- Champs MariaDB VB6: `stock_initial`, `stock_actuel`, `seuil_alerte`, `alerte`, `coeff_marge`
+- Ces champs sont gérés dans les scripts de synchronisation (`sync-pg-to-mariadb.ts`)
+- Mais **ils ne sont pas synchronisés vers PostgreSQL** ni exposés dans l'interface utilisateur
+- Le modèle [Produit](file://c:\Users\Berrada\Documents\facturapp\src\app\(dashboard)\produits\page-client.tsx#L9-L20) dans Prisma ne contient aucun champ lié au stock
+
+### Sécurité et Authentification
 
 - Authentification basée sur JWT via NextAuth
 - Contrôle d'accès basé sur les rôles (ADMIN/SAISIE/CONSULTATION)
 - Middleware pour protection des routes
 - API routes avec vérification des permissions
 
-## Structure des Pages et Composants
+### Structure des Pages et Composants
 
 - Les pages sont organisées dans `src/app/(dashboard)/`
 - Chaque module a sa propre structure (factures, devis, produits, etc.)
 - Pages serveur pour récupération des données
 - Composants client pour l'interaction utilisateur
 - Formulaires dynamiques pour création/modification
-
-## Synchronisation MariaDB ↔ PostgreSQL
-
-Le projet inclut des scripts de synchronisation bidirectionnelle:
-- `prisma/sync-mariadb-to-pg.ts`: Migration de MariaDB vers PostgreSQL
-- `prisma/sync-pg-to-mariadb.ts`: Migration de PostgreSQL vers MariaDB
-- Les deux bases sont maintenues synchronisées pour assurer la compatibilité avec le système VB6
+- **Aucun module dédié à la gestion de stock n'existe**
 
 ## Spécifications Techniques Importantes
 
@@ -75,25 +79,67 @@ Le projet inclut des scripts de synchronisation bidirectionnelle:
 
 - ✅ Utilisateurs (gestion complète avec rôles)
 - ✅ Clients et fournisseurs
-- ✅ Produits (catalogue de base)
-- ✅ Factures (création, validation, paiement)
+- ✅ Produits (catalogue de base - *sans suivi de stock*)
+- ✅ Factures (création, validation, paiement - *quantités sans impact sur stock*)
 - ✅ Devis (avec conversion en facture)
 - ✅ Avoirs (création, édition)
 - ✅ Paiements (suivi des encaissements)
 - ✅ Charges (gestion des dépenses)
 - ✅ Exports (PDF/Excel pour documents)
 
-## Fonctionnalités Manquantes/À Développer
+## Fonctionnalités Manquantes/À Développer - Module Stock
 
-- ❌ **Gestion du stock** (entrées/sorties, inventaire) - **Ce module n'est pas implémenté**
-- ❌ Suivi des mouvements de stock
-- ❌ Historique des entrées/sorties
-- ❌ Calculs automatiques de stock disponible
-- ❌ Alertes de stock bas/seuil
+### Niveau Modèle de Données (PostgreSQL)
+- ❌ Ajouter les champs de stock au modèle [Produit](file://c:\Users\Berrada\Documents\facturapp\src\app\(dashboard)\produits\page-client.tsx#L9-L20) dans Prisma:
+  - `stock_initial` (Decimal)
+  - `stock_actuel` (Decimal) 
+  - `seuil_alerte` (Decimal)
+  - `alerte` (Boolean)
+  - `coeff_marge` (Decimal)
+- ❌ Créer un modèle `MouvementStock` pour suivre les entrées/sorties
+- ❌ Créer un modèle `AlerteStock` pour gérer les notifications
 
-## État Actuel du Stock
+### Niveau Logique Métier
+- ❌ Système de calcul automatique du stock disponible (entrée - sortie)
+- ❌ Déclenchement automatique des alertes de stock bas
+- ❌ Mise à jour du stock lors des opérations (facturation, retours, ajustements)
+- ❌ Historique des mouvements de stock
 
-**Important**: Le système de gestion du stock n'est **PAS** implémenté dans la version actuelle. Bien que des traces de champs liés au stock existent dans la base MariaDB (`stock_initial`, `stock_actuel`, `seuil_alerte`, `alerte`), cette fonctionnalité n'est pas présente dans la partie PostgreSQL et l'interface utilisateur. Les quantités dans les factures sont utilisées uniquement pour le calcul des totaux, sans suivi effectif des stocks.
+### Niveau Interface Utilisateur
+- ❌ Module dédié "Stock" dans le menu principal
+- ❌ Page de gestion des stocks (vue d'ensemble)
+- ❌ Page de détail des mouvements de stock par produit
+- ❌ Page de gestion des alertes de stock
+- ❌ Page d'ajustement de stock manuel
+- ❌ Intégration du stock dans la page de détail des produits
+
+### Niveau API
+- ❌ Endpoints API pour la gestion des mouvements de stock
+- ❌ Mécanisme de mise à jour du stock lors de la création/modification des factures
+- ❌ Endpoint pour les alertes de stock
+- ❌ Endpoint pour les ajustements de stock
+
+## Plan de Développement du Module Stock
+
+### Phase 1: Extension du modèle de données
+1. Modifier le schéma Prisma pour ajouter les champs de stock
+2. Mettre à jour la base PostgreSQL (migrations)
+3. Tester la synchronisation avec MariaDB
+
+### Phase 2: Logique métier
+1. Créer les services de gestion de stock dans `src/lib`
+2. Implémenter les règles de calcul automatique du stock
+3. Intégrer la mise à jour du stock dans les processus existants (facturation, avoirs)
+
+### Phase 3: Interface utilisateur
+1. Créer le module "Stock" dans le dashboard
+2. Développer les pages de gestion des stocks
+3. Intégrer l'affichage du stock dans les formulaires produits et factures
+
+### Phase 4: Intégration et tests
+1. Assurer la cohérence entre les différentes parties du système
+2. Tester la synchronisation bidirectionnelle avec MariaDB
+3. Vérifier la sécurité et les permissions
 
 ## Configuration Requise
 
@@ -107,5 +153,8 @@ Le projet inclut des scripts de synchronisation bidirectionnelle:
 - Utilisation des utilitaires de permissions
 - Respect des spécifications de sécurité
 - Conversion appropriée des types Prisma Decimal
+- Conformité avec les normes de codage existantes dans le projet
 
-Ce résumé fournit une vue d'ensemble complète du projet FacturApp, en particulier concernant l'état actuel de la gestion du stock qui **n'est pas implémentée** et nécessite un développement complet.
+## Conclusion
+
+Le module de gestion de stock est un complément essentiel pour FacturApp qui nécessite une refonte significative du modèle de données et de la logique métier. La présence de champs de stock dans la base MariaDB VB6 indique que cette fonctionnalité était prévue ou existait dans l'ancien système, ce qui renforce la pertinence de son implémentation dans la version moderne.

@@ -33,6 +33,7 @@ model Utilisateur {
   role             Role           @relation(fields: [roleId], references: [id])
   factures         Facture[]
   journalAudit     JournalAudit[]
+  documentsImportes DocumentImporte[]
 
   @@map("utilisateurs")
 }
@@ -141,6 +142,7 @@ model Fournisseur {
   produits            Produit[]
   prixProduits        PrixProduit[]
   charges             Charge[]
+  documentsImportes DocumentImporte[]
 
   @@index([raisonSociale])
   @@index([telephone])
@@ -173,6 +175,7 @@ model Produit {
   factureLignes        FactureLigne[]
   avoirLignes          AvoirLigne[]
   devisLignes          DevisLigne[]
+  lignesImportees LigneImportee[]
 
   @@index([reference])
   @@index([description])
@@ -404,4 +407,52 @@ model JournalAudit {
   utilisateur   Utilisateur? @relation(fields: [utilisateurId], references: [id])
 
   @@map("journal_audit")
+}
+
+model DocumentImporte {
+  id                  Int             @id @default(autoincrement())
+  fournisseurId       Int             @map("fournisseur_id")
+  nomFichierOriginal  String          @map("nom_fichier_original") @db.VarChar(255)
+  nomFichierStocke    String          @map("nom_fichier_stocke") @db.VarChar(255)
+  cheminFichier       String          @map("chemin_fichier") @db.VarChar(500)
+  typeMime            String          @map("type_mime") @db.VarChar(100)
+  tailleFichier       Int             @map("taille_fichier") // en octets
+  texteOcr            String?         @map("texte_ocr") @db.Text
+  statut              String          @default("brouillon") @db.VarChar(30) // brouillon | en_traitement | valide | rejete
+  dateImport          DateTime        @default(now()) @map("date_import")
+  dateMiseAJour       DateTime        @updatedAt @map("date_mise_a_jour")
+  utilisateurId       Int?            @map("utilisateur_id")
+  donneesExtraites    Json?           @map("donnees_extraites")
+
+  // Relations
+  fournisseur         Fournisseur     @relation(fields: [fournisseurId], references: [id])
+  utilisateur         Utilisateur?    @relation(fields: [utilisateurId], references: [id])
+  lignes              LigneImportee[]
+
+  @@index([fournisseurId])
+  @@index([statut])
+  @@index([dateImport])
+  @@map("documents_importes")
+}
+
+model LigneImportee {
+  id                  Int             @id @default(autoincrement())
+  documentImporteId   Int             @map("document_importe_id")
+  designation         String          @db.VarChar(255)
+  quantite            Decimal         @db.Decimal(14, 2)
+  prixUnitaire        Decimal         @map("prix_unitaire") @db.Decimal(14, 2)
+  tauxTva             Decimal         @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantTotal        Decimal         @map("montant_total") @db.Decimal(14, 2)
+  referenceDetectee   String?         @map("reference_detectee") @db.VarChar(100)
+  produitId           Int?            @map("produit_id")
+  statut              String          @default("active") @db.VarChar(30)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  documentImporte     DocumentImporte @relation(fields: [documentImporteId], references: [id], onDelete: Cascade)
+  produit             Produit?        @relation(fields: [produitId], references: [id])
+
+  @@index([documentImporteId])
+  @@map("lignes_importees")
 }

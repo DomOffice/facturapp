@@ -25,6 +25,7 @@ const navGroups: NavGroup[] = [
       { href: '/devis', label: 'Devis', icon: <IconDevis /> },
       { href: '/avoirs', label: 'Avoirs', icon: <IconAvoir /> },
       { href: '/paiements', label: 'Paiements', icon: <IconCash /> },
+      { href: '/factures-fournisseurs', label: 'Factures fournisseurs', icon: <IconDoc /> },
       { href: '/charges', label: 'Charges', icon: <IconCharge /> },
     ],
   },
