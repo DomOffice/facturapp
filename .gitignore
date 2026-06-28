@@ -1,18 +1,77 @@
+# =========================
+# Node.js / Next.js
+# =========================
 node_modules/
 .next/
-.env
-.env.*
-!.env.example
+out/
+dist/
 
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
 pnpm-debug.log*
 
-.DS_Store
-Thumbs.db
+# Environment
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.*
+!.env.example
 
-dist/
-build/
-
+# =========================
+# Prisma
+# =========================
 .prisma/
+prisma/dev.db
+prisma/dev.db-journal
+
+# =========================
+# Python OCR
+# =========================
+ocr/.venv/
+ocr/__pycache__/
+ocr/**/*.pyc
+ocr/**/*.pyo
+ocr/**/*.pyd
+
+# OCR temporary files
+ocr/.pytest_cache/
+ocr/.mypy_cache/
+
+# PaddleOCR cache local
+.paddlex/
+.paddleocr/
+
+# OCR images temporaires
+**/_ocr_temp/
+
+# =========================
+# Uploads
+# =========================
+uploads/
+uploads/**
+
+# Si jamais tu testes en local avec ce dossier
+Factures_achats/
+Factures_achats/**
+
+# =========================
+# VSCode
+# =========================
+.vscode/settings.json
+
+# =========================
+# Windows
+# =========================
+Thumbs.db
+Desktop.ini
+
+# =========================
+# macOS
+# =========================
+.DS_Store
+
+build/
