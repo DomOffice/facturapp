@@ -186,3 +186,23 @@ Créer un système simple de profils fournisseurs :
 - profil générique par défaut ;
 - profil CASINFO ;
 - fallback si aucun profil spécifique n'existe.
+
+## 2026-06-29 — Sprint 3.4 ArticleBuilder OCR
+
+Décision :
+La logique `ligneArticleSurDeuxLignes` ne doit pas être conservée comme principe central.
+
+Motif :
+Une ligne article peut occuper une, deux ou plusieurs lignes OCR selon le fournisseur, le scan ou le modèle de facture.
+
+Nouvelle orientation :
+Créer une logique ArticleBuilder simple :
+- accumuler les lignes OCR ;
+- vérifier si l’article est complet ;
+- construire la ligne article lorsque TVA, PU, quantité et total sont identifiés.
+
+Principe d’architecture :
+- le moteur OCR ne connaît aucun fournisseur ;
+- les drivers fournisseurs restent déclaratifs ;
+- les fallbacks sont conservés ;
+- l’interface éditable existante n’est pas modifiée.

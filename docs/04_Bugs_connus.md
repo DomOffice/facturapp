@@ -108,6 +108,20 @@ Extraction basée sur les coordonnées PaddleOCR et regroupement logique des lig
 Statut :
 Corrigé pour CASINFO, à généraliser via profils fournisseurs.
 
+### Variantes de lignes articles CASINFO
+
+Symptôme :
+Certaines factures CASINFO ont une ligne article sur une seule ligne OCR, d’autres sur plusieurs lignes.
+
+Cause :
+La structure OCR varie selon le scan ou le modèle de facture.
+
+Correction en cours :
+Remplacer la logique `ligneArticleSurDeuxLignes` par un ArticleBuilder générique qui accumule les lignes jusqu’à obtenir un article complet.
+
+Statut :
+En cours — Sprint 3.4.
+
 ## Qualité des scans OCR
 
 Pour Sprint 3, l’extraction des lignes articles est validée uniquement sur des documents correctement scannés :

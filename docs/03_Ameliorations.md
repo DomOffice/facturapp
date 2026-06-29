@@ -72,13 +72,17 @@ Champs cibles :
 
 ### Profils OCR fournisseurs
 
-Objectif : adapter l'extraction des lignes selon la structure de facture du fournisseur sélectionné.
+### Moteur OCR lignes articles — ArticleBuilder
 
-Première approche :
-- conserver un profil générique ;
-- ajouter un profil CASINFO validé ;
-- prévoir un fallback générique ;
-- préparer plus tard l'apprentissage depuis les corrections utilisateur.
+Objectif : remplacer la logique fixe “article sur une ou deux lignes” par une logique générique.
+
+Principe :
+- lire les blocs OCR ligne par ligne ;
+- accumuler les lignes d’un article en cours ;
+- considérer l’article comme complet uniquement quand référence/désignation, TVA, PU, quantité et total sont détectés ;
+- permettre les désignations sur une, deux ou plusieurs lignes.
+
+Les drivers fournisseurs restent simples et ne doivent pas contenir de logique métier.
 
 ### Formulaire de validation
 

@@ -56,10 +56,11 @@ Réalisé :
 - affichage éditable des lignes dans l'interface.
 
 Reste à faire :
-- profils OCR fournisseurs ;
+- ArticleBuilder pour gérer les désignations sur une ou plusieurs lignes ;
+- détection automatique des colonnes à partir des en-têtes ;
+- drivers fournisseurs légers ;
 - sauvegarde des corrections utilisateur ;
 - rapprochement avec les articles existants.
-
 ### Phase 4 — Validation utilisateur
 
 Statut : démarrée.
@@ -108,10 +109,12 @@ Permettre de rechercher et consulter les documents importés.
 |---|---|
 | Import PDF/image | Terminé |
 | OCR local PaddleOCR | Terminé |
-| Extraction champs facture | À faire |
+| Extraction champs facture | Terminé |
 | Validation utilisateur | À faire |
 | Création facture fournisseur | À faire |
 | Détection doublons | À faire |
 | File OCR | À faire |
 | OCR cloud hybride | Optionnel futur |
-
+| Extraction lignes articles OCR | En cours avancé |
+| ArticleBuilder OCR | À faire |
+| Drivers fournisseurs OCR | En cours |

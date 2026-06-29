@@ -187,3 +187,10 @@ FacturApp doit évoluer par étapes :
 5. mettre à jour la documentation ;
 6. déployer ensuite en production.
 
+Le moteur OCR évolue vers une logique en deux niveaux :
+
+- un moteur générique qui lit les blocs OCR ;
+- des drivers fournisseurs légers qui décrivent les particularités éventuelles.
+
+Le moteur ne doit pas dépendre directement d’un fournisseur précis.  
+Les drivers ne doivent pas contenir de logique complexe : uniquement des paramètres, alias, corrections ou particularités.
