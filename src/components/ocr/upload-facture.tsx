@@ -1,185 +1,199 @@
-'use client'
+"use client";
 
-import { useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import EditableInvoiceLines, {
   LigneFactureExtraite,
-} from './EditableInvoiceLines'
+} from "./EditableInvoiceLines";
 
 type Fournisseur = {
-  id: number
-  nom: string
-  code?: string | null
-}
+  id: number;
+  nom: string;
+  code?: string | null;
+};
 
 type ExtractionFacture = {
-  fournisseurNom?: string
-  numeroFacture?: string
-  dateFacture?: string
-  iceFournisseur?: string
-  totalHt?: number
-  totalTva?: number
-  totalTtc?: number
-  devise?: string
-  confiance?: number
-  alertes?: string[]
-  lignes?: LigneFactureExtraite[]
-}
+  fournisseurNom?: string;
+  numeroFacture?: string;
+  dateFacture?: string;
+  iceFournisseur?: string;
+  totalHt?: number;
+  totalTva?: number;
+  totalTtc?: number;
+  devise?: string;
+  confiance?: number;
+  alertes?: string[];
+  lignes?: LigneFactureExtraite[];
+  profilOcr?: string;
+  strategieExtractionLignes?: string;
+  fallbackUtilise?: boolean;
+  qualiteExtraction?: "A" | "B" | "C" | "D";
+};
 
 type UploadEtat =
-  | { type: 'idle' }
-  | { type: 'drag_over' }
-  | { type: 'uploading'; progression: number }
-  | { type: 'ocr_en_cours'; documentId: number; nomFichier: string }
+  | { type: "idle" }
+  | { type: "drag_over" }
+  | { type: "uploading"; progression: number }
+  | { type: "ocr_en_cours"; documentId: number; nomFichier: string }
   | {
-      type: 'succes'
-      documentId: number
-      nomFichier: string
-      nomStocke: string
-      chemin: string
-      typeMime: string
-      taille: number
-      texteOcr: string
-      extraction?: ExtractionFacture
+      type: "succes";
+      documentId: number;
+      nomFichier: string;
+      nomStocke: string;
+      chemin: string;
+      typeMime: string;
+      taille: number;
+      texteOcr: string;
+      extraction?: ExtractionFacture;
     }
-  | { type: 'erreur'; message: string }
+  | { type: "erreur"; message: string };
 
 type Props = {
-  fournisseurs: Fournisseur[]
-}
+  fournisseurs: Fournisseur[];
+};
 
-const FORMATS_ACCEPTES = ['application/pdf', 'image/jpeg', 'image/png']
+const FORMATS_ACCEPTES = ["application/pdf", "image/jpeg", "image/png"];
 
 function formaterTaille(octets: number): string {
-  if (octets < 1024) return `${octets} o`
-  if (octets < 1024 * 1024) return `${(octets / 1024).toFixed(1)} Ko`
-  return `${(octets / (1024 * 1024)).toFixed(1)} Mo`
+  if (octets < 1024) return `${octets} o`;
+  if (octets < 1024 * 1024) return `${(octets / 1024).toFixed(1)} Ko`;
+  return `${(octets / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-function formaterMontant(value?: number, devise = 'MAD') {
-  if (typeof value !== 'number') return 'Non détecté'
+function formaterMontant(value?: number, devise = "MAD") {
+  if (typeof value !== "number") return "Non détecté";
 
-  return `${value.toLocaleString('fr-FR', {
+  return `${value.toLocaleString("fr-FR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })} ${devise}`
+  })} ${devise}`;
 }
 
 export default function UploadFacture({ fournisseurs }: Props) {
-  const router = useRouter()
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const [etat, setEtat] = useState<UploadEtat>({ type: 'idle' })
-  const [fournisseurId, setFournisseurId] = useState('')
-  const [fichierSelectionne, setFichierSelectionne] = useState<File | null>(null)
-  const [lignesEditables, setLignesEditables] = useState<LigneFactureExtraite[]>([])
+  const [etat, setEtat] = useState<UploadEtat>({ type: "idle" });
+  const [fournisseurId, setFournisseurId] = useState("");
+  const [fichierSelectionne, setFichierSelectionne] = useState<File | null>(
+    null,
+  );
+  const [lignesEditables, setLignesEditables] = useState<
+    LigneFactureExtraite[]
+  >([]);
 
   const validerFichier = (fichier: File): string | null => {
     if (!FORMATS_ACCEPTES.includes(fichier.type)) {
-      return 'Format non autorisé.\nFormats acceptés : PDF, JPEG, PNG.'
+      return "Format non autorisé.\nFormats acceptés : PDF, JPEG, PNG.";
     }
 
     if (fichier.size > 10 * 1024 * 1024) {
-      return `Fichier trop volumineux (${formaterTaille(fichier.size)}).\nMaximum : 10 Mo.`
+      return `Fichier trop volumineux (${formaterTaille(fichier.size)}).\nMaximum : 10 Mo.`;
     }
 
-    return null
-  }
+    return null;
+  };
 
   const selectionnerFichier = useCallback((fichier: File) => {
-    const erreur = validerFichier(fichier)
+    const erreur = validerFichier(fichier);
 
     if (erreur) {
-      setEtat({ type: 'erreur', message: erreur })
-      return
+      setEtat({ type: "erreur", message: erreur });
+      return;
     }
 
-    setFichierSelectionne(fichier)
-    setLignesEditables([])
-    setEtat({ type: 'idle' })
-  }, [])
+    setFichierSelectionne(fichier);
+    setLignesEditables([]);
+    setEtat({ type: "idle" });
+  }, []);
 
   const handleSoumettre = async () => {
-    if (!fichierSelectionne) return
+    if (!fichierSelectionne) return;
 
     if (!fournisseurId) {
-      setEtat({ type: 'erreur', message: 'Veuillez sélectionner un fournisseur.' })
-      return
+      setEtat({
+        type: "erreur",
+        message: "Veuillez sélectionner un fournisseur.",
+      });
+      return;
     }
 
-    setEtat({ type: 'uploading', progression: 0 })
+    setEtat({ type: "uploading", progression: 0 });
 
     try {
-      const formData = new FormData()
-      formData.append('fichier', fichierSelectionne)
-      formData.append('fournisseurId', fournisseurId)
+      const formData = new FormData();
+      formData.append("fichier", fichierSelectionne);
+      formData.append("fournisseurId", fournisseurId);
 
-      const uploadRes = await fetch('/api/factures-fournisseurs/upload', {
-        method: 'POST',
+      const uploadRes = await fetch("/api/factures-fournisseurs/upload", {
+        method: "POST",
         body: formData,
-      })
+      });
 
-      const uploadData = await uploadRes.json()
+      const uploadData = await uploadRes.json();
 
       if (!uploadRes.ok) {
         setEtat({
-          type: 'erreur',
+          type: "erreur",
           message: uploadData.error || "Erreur lors de l'upload.",
-        })
-        return
+        });
+        return;
       }
 
-      const documentId = Number(uploadData.documentId)
+      const documentId = Number(uploadData.documentId);
 
       setEtat({
-        type: 'ocr_en_cours',
+        type: "ocr_en_cours",
         documentId,
         nomFichier: uploadData.fichier.nomOriginal,
-      })
+      });
 
-      const ocrRes = await fetch(`/api/factures-fournisseurs/ocr/${documentId}`, {
-        method: 'POST',
-      })
+      const ocrRes = await fetch(
+        `/api/factures-fournisseurs/ocr/${documentId}`,
+        {
+          method: "POST",
+        },
+      );
 
-      const ocrData = await ocrRes.json()
+      const ocrData = await ocrRes.json();
 
       if (!ocrRes.ok) {
         setEtat({
-          type: 'erreur',
+          type: "erreur",
           message: ocrData.error || "Erreur lors de l'OCR.",
-        })
-        return
+        });
+        return;
       }
 
-      const lignes = ocrData.extraction?.lignes || []
-      setLignesEditables(lignes)
+      const lignes = ocrData.extraction?.lignes || [];
+      setLignesEditables(lignes);
 
       setEtat({
-        type: 'succes',
+        type: "succes",
         documentId,
         nomFichier: uploadData.fichier.nomOriginal,
         nomStocke: uploadData.fichier.nomStocke,
         chemin: uploadData.fichier.chemin,
         typeMime: uploadData.fichier.typeMime,
         taille: uploadData.fichier.taille,
-        texteOcr: ocrData.texte || '',
+        texteOcr: ocrData.texte || "",
         extraction: ocrData.extraction,
-      })
+      });
     } catch (error) {
-      console.error('[UPLOAD_OCR_FACTURE]', error)
+      console.error("[UPLOAD_OCR_FACTURE]", error);
       setEtat({
-        type: 'erreur',
-        message: 'Erreur réseau.\nVeuillez réessayer.',
-      })
+        type: "erreur",
+        message: "Erreur réseau.\nVeuillez réessayer.",
+      });
     }
-  }
+  };
 
   const reinitialiser = () => {
-    setFichierSelectionne(null)
-    setLignesEditables([])
-    setEtat({ type: 'idle' })
-    if (inputRef.current) inputRef.current.value = ''
-  }
+    setFichierSelectionne(null);
+    setLignesEditables([]);
+    setEtat({ type: "idle" });
+    if (inputRef.current) inputRef.current.value = "";
+  };
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
@@ -191,30 +205,32 @@ export default function UploadFacture({ fournisseurs }: Props) {
         <select
           value={fournisseurId}
           onChange={(e) => setFournisseurId(e.target.value)}
-          disabled={etat.type === 'uploading' || etat.type === 'ocr_en_cours'}
+          disabled={etat.type === "uploading" || etat.type === "ocr_en_cours"}
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white"
         >
           <option value="">-- Sélectionner un fournisseur --</option>
           {fournisseurs.map((f) => (
             <option key={f.id} value={f.id}>
               {f.nom}
-              {f.code ? ` (${f.code})` : ''}
+              {f.code ? ` (${f.code})` : ""}
             </option>
           ))}
         </select>
       </div>
 
-      {etat.type !== 'succes' && (
+      {etat.type !== "succes" && (
         <div
           onDragOver={(e) => {
-            e.preventDefault()
-            setEtat({ type: 'drag_over' })
+            e.preventDefault();
+            setEtat({ type: "drag_over" });
           }}
-          onDragLeave={() => etat.type === 'drag_over' && setEtat({ type: 'idle' })}
+          onDragLeave={() =>
+            etat.type === "drag_over" && setEtat({ type: "idle" })
+          }
           onDrop={(e) => {
-            e.preventDefault()
-            const fichier = e.dataTransfer.files?.[0]
-            if (fichier) selectionnerFichier(fichier)
+            e.preventDefault();
+            const fichier = e.dataTransfer.files?.[0];
+            if (fichier) selectionnerFichier(fichier);
           }}
           onClick={() => inputRef.current?.click()}
           className="border-2 border-dashed rounded-lg p-10 text-center cursor-pointer border-gray-300 hover:border-blue-400 hover:bg-gray-50"
@@ -224,15 +240,17 @@ export default function UploadFacture({ fournisseurs }: Props) {
             type="file"
             accept=".pdf,.jpg,.jpeg,.png"
             onChange={(e) => {
-              const fichier = e.target.files?.[0]
-              if (fichier) selectionnerFichier(fichier)
+              const fichier = e.target.files?.[0];
+              if (fichier) selectionnerFichier(fichier);
             }}
             className="hidden"
           />
 
           {fichierSelectionne ? (
             <div>
-              <p className="font-medium text-gray-900">{fichierSelectionne.name}</p>
+              <p className="font-medium text-gray-900">
+                {fichierSelectionne.name}
+              </p>
               <p className="text-sm text-gray-500">
                 {formaterTaille(fichierSelectionne.size)}
               </p>
@@ -240,8 +258,8 @@ export default function UploadFacture({ fournisseurs }: Props) {
               <button
                 type="button"
                 onClick={(e) => {
-                  e.stopPropagation()
-                  reinitialiser()
+                  e.stopPropagation();
+                  reinitialiser();
                 }}
                 className="text-xs text-red-500 hover:underline mt-1"
               >
@@ -261,25 +279,25 @@ export default function UploadFacture({ fournisseurs }: Props) {
         </div>
       )}
 
-      {etat.type === 'uploading' && (
+      {etat.type === "uploading" && (
         <div className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md p-3">
           Upload en cours…
         </div>
       )}
 
-      {etat.type === 'ocr_en_cours' && (
+      {etat.type === "ocr_en_cours" && (
         <div className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md p-3">
           Upload terminé. OCR en cours sur le document #{etat.documentId}…
         </div>
       )}
 
-      {etat.type === 'erreur' && (
+      {etat.type === "erreur" && (
         <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3 whitespace-pre-line">
           {etat.message}
         </div>
       )}
 
-      {etat.type === 'succes' && (
+      {etat.type === "succes" && (
         <div className="space-y-6">
           <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3">
             <h3 className="font-semibold">OCR terminé avec succès</h3>
@@ -294,48 +312,121 @@ export default function UploadFacture({ fournisseurs }: Props) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <p>
-                  <strong>Fournisseur :</strong>{' '}
-                  {etat.extraction.fournisseurNom || 'Non détecté'}
+                  <strong>Fournisseur :</strong>{" "}
+                  {etat.extraction.fournisseurNom || "Non détecté"}
                 </p>
                 <p>
-                  <strong>N° facture :</strong>{' '}
-                  {etat.extraction.numeroFacture || 'Non détecté'}
+                  <strong>N° facture :</strong>{" "}
+                  {etat.extraction.numeroFacture || "Non détecté"}
                 </p>
                 <p>
-                  <strong>Date :</strong>{' '}
-                  {etat.extraction.dateFacture || 'Non détectée'}
+                  <strong>Date :</strong>{" "}
+                  {etat.extraction.dateFacture || "Non détectée"}
                 </p>
                 <p>
-                  <strong>ICE :</strong>{' '}
-                  {etat.extraction.iceFournisseur || 'Non détecté'}
+                  <strong>ICE :</strong>{" "}
+                  {etat.extraction.iceFournisseur || "Non détecté"}
                 </p>
                 <p>
-                  <strong>Total HT :</strong>{' '}
-                  {formaterMontant(etat.extraction.totalHt, etat.extraction.devise)}
+                  <strong>Total HT :</strong>{" "}
+                  {formaterMontant(
+                    etat.extraction.totalHt,
+                    etat.extraction.devise,
+                  )}
                 </p>
                 <p>
-                  <strong>TVA :</strong>{' '}
-                  {formaterMontant(etat.extraction.totalTva, etat.extraction.devise)}
+                  <strong>TVA :</strong>{" "}
+                  {formaterMontant(
+                    etat.extraction.totalTva,
+                    etat.extraction.devise,
+                  )}
                 </p>
                 <p>
-                  <strong>Total TTC :</strong>{' '}
-                  {formaterMontant(etat.extraction.totalTtc, etat.extraction.devise)}
+                  <strong>Total TTC :</strong>{" "}
+                  {formaterMontant(
+                    etat.extraction.totalTtc,
+                    etat.extraction.devise,
+                  )}
                 </p>
                 <p>
                   <strong>Confiance :</strong> {etat.extraction.confiance ?? 0}%
                 </p>
+                <p>
+                  <strong>Profil OCR :</strong>{" "}
+                  {etat.extraction.profilOcr || "Non détecté"}
+                </p>
+
+                <p>
+                  <strong>Stratégie lignes :</strong>{" "}
+                  {etat.extraction.strategieExtractionLignes || "Non détectée"}
+                </p>
+
+                <p>
+                  <strong>Fallback :</strong>{" "}
+                  {etat.extraction.fallbackUtilise ? "Oui" : "Non"}
+                </p>
+
+                <p>
+                  <strong>Qualité extraction :</strong>{" "}
+                  {etat.extraction.qualiteExtraction || "Non évaluée"}
+                </p>
               </div>
 
-              {etat.extraction.alertes && etat.extraction.alertes.length > 0 && (
-                <div className="mt-4 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-md p-3">
-                  <strong>Alertes :</strong>
-                  <ul className="list-disc ml-5 mt-1">
-                    {etat.extraction.alertes.map((alerte, index) => (
-                      <li key={index}>{alerte}</li>
-                    ))}
-                  </ul>
+              {etat.extraction.alertes &&
+                etat.extraction.alertes.length > 0 && (
+                  <div className="mt-4 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-md p-3">
+                    <strong>Alertes :</strong>
+                    <ul className="list-disc ml-5 mt-1">
+                      {etat.extraction.alertes.map((alerte, index) => (
+                        <li key={index}>{alerte}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              <div className="mt-6 border rounded-lg p-4 bg-gray-50">
+                <h4 className="font-semibold mb-3">Diagnostic OCR</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  <p>
+                    <strong>Profil OCR :</strong>{" "}
+                    {etat.extraction.profilOcr || "Non détecté"}
+                  </p>
+
+                  <p>
+                    <strong>Stratégie lignes :</strong>{" "}
+                    {etat.extraction.strategieExtractionLignes ||
+                      "Non détectée"}
+                  </p>
+
+                  <p>
+                    <strong>Fallback :</strong>{" "}
+                    {etat.extraction.fallbackUtilise ? "Oui" : "Non"}
+                  </p>
+
+                  <p>
+                    <strong>Qualité extraction :</strong>{" "}
+                    {etat.extraction.qualiteExtraction || "Non évaluée"}
+                  </p>
+
+                  <p>
+                    <strong>Articles détectés :</strong>{" "}
+                    {lignesEditables.length}
+                  </p>
+
+                  <p>
+                    <strong>Confiance moyenne lignes :</strong>{" "}
+                    {lignesEditables.length > 0
+                      ? `${Math.round(
+                          lignesEditables.reduce(
+                            (total, ligne) => total + ligne.confiance,
+                            0,
+                          ) / lignesEditables.length,
+                        )}%`
+                      : "Non évaluée"}
+                  </p>
                 </div>
-              )}
+              </div>
 
               <EditableInvoiceLines
                 lignes={lignesEditables}
@@ -347,7 +438,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
           <div>
             <h4 className="font-semibold mb-2">Texte OCR brut</h4>
             <pre className="max-h-80 overflow-auto text-xs bg-gray-50 border rounded-md p-3 whitespace-pre-wrap">
-              {etat.texteOcr || 'Aucun texte extrait.'}
+              {etat.texteOcr || "Aucun texte extrait."}
             </pre>
           </div>
         </div>
@@ -356,30 +447,32 @@ export default function UploadFacture({ fournisseurs }: Props) {
       <div className="flex justify-end gap-3">
         <button
           type="button"
-          onClick={() => router.push('/factures-fournisseurs')}
+          onClick={() => router.push("/factures-fournisseurs")}
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
         >
           Annuler
         </button>
 
-        {etat.type !== 'succes' ? (
+        {etat.type !== "succes" ? (
           <button
             type="button"
             onClick={handleSoumettre}
             disabled={
               !fichierSelectionne ||
               !fournisseurId ||
-              etat.type === 'uploading' ||
-              etat.type === 'ocr_en_cours'
+              etat.type === "uploading" ||
+              etat.type === "ocr_en_cours"
             }
             className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
-            {etat.type === 'ocr_en_cours' ? 'OCR en cours…' : 'Uploader et lancer OCR'}
+            {etat.type === "ocr_en_cours"
+              ? "OCR en cours…"
+              : "Uploader et lancer OCR"}
           </button>
         ) : (
           <button
             type="button"
-            onClick={() => router.push('/factures-fournisseurs')}
+            onClick={() => router.push("/factures-fournisseurs")}
             className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
           >
             Terminer
@@ -387,5 +480,5 @@ export default function UploadFacture({ fournisseurs }: Props) {
         )}
       </div>
     </div>
-  )
+  );
 }
