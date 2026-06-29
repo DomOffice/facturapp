@@ -2,6 +2,9 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import EditableInvoiceLines, {
+  LigneFactureExtraite,
+} from './EditableInvoiceLines'
 
 type Fournisseur = {
   id: number
@@ -20,6 +23,7 @@ type ExtractionFacture = {
   devise?: string
   confiance?: number
   alertes?: string[]
+  lignes?: LigneFactureExtraite[]
 }
 
 type UploadEtat =
@@ -54,6 +58,7 @@ function formaterTaille(octets: number): string {
 
 function formaterMontant(value?: number, devise = 'MAD') {
   if (typeof value !== 'number') return 'Non détecté'
+
   return `${value.toLocaleString('fr-FR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -67,14 +72,15 @@ export default function UploadFacture({ fournisseurs }: Props) {
   const [etat, setEtat] = useState<UploadEtat>({ type: 'idle' })
   const [fournisseurId, setFournisseurId] = useState('')
   const [fichierSelectionne, setFichierSelectionne] = useState<File | null>(null)
+  const [lignesEditables, setLignesEditables] = useState<LigneFactureExtraite[]>([])
 
   const validerFichier = (fichier: File): string | null => {
     if (!FORMATS_ACCEPTES.includes(fichier.type)) {
-      return 'Format non autorisé. Formats acceptés : PDF, JPEG, PNG.'
+      return 'Format non autorisé.\nFormats acceptés : PDF, JPEG, PNG.'
     }
 
     if (fichier.size > 10 * 1024 * 1024) {
-      return `Fichier trop volumineux (${formaterTaille(fichier.size)}). Maximum : 10 Mo.`
+      return `Fichier trop volumineux (${formaterTaille(fichier.size)}).\nMaximum : 10 Mo.`
     }
 
     return null
@@ -89,6 +95,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
     }
 
     setFichierSelectionne(fichier)
+    setLignesEditables([])
     setEtat({ type: 'idle' })
   }, [])
 
@@ -115,7 +122,10 @@ export default function UploadFacture({ fournisseurs }: Props) {
       const uploadData = await uploadRes.json()
 
       if (!uploadRes.ok) {
-        setEtat({ type: 'erreur', message: uploadData.error || "Erreur lors de l'upload." })
+        setEtat({
+          type: 'erreur',
+          message: uploadData.error || "Erreur lors de l'upload.",
+        })
         return
       }
 
@@ -134,9 +144,15 @@ export default function UploadFacture({ fournisseurs }: Props) {
       const ocrData = await ocrRes.json()
 
       if (!ocrRes.ok) {
-        setEtat({ type: 'erreur', message: ocrData.error || "Erreur lors de l'OCR." })
+        setEtat({
+          type: 'erreur',
+          message: ocrData.error || "Erreur lors de l'OCR.",
+        })
         return
       }
+
+      const lignes = ocrData.extraction?.lignes || []
+      setLignesEditables(lignes)
 
       setEtat({
         type: 'succes',
@@ -151,18 +167,22 @@ export default function UploadFacture({ fournisseurs }: Props) {
       })
     } catch (error) {
       console.error('[UPLOAD_OCR_FACTURE]', error)
-      setEtat({ type: 'erreur', message: 'Erreur réseau. Veuillez réessayer.' })
+      setEtat({
+        type: 'erreur',
+        message: 'Erreur réseau.\nVeuillez réessayer.',
+      })
     }
   }
 
   const reinitialiser = () => {
     setFichierSelectionne(null)
+    setLignesEditables([])
     setEtat({ type: 'idle' })
     if (inputRef.current) inputRef.current.value = ''
   }
 
   return (
-    <div className="space-y-6">
+    <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Fournisseur *
@@ -177,7 +197,8 @@ export default function UploadFacture({ fournisseurs }: Props) {
           <option value="">-- Sélectionner un fournisseur --</option>
           {fournisseurs.map((f) => (
             <option key={f.id} value={f.id}>
-              {f.nom}{f.code ? ` (${f.code})` : ''}
+              {f.nom}
+              {f.code ? ` (${f.code})` : ''}
             </option>
           ))}
         </select>
@@ -212,7 +233,10 @@ export default function UploadFacture({ fournisseurs }: Props) {
           {fichierSelectionne ? (
             <div>
               <p className="font-medium text-gray-900">{fichierSelectionne.name}</p>
-              <p className="text-sm text-gray-500">{formaterTaille(fichierSelectionne.size)}</p>
+              <p className="text-sm text-gray-500">
+                {formaterTaille(fichierSelectionne.size)}
+              </p>
+
               <button
                 type="button"
                 onClick={(e) => {
@@ -226,10 +250,10 @@ export default function UploadFacture({ fournisseurs }: Props) {
             </div>
           ) : (
             <div>
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-gray-700">
                 Glissez-déposez ou cliquez pour sélectionner
               </p>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-500">
                 PDF, JPEG, PNG — 10 Mo maximum
               </p>
             </div>
@@ -238,51 +262,72 @@ export default function UploadFacture({ fournisseurs }: Props) {
       )}
 
       {etat.type === 'uploading' && (
-        <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-700">
+        <div className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md p-3">
           Upload en cours…
         </div>
       )}
 
       {etat.type === 'ocr_en_cours' && (
-        <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
+        <div className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md p-3">
           Upload terminé. OCR en cours sur le document #{etat.documentId}…
         </div>
       )}
 
       {etat.type === 'erreur' && (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3 whitespace-pre-line">
           {etat.message}
         </div>
       )}
 
       {etat.type === 'succes' && (
-        <div className="space-y-4 rounded-lg border border-green-200 bg-green-50 p-5">
-          <div>
-            <h3 className="font-semibold text-green-800">OCR terminé avec succès</h3>
-            <p className="text-sm text-green-700 mt-1">
+        <div className="space-y-6">
+          <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3">
+            <h3 className="font-semibold">OCR terminé avec succès</h3>
+            <p>
               Document #{etat.documentId} — {etat.nomFichier}
             </p>
           </div>
 
           {etat.extraction && (
-            <div className="rounded-md bg-white border p-4">
-              <h4 className="font-semibold text-gray-900 mb-3">
-                Données détectées
-              </h4>
+            <div className="border rounded-lg p-4">
+              <h4 className="font-semibold mb-3">Données détectées</h4>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div><strong>Fournisseur :</strong> {etat.extraction.fournisseurNom || 'Non détecté'}</div>
-                <div><strong>N° facture :</strong> {etat.extraction.numeroFacture || 'Non détecté'}</div>
-                <div><strong>Date :</strong> {etat.extraction.dateFacture || 'Non détectée'}</div>
-                <div><strong>ICE :</strong> {etat.extraction.iceFournisseur || 'Non détecté'}</div>
-                <div><strong>Total HT :</strong> {formaterMontant(etat.extraction.totalHt, etat.extraction.devise)}</div>
-                <div><strong>TVA :</strong> {formaterMontant(etat.extraction.totalTva, etat.extraction.devise)}</div>
-                <div><strong>Total TTC :</strong> {formaterMontant(etat.extraction.totalTtc, etat.extraction.devise)}</div>
-                <div><strong>Confiance :</strong> {etat.extraction.confiance ?? 0}%</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                <p>
+                  <strong>Fournisseur :</strong>{' '}
+                  {etat.extraction.fournisseurNom || 'Non détecté'}
+                </p>
+                <p>
+                  <strong>N° facture :</strong>{' '}
+                  {etat.extraction.numeroFacture || 'Non détecté'}
+                </p>
+                <p>
+                  <strong>Date :</strong>{' '}
+                  {etat.extraction.dateFacture || 'Non détectée'}
+                </p>
+                <p>
+                  <strong>ICE :</strong>{' '}
+                  {etat.extraction.iceFournisseur || 'Non détecté'}
+                </p>
+                <p>
+                  <strong>Total HT :</strong>{' '}
+                  {formaterMontant(etat.extraction.totalHt, etat.extraction.devise)}
+                </p>
+                <p>
+                  <strong>TVA :</strong>{' '}
+                  {formaterMontant(etat.extraction.totalTva, etat.extraction.devise)}
+                </p>
+                <p>
+                  <strong>Total TTC :</strong>{' '}
+                  {formaterMontant(etat.extraction.totalTtc, etat.extraction.devise)}
+                </p>
+                <p>
+                  <strong>Confiance :</strong> {etat.extraction.confiance ?? 0}%
+                </p>
               </div>
 
               {etat.extraction.alertes && etat.extraction.alertes.length > 0 && (
-                <div className="mt-4 rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800">
+                <div className="mt-4 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-md p-3">
                   <strong>Alertes :</strong>
                   <ul className="list-disc ml-5 mt-1">
                     {etat.extraction.alertes.map((alerte, index) => (
@@ -291,19 +336,24 @@ export default function UploadFacture({ fournisseurs }: Props) {
                   </ul>
                 </div>
               )}
+
+              <EditableInvoiceLines
+                lignes={lignesEditables}
+                onChange={setLignesEditables}
+              />
             </div>
           )}
 
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Texte OCR brut</h4>
-            <pre className="max-h-96 overflow-auto rounded-md bg-white p-4 text-xs text-gray-800 border whitespace-pre-wrap">
+            <h4 className="font-semibold mb-2">Texte OCR brut</h4>
+            <pre className="max-h-80 overflow-auto text-xs bg-gray-50 border rounded-md p-3 whitespace-pre-wrap">
               {etat.texteOcr || 'Aucun texte extrait.'}
             </pre>
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex justify-end gap-3">
         <button
           type="button"
           onClick={() => router.push('/factures-fournisseurs')}
