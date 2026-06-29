@@ -62,6 +62,9 @@ export async function POST(
 
     const document = await prisma.documentImporte.findUnique({
       where: { id: documentId },
+      include: {
+        fournisseur: true,
+      },
     });
 
     if (!document) {
@@ -111,16 +114,10 @@ export async function POST(
 
     const texteOcr = resultatOcr.texte || "";
 
-    console.log("================================");
-    console.log("DEBUG OCR");
-    console.log("Pages :", resultatOcr.pages?.length);
-    console.log("Lignes page 1 :", resultatOcr.pages?.[0]?.lignes?.length);
-    console.log("Premier élément :", resultatOcr.pages?.[0]?.lignes?.[0]);
-    console.log("================================");
-    
     const extraction = extraireFactureFournisseurDepuisOcr(
       texteOcr,
       resultatOcr,
+      document.fournisseur?.raisonSociale,
     );
 
     const documentMaj = await prisma.documentImporte.update({

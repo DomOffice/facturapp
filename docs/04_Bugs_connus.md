@@ -107,3 +107,15 @@ Extraction basée sur les coordonnées PaddleOCR et regroupement logique des lig
 
 Statut :
 Corrigé pour CASINFO, à généraliser via profils fournisseurs.
+
+## Qualité des scans OCR
+
+Pour Sprint 3, l’extraction des lignes articles est validée uniquement sur des documents correctement scannés :
+- page droite ;
+- texte lisible ;
+- tableau non incliné ;
+- résolution suffisante ;
+- facture complète.
+
+Les documents inclinés ou de mauvaise qualité peuvent échouer à l’extraction des lignes.  
+La correction automatique d’inclinaison ou le redressement d’image n’est pas prioritaire à ce stade.
