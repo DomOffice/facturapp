@@ -4,7 +4,7 @@ export const casinfoDriver: ProfilOcrFournisseur = {
   code: 'casinfo',
   nom: 'CASINFO',
   aliases: ['casinfo'],
-  ligneArticleSurDeuxLignes: true,
+  //ligneArticleSurDeuxLignes: true,
   colonnes: {
     designation: { xMin: 0, xMax: 1120 },
     tva: { xMin: 900, xMax: 1180 },

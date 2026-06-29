@@ -61,7 +61,7 @@ export type ProfilOcrFournisseur = {
   code: 'generic' | 'generic_large' | 'casinfo'
   nom: string
   aliases: string[]
-  ligneArticleSurDeuxLignes: boolean
+  //ligneArticleSurDeuxLignes: boolean
   colonnes: {
     designation: { xMin: number; xMax: number }
     tva: { xMin: number; xMax: number }
