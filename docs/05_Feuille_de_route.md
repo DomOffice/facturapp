@@ -47,26 +47,25 @@ Statut : terminé.
 
 ### Phase 3 — Extraction intelligente
 
-Statut : prochaine étape.
+Statut : en cours avancé.
 
-Objectif : extraire automatiquement les champs principaux.
+Réalisé :
+- extraction des champs principaux ;
+- extraction des lignes articles depuis les coordonnées PaddleOCR ;
+- confiance par ligne ;
+- affichage éditable des lignes dans l'interface.
 
-Champs :
-
-- numéro facture ;
-- date facture ;
-- fournisseur ;
-- ICE ;
-- total HT ;
-- TVA ;
-- total TTC ;
-- lignes articles.
+Reste à faire :
+- profils OCR fournisseurs ;
+- sauvegarde des corrections utilisateur ;
+- rapprochement avec les articles existants.
 
 ### Phase 4 — Validation utilisateur
 
-Statut : à faire.
+Statut : démarrée.
 
-Créer une page permettant de valider ou corriger les données extraites.
+Un premier tableau éditable existe côté interface.  
+Il reste à persister les corrections, gérer les validations et préparer la création réelle de la facture fournisseur.
 
 ### Phase 5 — Création facture fournisseur
 

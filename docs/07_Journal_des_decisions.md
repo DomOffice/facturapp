@@ -160,3 +160,29 @@ Garder l'historique et le contexte technique avec le code source.
 
 Les fichiers `.md` doivent être mis à jour à chaque évolution significative.
 
+# 07 — Journal des décisions FacturApp
+
+Dernière mise à jour : 2026-06-29
+
+## 2026-06-29 — Sprint 3 OCR lignes articles
+
+Décision :
+Le module factures fournisseurs extrait désormais les lignes articles à partir des coordonnées PaddleOCR, et non uniquement depuis le texte OCR brut.
+
+Motif :
+Le texte brut ne conserve pas suffisamment la structure des tableaux. Les coordonnées X/Y permettent de reconstruire les colonnes : désignation, TVA, PU TTC, quantité et total TTC.
+
+Implémentation actuelle :
+- extraction des lignes dans `src/lib/ocr/extract-facture-fournisseur.ts` ;
+- stockage dans `donnees_extraites.extraction.lignes` ;
+- affichage dans `src/components/ocr/EditableInvoiceLines.tsx` ;
+- badge de confiance dans `src/components/ocr/ConfidenceBadge.tsx`.
+
+Limite connue :
+La logique actuelle fonctionne sur CASINFO et doit être généralisée avec des profils OCR fournisseurs.
+
+Décision suivante :
+Créer un système simple de profils fournisseurs :
+- profil générique par défaut ;
+- profil CASINFO ;
+- fallback si aucun profil spécifique n'existe.

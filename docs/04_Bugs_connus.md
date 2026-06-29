@@ -94,3 +94,16 @@ Aucun bug bloquant connu à ce stade pour :
 - affichage OCR ;
 - mise à jour `ocr_termine`.
 
+### Extraction ligne article CASINFO décalée
+
+Symptôme :
+Les lignes articles étaient mal détectées : la deuxième ligne de désignation était interprétée comme référence, ce qui inversait quantité et prix.
+
+Cause :
+Les factures CASINFO affichent une ligne article sur deux lignes OCR.
+
+Correction :
+Extraction basée sur les coordonnées PaddleOCR et regroupement logique des lignes article.
+
+Statut :
+Corrigé pour CASINFO, à généraliser via profils fournisseurs.

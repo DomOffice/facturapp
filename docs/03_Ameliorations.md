@@ -26,6 +26,25 @@ Dernière mise à jour : 2026-06-28
 - Mise à jour du statut `ocr_termine`.
 - Remplissage du texte OCR en base.
 
+### Module OCR — extraction structurée
+
+- Extraction des champs principaux depuis OCR :
+  - fournisseur ;
+  - numéro de facture ;
+  - date facture ;
+  - ICE fournisseur ;
+  - total HT ;
+  - TVA ;
+  - total TTC ;
+  - devise ;
+  - confiance globale ;
+  - alertes.
+- Extraction des lignes articles depuis les coordonnées PaddleOCR.
+- Stockage des lignes dans `donnees_extraites.extraction.lignes`.
+- Ajout d'une confiance par ligne.
+- Affichage des lignes articles dans l'interface.
+- Cellules du tableau rendues éditables côté interface, sans insertion BDD à ce stade.
+
 ### Configuration projet
 
 - `.gitignore` adapté au Python, OCR, uploads et environnements.
@@ -50,6 +69,16 @@ Champs cibles :
 - lignes article ;
 - devise ;
 - conditions éventuelles.
+
+### Profils OCR fournisseurs
+
+Objectif : adapter l'extraction des lignes selon la structure de facture du fournisseur sélectionné.
+
+Première approche :
+- conserver un profil générique ;
+- ajouter un profil CASINFO validé ;
+- prévoir un fallback générique ;
+- préparer plus tard l'apprentissage depuis les corrections utilisateur.
 
 ### Formulaire de validation
 

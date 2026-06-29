@@ -139,6 +139,15 @@ Le moteur actuel est local : Python + PaddleOCR.
 
 L'architecture doit rester compatible avec un futur provider cloud : Azure Document Intelligence, Google Document AI, Mistral OCR ou autre.
 
+Le traitement OCR ne stocke plus uniquement le texte brut.  
+Il conserve aussi les coordonnées PaddleOCR et exploite ces coordonnées pour extraire les lignes articles des factures fournisseurs.
+
+Les lignes extraites restent à l'état de pré-validation :
+- elles sont affichées dans l'interface ;
+- elles sont éditables côté frontend ;
+- elles ne créent pas encore de facture fournisseur réelle ;
+- elles n'impactent pas encore le stock.
+
 ## 8. Dossier OCR
 
 Organisation retenue :
