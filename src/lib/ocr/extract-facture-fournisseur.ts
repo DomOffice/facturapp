@@ -1,7 +1,5 @@
-import {
-  chargerDriverOcr,
-  genericLargeDriver,
-} from './drivers'
+import { construireLigneArticleDepuisGroupes } from "./article-builder";
+import { chargerDriverOcr, genericLargeDriver } from "./drivers";
 import type {
   FactureFournisseurExtraite,
   LigneFactureExtraite,
@@ -9,251 +7,209 @@ import type {
   ProfilOcrFournisseur,
   ResultatOcr,
   StrategieExtractionLignes,
-} from './types'
+} from "./types";
 
-export type {
-  FactureFournisseurExtraite,
-  LigneFactureExtraite,
-}
+export type { FactureFournisseurExtraite, LigneFactureExtraite };
 
 function parseMontant(value: string): number | undefined {
-  const normalized = value.replace(/\s/g, '').replace(',', '.')
-  const montant = Number(normalized)
-  return Number.isFinite(montant) ? montant : undefined
+  const normalized = value.replace(/\s/g, "").replace(",", ".");
+  const montant = Number(normalized);
+  return Number.isFinite(montant) ? montant : undefined;
 }
 
 function chercher(regex: RegExp, texte: string): string | undefined {
-  const match = texte.match(regex)
-  return match && match[1] ? match[1].trim() : undefined
+  const match = texte.match(regex);
+  return match && match[1] ? match[1].trim() : undefined;
 }
 
 function normaliserTexte(value: string): string {
-  return value.replace(/\r/g, '\n')
+  return value.replace(/\r/g, "\n");
 }
 
 function extraireMotsOcr(resultatOcr?: ResultatOcr): MotOcrNormalise[] {
-  const mots: MotOcrNormalise[] = []
+  const mots: MotOcrNormalise[] = [];
 
-  if (!resultatOcr || !Array.isArray(resultatOcr.pages)) return mots
+  if (!resultatOcr || !Array.isArray(resultatOcr.pages)) return mots;
 
   for (const page of resultatOcr.pages) {
-    if (!page || !Array.isArray(page.lignes)) continue
+    if (!page || !Array.isArray(page.lignes)) continue;
 
     for (const ligne of page.lignes) {
-      const texte = String(ligne.texte || ligne.text || '').trim()
-      if (!texte) continue
+      const texte = String(ligne.texte || ligne.text || "").trim();
+      if (!texte) continue;
 
-      const position = ligne.position
-      if (!Array.isArray(position) || position.length === 0) continue
+      const position = ligne.position;
+      if (!Array.isArray(position) || position.length === 0) continue;
 
-      const xs = position.map((p) => p[0])
-      const ys = position.map((p) => p[1])
+      const xs = position.map((p) => p[0]);
+      const ys = position.map((p) => p[1]);
 
       mots.push({
         texte,
         x: Math.min.apply(null, xs),
         y: ys.reduce((sum, val) => sum + val, 0) / ys.length,
         score: ligne.score ?? ligne.confiance,
-      })
+      });
     }
   }
 
   return mots.sort((a, b) => {
-    if (Math.abs(a.y - b.y) > 8) return a.y - b.y
-    return a.x - b.x
-  })
+    if (Math.abs(a.y - b.y) > 8) return a.y - b.y;
+    return a.x - b.x;
+  });
 }
 
 function grouperParLignes(mots: MotOcrNormalise[]): MotOcrNormalise[][] {
-  const groupes: MotOcrNormalise[][] = []
-  const toleranceY = 12
+  const groupes: MotOcrNormalise[][] = [];
+  const toleranceY = 12;
 
   for (const mot of mots) {
-    let groupeTrouve: MotOcrNormalise[] | undefined
+    let groupeTrouve: MotOcrNormalise[] | undefined;
 
     for (const groupe of groupes) {
       const yMoyen =
-        groupe.reduce((sum, item) => sum + item.y, 0) / groupe.length
+        groupe.reduce((sum, item) => sum + item.y, 0) / groupe.length;
 
       if (Math.abs(yMoyen - mot.y) <= toleranceY) {
-        groupeTrouve = groupe
-        break
+        groupeTrouve = groupe;
+        break;
       }
     }
 
-    if (groupeTrouve) groupeTrouve.push(mot)
-    else groupes.push([mot])
+    if (groupeTrouve) groupeTrouve.push(mot);
+    else groupes.push([mot]);
   }
 
-  return groupes.map((groupe) => groupe.sort((a, b) => a.x - b.x))
+  return groupes.map((groupe) => groupe.sort((a, b) => a.x - b.x));
 }
 
 function extraireReferenceDepuisDesignation(designation: string): {
-  reference?: string
-  designation: string
+  reference?: string;
+  designation: string;
 } {
-  const texte = designation.trim()
-  const match = texte.match(/^([A-Z0-9][A-Z0-9._/-]{2,})\s*[-–:]?\s+(.+)$/i)
+  const texte = designation.trim();
+  const match = texte.match(/^([A-Z0-9][A-Z0-9._/-]{2,})\s*[-–:]?\s+(.+)$/i);
 
-  if (!match) return { designation: texte }
+  if (!match) return { designation: texte };
 
   return {
     reference: match[1].trim(),
     designation: match[2].trim(),
-  }
+  };
 }
 
 function calculerConfianceLigne(ligne: LigneFactureExtraite): number {
-  let points = 30
+  let points = 30;
 
-  if (ligne.designation && ligne.designation.length >= 5) points += 20
-  if (ligne.reference) points += 10
-  if (ligne.quantite !== undefined) points += 15
-  if (ligne.prixUnitaireTtc !== undefined) points += 10
-  if (ligne.totalTtc !== undefined) points += 15
+  if (ligne.designation && ligne.designation.length >= 5) points += 20;
+  if (ligne.reference) points += 10;
+  if (ligne.quantite !== undefined) points += 15;
+  if (ligne.prixUnitaireTtc !== undefined) points += 10;
+  if (ligne.totalTtc !== undefined) points += 15;
 
   if (
     ligne.quantite !== undefined &&
     ligne.prixUnitaireTtc !== undefined &&
     ligne.totalTtc !== undefined
   ) {
-    const attendu = ligne.quantite * ligne.prixUnitaireTtc
-    const ecart = Math.abs(attendu - ligne.totalTtc)
+    const attendu = ligne.quantite * ligne.prixUnitaireTtc;
+    const ecart = Math.abs(attendu - ligne.totalTtc);
 
-    if (ecart <= 0.05) points += 10
-    else if (ecart > 1) points -= 20
+    if (ecart <= 0.05) points += 10;
+    else if (ecart > 1) points -= 20;
   }
 
-  return Math.max(0, Math.min(100, points))
+  return Math.max(0, Math.min(100, points));
 }
 
 function extraireLignesParProfil(
   resultatOcr: ResultatOcr | undefined,
   profil: ProfilOcrFournisseur,
 ): LigneFactureExtraite[] {
-  const colonnes = profil.colonnes
-  const mots = extraireMotsOcr(resultatOcr)
-  const lignes: LigneFactureExtraite[] = []
+  const mots = extraireMotsOcr(resultatOcr);
+  const lignes: LigneFactureExtraite[] = [];
 
   const headerDesignation = mots.find((m) =>
     /désignation|designation/i.test(m.texte),
-  )
+  );
 
-  const debutTableauY = headerDesignation ? headerDesignation.y + 10 : 0
+  const debutTableauY = headerDesignation ? headerDesignation.y + 10 : 0;
 
-  const totalHt = mots.find((m) => /total\s*ht/i.test(m.texte) && m.y > debutTableauY + 100)
-  const finTableauY = totalHt ? totalHt.y - 15 : Number.MAX_SAFE_INTEGER
+  const totalHt = mots.find(
+    (m) => /total\s*ht/i.test(m.texte) && m.y > debutTableauY + 100,
+  );
+
+  const finTableauY = totalHt ? totalHt.y - 15 : Number.MAX_SAFE_INTEGER;
 
   const groupes = grouperParLignes(
     mots.filter((m) => m.y >= debutTableauY && m.y <= finTableauY),
-  )
+  );
 
-  let designationEnCours = ''
+  let groupesArticleEnCours: MotOcrNormalise[][] = [];
 
   for (const groupe of groupes) {
-    const textesDesignation = groupe
-      .filter(
-        (m) =>
-          m.x >= colonnes.designation.xMin &&
-          m.x < colonnes.designation.xMax,
-      )
-      .map((m) => m.texte.trim())
-      .filter(Boolean)
+    const texteGroupe = groupe
+      .map((m) => m.texte)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    const texteDesignation = textesDesignation.join(' ').replace(/\s+/g, ' ').trim()
+    if (!texteGroupe) continue;
 
-    const tva = groupe.find(
-      (m) =>
-        m.x >= colonnes.tva.xMin &&
-        m.x < colonnes.tva.xMax &&
-        /\d+\s*%/.test(m.texte),
-    )
+    const ligneBasse = texteGroupe.toLowerCase();
 
-    const pu = groupe.find(
-      (m) =>
-        m.x >= colonnes.puTtc.xMin &&
-        m.x < colonnes.puTtc.xMax &&
-        /^\d[\d\s]*[,.]\d{2}$/.test(m.texte.replace(/\s/g, '')),
-    )
-
-    const qte = groupe.find(
-      (m) =>
-        m.x >= colonnes.quantite.xMin &&
-        m.x < colonnes.quantite.xMax &&
-        /^\d+$/.test(m.texte.trim()),
-    )
-
-    const total = groupe.find(
-      (m) =>
-        m.x >= colonnes.totalTtc.xMin &&
-        m.x < colonnes.totalTtc.xMax &&
-        /^\d[\d\s]*[,.]\d{2}$/.test(m.texte.replace(/\s/g, '')),
-    )
-
-    const commenceArticle = /^[A-Z0-9][A-Z0-9._/-]{2,}\s*[-–:]/i.test(
-      texteDesignation,
-    )
-
-    if (commenceArticle) {
-      designationEnCours = texteDesignation
-      if (profil.ligneArticleSurDeuxLignes) continue
+    if (
+      ligneBasse.includes("total ht") ||
+      ligneBasse.includes("total tva") ||
+      ligneBasse === "total ttc" ||
+      ligneBasse.includes("arrêtée la présente") ||
+      ligneBasse.includes("arretee la presente") ||
+      ligneBasse.includes("magasinier") ||
+      ligneBasse.includes("nos marchandises") ||
+      ligneBasse.includes("garantie") ||
+      ligneBasse.includes("siège social") ||
+      ligneBasse.includes("siege social") ||
+      ligneBasse.includes("téléphone") ||
+      ligneBasse.includes("telephone")
+    ) {
+      continue;
     }
 
-    if (texteDesignation && designationEnCours && !commenceArticle) {
-      designationEnCours = `${designationEnCours} ${texteDesignation}`
-        .replace(/\s+/g, ' ')
-        .trim()
+    groupesArticleEnCours.push(groupe);
+
+    const ligneConstruite = construireLigneArticleDepuisGroupes(
+      groupesArticleEnCours,
+      profil,
+    );
+
+    if (ligneConstruite) {
+      lignes.push(ligneConstruite);
+      groupesArticleEnCours = [];
     }
-
-    if (!designationEnCours || !tva || !pu || !qte || !total) continue
-
-    const tauxTvaMatch = tva.texte.match(/(\d+)\s*%/)
-    const refEtDesignation = extraireReferenceDepuisDesignation(designationEnCours)
-
-    const ligne: LigneFactureExtraite = {
-      reference: refEtDesignation.reference,
-      designation: refEtDesignation.designation,
-      quantite: Number(qte.texte.trim()),
-      prixUnitaireTtc: parseMontant(pu.texte),
-      tauxTva: tauxTvaMatch ? Number(tauxTvaMatch[1]) : undefined,
-      totalTtc: parseMontant(total.texte),
-      confiance: 0,
-      alertes: [],
-    }
-
-    if (!ligne.reference) ligne.alertes.push('Référence non détectée')
-    if (ligne.quantite === undefined) ligne.alertes.push('Quantité non détectée')
-    if (ligne.prixUnitaireTtc === undefined) ligne.alertes.push('Prix unitaire non détecté')
-    if (ligne.totalTtc === undefined) ligne.alertes.push('Total ligne non détecté')
-
-    ligne.confiance = calculerConfianceLigne(ligne)
-
-    lignes.push(ligne)
-    designationEnCours = ''
   }
 
-  return lignes
+  return lignes;
 }
 
 function extraireLignesDepuisTexte(texteOcr: string): LigneFactureExtraite[] {
   const lignesTexte = normaliserTexte(texteOcr)
-    .split('\n')
+    .split("\n")
     .map((ligne) => ligne.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 
-  const lignes: LigneFactureExtraite[] = []
+  const lignes: LigneFactureExtraite[] = [];
 
   for (let i = 0; i < lignesTexte.length; i += 1) {
-    const ligneReference = lignesTexte[i]
+    const ligneReference = lignesTexte[i];
 
     if (!/^[A-Z0-9][A-Z0-9._/-]{2,}\s*[-–:]/i.test(ligneReference)) {
-      continue
+      continue;
     }
 
-    const tvaTexte = lignesTexte[i + 1]
-    const puTexte = lignesTexte[i + 2]
-    const qteTexte = lignesTexte[i + 3]
-    const totalTexte = lignesTexte[i + 4]
+    const tvaTexte = lignesTexte[i + 1];
+    const puTexte = lignesTexte[i + 2];
+    const qteTexte = lignesTexte[i + 3];
+    const totalTexte = lignesTexte[i + 4];
 
     if (
       !tvaTexte ||
@@ -261,16 +217,16 @@ function extraireLignesDepuisTexte(texteOcr: string): LigneFactureExtraite[] {
       !qteTexte ||
       !totalTexte ||
       !/\b(20|10|7)\s*%/.test(tvaTexte) ||
-      !/^\d[\d\s]*[,.]\d{2}$/.test(puTexte.replace(/\s/g, '')) ||
+      !/^\d[\d\s]*[,.]\d{2}$/.test(puTexte.replace(/\s/g, "")) ||
       !/^\d+$/.test(qteTexte) ||
-      !/^\d[\d\s]*[,.]\d{2}$/.test(totalTexte.replace(/\s/g, ''))
+      !/^\d[\d\s]*[,.]\d{2}$/.test(totalTexte.replace(/\s/g, ""))
     ) {
-      continue
+      continue;
     }
 
-    const refEtDesignation = extraireReferenceDepuisDesignation(ligneReference)
+    const refEtDesignation = extraireReferenceDepuisDesignation(ligneReference);
 
-    const tauxTvaMatch = tvaTexte.match(/\b(20|10|7)\s*%/)
+    const tauxTvaMatch = tvaTexte.match(/\b(20|10|7)\s*%/);
 
     const ligneExtraite: LigneFactureExtraite = {
       reference: refEtDesignation.reference,
@@ -280,58 +236,64 @@ function extraireLignesDepuisTexte(texteOcr: string): LigneFactureExtraite[] {
       tauxTva: tauxTvaMatch ? Number(tauxTvaMatch[1]) : undefined,
       totalTtc: parseMontant(totalTexte),
       confiance: 0,
-      alertes: ['Extraction fallback texte brut'],
-    }
+      alertes: ["Extraction fallback texte brut"],
+    };
 
-    ligneExtraite.confiance = Math.min(80, calculerConfianceLigne(ligneExtraite))
+    ligneExtraite.confiance = Math.min(
+      80,
+      calculerConfianceLigne(ligneExtraite),
+    );
 
-    lignes.push(ligneExtraite)
+    lignes.push(ligneExtraite);
 
-    i += 4
+    i += 4;
   }
 
-  return lignes
+  return lignes;
 }
 function extraireLignesAvecFallback(
   texteOcr: string,
   resultatOcr: ResultatOcr | undefined,
   profil: ProfilOcrFournisseur,
 ): {
-  lignes: LigneFactureExtraite[]
-  strategie: StrategieExtractionLignes
-  fallbackUtilise: boolean
-  qualite: 'A' | 'B' | 'C' | 'D'
+  lignes: LigneFactureExtraite[];
+  strategie: StrategieExtractionLignes;
+  fallbackUtilise: boolean;
+  qualite: "A" | "B" | "C" | "D";
 } {
-  const lignesProfil = extraireLignesParProfil(resultatOcr, profil)
+  const lignesProfil = extraireLignesParProfil(resultatOcr, profil);
 
   if (lignesProfil.length > 0) {
     return {
       lignes: lignesProfil,
-      strategie: 'profil',
+      strategie: "profil",
       fallbackUtilise: false,
-      qualite: lignesProfil.every((l) => l.confiance > 95) ? 'A' : 'B',
-    }
+      qualite: lignesProfil.every((l) => l.confiance > 95) ? "A" : "B",
+    };
   }
 
-  const lignesGenerique = extraireLignesParProfil(resultatOcr, genericLargeDriver)
+  const lignesGenerique = extraireLignesParProfil(
+    resultatOcr,
+    genericLargeDriver,
+  );
 
   if (lignesGenerique.length > 0) {
     return {
       lignes: lignesGenerique,
-      strategie: 'fallback_generique',
+      strategie: "fallback_generique",
       fallbackUtilise: true,
-      qualite: 'C',
-    }
+      qualite: "C",
+    };
   }
 
-  const lignesTexte = extraireLignesDepuisTexte(texteOcr)
+  const lignesTexte = extraireLignesDepuisTexte(texteOcr);
 
   return {
     lignes: lignesTexte,
-    strategie: 'fallback_texte',
+    strategie: "fallback_texte",
     fallbackUtilise: true,
-    qualite: lignesTexte.length > 0 ? 'D' : 'D',
-  }
+    qualite: lignesTexte.length > 0 ? "D" : "D",
+  };
 }
 
 export function extraireFactureFournisseurDepuisOcr(
@@ -339,7 +301,7 @@ export function extraireFactureFournisseurDepuisOcr(
   resultatOcr?: ResultatOcr,
   fournisseurSelectionneNom?: string,
 ): FactureFournisseurExtraite {
-  const texte = normaliserTexte(texteOcr)
+  const texte = normaliserTexte(texteOcr);
 
   const numeroFacture =
     chercher(
@@ -347,63 +309,67 @@ export function extraireFactureFournisseurDepuisOcr(
       texte,
     ) ||
     chercher(/(?:N[°º�]\s*:?\s*)([A-Z]{1,5}\d{4}[-/]\d{3,8})/i, texte) ||
-    chercher(/\b([A-Z]{1,5}\d{4}[-/]\d{3,8})\b/i, texte)
+    chercher(/\b([A-Z]{1,5}\d{4}[-/]\d{3,8})\b/i, texte);
 
   const dateFacture = chercher(
     /(?:date\s*(?:facturation|facture)?\s*:?\s*)(\d{2}\/\d{2}\/\d{4})/i,
     texte,
-  )
+  );
 
-  const iceMatches = Array.from(texte.matchAll(/ICE\s*:?\s*(\d{10,20})/gi))
+  const iceMatches = Array.from(texte.matchAll(/ICE\s*:?\s*(\d{10,20})/gi));
   const iceFournisseur =
-    iceMatches.length > 0 ? iceMatches[iceMatches.length - 1][1] : undefined
+    iceMatches.length > 0 ? iceMatches[iceMatches.length - 1][1] : undefined;
 
   const totalHt = parseMontant(
-    chercher(/total\s*ht\s*\n?\s*([\d\s]+[,.]\d{2})/i, texte) || '',
-  )
+    chercher(/total\s*ht\s*\n?\s*([\d\s]+[,.]\d{2})/i, texte) || "",
+  );
 
   const totalTva = parseMontant(
     chercher(/total\s*tva(?:\s*\d+%)?\s*\n?\s*([\d\s]+[,.]\d{2})/i, texte) ||
-      '',
-  )
+      "",
+  );
 
   const totalTtc = parseMontant(
-    chercher(/total\s*ttc\s*\n?\s*([\d\s]+[,.]\d{2})/i, texte) || '',
-  )
+    chercher(/total\s*ttc\s*\n?\s*([\d\s]+[,.]\d{2})/i, texte) || "",
+  );
 
   const fournisseurNom =
     fournisseurSelectionneNom ||
     texte
-      .split('\n')
+      .split("\n")
       .map((ligne) => ligne.trim())
-      .find((ligne) => ligne.length >= 3 && /^[A-Z0-9\s&.-]+$/.test(ligne))
+      .find((ligne) => ligne.length >= 3 && /^[A-Z0-9\s&.-]+$/.test(ligne));
 
-  const devise = /dirham|mad|dh/i.test(texte) ? 'MAD' : undefined
+  const devise = /dirham|mad|dh/i.test(texte) ? "MAD" : undefined;
 
-  const profil = chargerDriverOcr(fournisseurNom)
+  const profil = chargerDriverOcr(fournisseurNom);
 
-  const extractionLignes = extraireLignesAvecFallback(texte, resultatOcr, profil)
-  const lignes = extractionLignes.lignes
+  const extractionLignes = extraireLignesAvecFallback(
+    texte,
+    resultatOcr,
+    profil,
+  );
+  const lignes = extractionLignes.lignes;
 
-  const alertes: string[] = []
+  const alertes: string[] = [];
 
-  if (!numeroFacture) alertes.push('Numéro de facture non détecté')
-  if (!dateFacture) alertes.push('Date de facture non détectée')
-  if (!totalTtc) alertes.push('Total TTC non détecté')
-  if (!totalHt) alertes.push('Total HT non détecté')
-  if (!iceFournisseur) alertes.push('ICE fournisseur non détecté')
-  if (lignes.length === 0) alertes.push('Aucune ligne article détectée')
+  if (!numeroFacture) alertes.push("Numéro de facture non détecté");
+  if (!dateFacture) alertes.push("Date de facture non détectée");
+  if (!totalTtc) alertes.push("Total TTC non détecté");
+  if (!totalHt) alertes.push("Total HT non détecté");
+  if (!iceFournisseur) alertes.push("ICE fournisseur non détecté");
+  if (lignes.length === 0) alertes.push("Aucune ligne article détectée");
   if (extractionLignes.fallbackUtilise && lignes.length > 0) {
-    alertes.push(`Fallback utilisé : ${extractionLignes.strategie}`)
+    alertes.push(`Fallback utilisé : ${extractionLignes.strategie}`);
   }
 
-  let points = 0
-  if (numeroFacture) points += 20
-  if (dateFacture) points += 20
-  if (totalHt) points += 15
-  if (totalTva) points += 15
-  if (totalTtc) points += 20
-  if (iceFournisseur) points += 10
+  let points = 0;
+  if (numeroFacture) points += 20;
+  if (dateFacture) points += 20;
+  if (totalHt) points += 15;
+  if (totalTva) points += 15;
+  if (totalTtc) points += 20;
+  if (iceFournisseur) points += 10;
 
   return {
     fournisseurNom,
@@ -421,5 +387,5 @@ export function extraireFactureFournisseurDepuisOcr(
     lignes,
     confiance: points,
     alertes,
-  }
+  };
 }
