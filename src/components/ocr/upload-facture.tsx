@@ -188,6 +188,39 @@ export default function UploadFacture({ fournisseurs }: Props) {
     }
   };
 
+  const validerLignes = async () => {
+    if (etat.type !== "succes") return;
+
+    try {
+      const res = await fetch(
+        `/api/factures-fournisseurs/valider-lignes/${etat.documentId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lignes: lignesEditables }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setEtat({
+          type: "erreur",
+          message: data.error || "Erreur de validation.",
+        });
+        return;
+      }
+
+      router.push("/factures-fournisseurs");
+    } catch (error) {
+      console.error("[VALIDER_LIGNES_UI]", error);
+      setEtat({
+        type: "erreur",
+        message: "Erreur réseau lors de la validation des lignes.",
+      });
+    }
+  };
+
   const reinitialiser = () => {
     setFichierSelectionne(null);
     setLignesEditables([]);
@@ -472,10 +505,10 @@ export default function UploadFacture({ fournisseurs }: Props) {
         ) : (
           <button
             type="button"
-            onClick={() => router.push("/factures-fournisseurs")}
+            onClick={validerLignes}
             className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
           >
-            Terminer
+            Valider les lignes
           </button>
         )}
       </div>
