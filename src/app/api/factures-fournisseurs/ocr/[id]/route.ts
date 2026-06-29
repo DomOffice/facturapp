@@ -110,7 +110,18 @@ export async function POST(
     }
 
     const texteOcr = resultatOcr.texte || "";
-    const extraction = extraireFactureFournisseurDepuisOcr(texteOcr);
+
+    console.log("================================");
+    console.log("DEBUG OCR");
+    console.log("Pages :", resultatOcr.pages?.length);
+    console.log("Lignes page 1 :", resultatOcr.pages?.[0]?.lignes?.length);
+    console.log("Premier élément :", resultatOcr.pages?.[0]?.lignes?.[0]);
+    console.log("================================");
+    
+    const extraction = extraireFactureFournisseurDepuisOcr(
+      texteOcr,
+      resultatOcr,
+    );
 
     const documentMaj = await prisma.documentImporte.update({
       where: { id: documentId },

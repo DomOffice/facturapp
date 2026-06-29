@@ -5,6 +5,8 @@ from pathlib import Path
 import fitz  # PyMuPDF
 from paddleocr import PaddleOCR
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 ocr = PaddleOCR(
     lang="fr",
