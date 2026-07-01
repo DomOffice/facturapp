@@ -188,6 +188,68 @@ export default function UploadFacture({ fournisseurs }: Props) {
     }
   };
 
+  const rechercherProduitPourLigne = async (
+    index: number,
+    recherche: string,
+  ) => {
+    const q = recherche.trim();
+
+    setLignesEditables((lignes) =>
+      lignes.map((ligne, i) =>
+        i === index ? { ...ligne, produitRecherche: recherche } : ligne,
+      ),
+    );
+
+    if (q.length < 2) {
+      setLignesEditables((lignes) =>
+        lignes.map((ligne, i) =>
+          i === index
+            ? { ...ligne, produitsProposes: [], produitId: null }
+            : ligne,
+        ),
+      );
+      return;
+    }
+
+    const ligne = lignesEditables[index];
+
+    const qComplet = [q, ligne?.reference, ligne?.designation]
+      .filter(Boolean)
+      .join(" ");
+
+    const params = new URLSearchParams({ q: qComplet });
+
+    if (fournisseurId) {
+      params.set("fournisseurId", fournisseurId);
+    }
+
+    const res = await fetch(`/api/produits/recherche?${params.toString()}`);
+    const data = await res.json();
+
+    const produits = Array.isArray(data.produits) ? data.produits : [];
+
+    setLignesEditables((lignes) =>
+      lignes.map((ligne, i) =>
+        i === index
+          ? {
+              ...ligne,
+              produitsProposes: produits,
+              produitId: produits.length === 1 ? produits[0].id : null,
+            }
+          : ligne,
+      ),
+    );
+  };
+
+  const selectionnerProduitPourLigne = (
+    index: number,
+    produitId: number | null,
+  ) => {
+    setLignesEditables((lignes) =>
+      lignes.map((ligne, i) => (i === index ? { ...ligne, produitId } : ligne)),
+    );
+  };
+
   const validerLignes = async () => {
     if (etat.type !== "succes") return;
 
@@ -464,6 +526,8 @@ export default function UploadFacture({ fournisseurs }: Props) {
               <EditableInvoiceLines
                 lignes={lignesEditables}
                 onChange={setLignesEditables}
+                onRechercheProduit={rechercherProduitPourLigne}
+                onSelectionProduit={selectionnerProduitPourLigne}
               />
             </div>
           )}

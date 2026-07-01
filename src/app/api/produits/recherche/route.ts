@@ -25,6 +25,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ produits: [] });
     }
 
+    const mots = q
+      .split(/\s+/)
+      .map((mot) => mot.trim())
+      .filter((mot) => mot.length >= 2);
+
     const produits = await prisma.produit.findMany({
       where: {
         AND: [
@@ -32,10 +37,10 @@ export async function GET(req: NextRequest) {
             ? { fournisseurId }
             : {},
           {
-            OR: [
-              { reference: { contains: q, mode: "insensitive" } },
-              { description: { contains: q, mode: "insensitive" } },
-            ],
+            OR: mots.flatMap((mot) => [
+              { reference: { contains: mot, mode: "insensitive" as const } },
+              { description: { contains: mot, mode: "insensitive" as const } },
+            ]),
           },
         ],
       },
