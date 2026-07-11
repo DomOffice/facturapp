@@ -11,6 +11,7 @@ export type ProduitRecherche = {
   prixVenteHt: string | null;
   prixVenteTtc: string | null;
   fournisseurId: number | null;
+  score?: number;
 };
 
 export type LigneFactureExtraite = {
@@ -22,9 +23,11 @@ export type LigneFactureExtraite = {
   totalTtc?: number;
   confiance: number;
   alertes: string[];
+
   produitId?: number | null;
   produitRecherche?: string;
   produitsProposes?: ProduitRecherche[];
+  rechercheProduitEnCours?: boolean;
 };
 
 type Props = {
@@ -34,7 +37,10 @@ type Props = {
     index: number,
     recherche: string,
   ) => void | Promise<void>;
-  onSelectionProduit?: (index: number, produitId: number | null) => void;
+  onSelectionProduit?: (
+    index: number,
+    produitId: number | null,
+  ) => void;
 };
 
 export default function EditableInvoiceLines({
@@ -58,6 +64,7 @@ export default function EditableInvoiceLines({
         champ === "totalTtc"
       ) {
         const nombre = Number(valeur.replace(",", "."));
+
         return {
           ...ligne,
           [champ]: Number.isFinite(nombre) ? nombre : undefined,
@@ -74,14 +81,18 @@ export default function EditableInvoiceLines({
   }
 
   function libelleProduit(produit: ProduitRecherche) {
-    return [produit.reference, produit.description].filter(Boolean).join(" — ");
+    return [produit.reference, produit.description]
+      .filter(Boolean)
+      .join(" — ");
   }
 
   if (lignes.length === 0) return null;
 
   return (
     <div className="mt-6">
-      <h4 className="font-semibold mb-3">Lignes articles détectées</h4>
+      <h4 className="font-semibold mb-3">
+        Lignes articles détectées
+      </h4>
 
       <div className="overflow-x-auto border rounded-lg">
         <table className="min-w-full text-sm">
@@ -108,7 +119,11 @@ export default function EditableInvoiceLines({
                     <input
                       value={ligne.reference || ""}
                       onChange={(e) =>
-                        modifierLigne(index, "reference", e.target.value)
+                        modifierLigne(
+                          index,
+                          "reference",
+                          e.target.value,
+                        )
                       }
                       className="w-28 border rounded px-2 py-1"
                     />
@@ -118,7 +133,11 @@ export default function EditableInvoiceLines({
                     <textarea
                       value={ligne.designation || ""}
                       onChange={(e) =>
-                        modifierLigne(index, "designation", e.target.value)
+                        modifierLigne(
+                          index,
+                          "designation",
+                          e.target.value,
+                        )
                       }
                       className="w-full min-w-[260px] max-w-[420px] border rounded px-2 py-1"
                       rows={2}
@@ -129,7 +148,11 @@ export default function EditableInvoiceLines({
                     <input
                       value={ligne.quantite ?? ""}
                       onChange={(e) =>
-                        modifierLigne(index, "quantite", e.target.value)
+                        modifierLigne(
+                          index,
+                          "quantite",
+                          e.target.value,
+                        )
                       }
                       className="w-20 border rounded px-2 py-1 text-right"
                     />
@@ -139,7 +162,11 @@ export default function EditableInvoiceLines({
                     <input
                       value={ligne.prixUnitaireTtc ?? ""}
                       onChange={(e) =>
-                        modifierLigne(index, "prixUnitaireTtc", e.target.value)
+                        modifierLigne(
+                          index,
+                          "prixUnitaireTtc",
+                          e.target.value,
+                        )
                       }
                       className="w-24 border rounded px-2 py-1 text-right"
                     />
@@ -149,7 +176,11 @@ export default function EditableInvoiceLines({
                     <input
                       value={ligne.tauxTva ?? ""}
                       onChange={(e) =>
-                        modifierLigne(index, "tauxTva", e.target.value)
+                        modifierLigne(
+                          index,
+                          "tauxTva",
+                          e.target.value,
+                        )
                       }
                       className="w-20 border rounded px-2 py-1 text-right"
                     />
@@ -159,52 +190,81 @@ export default function EditableInvoiceLines({
                     <input
                       value={ligne.totalTtc ?? ""}
                       onChange={(e) =>
-                        modifierLigne(index, "totalTtc", e.target.value)
+                        modifierLigne(
+                          index,
+                          "totalTtc",
+                          e.target.value,
+                        )
                       }
                       className="w-24 border rounded px-2 py-1 text-right"
                     />
                   </td>
 
-                  <td className="px-3 py-2 min-w-[280px]">
+                  <td className="px-3 py-2 min-w-[320px]">
                     <input
-                      value={ligne.produitRecherche ?? ligne.reference ?? ""}
+                      value={ligne.produitRecherche ?? ""}
                       onChange={(e) =>
-                        onRechercheProduit?.(index, e.target.value)
+                        onRechercheProduit?.(
+                          index,
+                          e.target.value,
+                        )
                       }
-                      placeholder="Rechercher article..."
+                      placeholder="Rechercher par référence ou désignation..."
                       className="w-full border rounded px-2 py-1"
                     />
 
-                    {produits.length > 0 && (
-                      <select
-                        value={ligne.produitId ?? ""}
-                        onChange={(e) =>
-                          onSelectionProduit?.(
-                            index,
-                            e.target.value ? Number(e.target.value) : null,
-                          )
-                        }
-                        className="mt-2 w-full border rounded px-2 py-1"
-                      >
-                        <option value="">À rapprocher</option>
+                    <select
+                      value={ligne.produitId ?? ""}
+                      onChange={(e) =>
+                        onSelectionProduit?.(
+                          index,
+                          e.target.value
+                            ? Number(e.target.value)
+                            : null,
+                        )
+                      }
+                      className="mt-2 w-full border rounded px-2 py-1"
+                    >
+                      <option value="">À rapprocher</option>
 
-                        {produits.map((produit) => (
-                          <option key={produit.id} value={produit.id}>
-                            {libelleProduit(produit)}
-                          </option>
-                        ))}
-                      </select>
+                      {produits.map((produit) => (
+                        <option key={produit.id} value={produit.id}>
+                          {libelleProduit(produit)}
+                          {typeof produit.score === "number"
+                            ? ` — ${produit.score}%`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+
+                    {ligne.rechercheProduitEnCours && (
+                      <div className="mt-1 text-xs text-gray-500">
+                        Recherche en cours…
+                      </div>
                     )}
 
-                    {ligne.produitId ? (
-                      <div className="mt-1 text-xs text-green-700">
-                        Article associé #{ligne.produitId}
-                      </div>
-                    ) : (
-                      <div className="mt-1 text-xs text-orange-600">
-                        Aucun article associé
-                      </div>
-                    )}
+                    {!ligne.rechercheProduitEnCours &&
+                      ligne.produitId && (
+                        <div className="mt-1 text-xs text-green-700">
+                          Article associé #{ligne.produitId}
+                        </div>
+                      )}
+
+                    {!ligne.rechercheProduitEnCours &&
+                      !ligne.produitId &&
+                      produits.length > 0 && (
+                        <div className="mt-1 text-xs text-orange-600">
+                          Sélection à confirmer
+                        </div>
+                      )}
+
+                    {!ligne.rechercheProduitEnCours &&
+                      !ligne.produitId &&
+                      produits.length === 0 && (
+                        <div className="mt-1 text-xs text-orange-600">
+                          Aucun article associé
+                        </div>
+                      )}
                   </td>
 
                   <td className="px-3 py-2 text-center">

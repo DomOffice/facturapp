@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import EditableInvoiceLines, {
   LigneFactureExtraite,
+  ProduitRecherche,
 } from "./EditableInvoiceLines";
 
 type Fournisseur = {
@@ -107,6 +108,115 @@ export default function UploadFacture({ fournisseurs }: Props) {
     setEtat({ type: "idle" });
   }, []);
 
+const rechercherProduits = async (
+  recherche: string,
+): Promise<ProduitRecherche[]> => {
+  const q = recherche.trim();
+
+  if (q.length < 2) {
+    return [];
+  }
+
+  const params = new URLSearchParams({ q });
+
+  if (fournisseurId) {
+    params.set("fournisseurId", fournisseurId);
+  }
+
+  const res = await fetch(
+    `/api/produits/recherche?${params.toString()}`,
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("[RECHERCHE_PRODUITS_UI]", data);
+    return [];
+  }
+
+  return Array.isArray(data.produits) ? data.produits : [];
+};
+
+const enrichirLignesAvecProduits = async (
+  lignes: LigneFactureExtraite[],
+): Promise<LigneFactureExtraite[]> => {
+  return Promise.all(
+    lignes.map(async (ligne) => {
+      const reference = ligne.reference?.trim() || "";
+      const designation = ligne.designation?.trim() || "";
+
+      if (!reference && designation.length < 2) {
+        return {
+          ...ligne,
+          produitId: null,
+          produitRecherche: "",
+          produitsProposes: [],
+          rechercheProduitEnCours: false,
+        };
+      }
+
+      /*
+       * Première tentative :
+       * référence OCR + désignation.
+       */
+      const rechercheComplete = [reference, designation]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      let produits = await rechercherProduits(rechercheComplete);
+
+      /*
+       * Deuxième tentative :
+       * si aucune proposition pertinente, on cherche uniquement
+       * avec la désignation. C'est particulièrement utile pour
+       * les références fournisseur ou codes-barres absents de la BDD.
+       */
+      if (produits.length === 0 && designation.length >= 2) {
+        produits = await rechercherProduits(designation);
+      }
+
+      /*
+       * Dernier recours :
+       * référence seule, utile pour les références commerciales
+       * réellement présentes dans la BDD.
+       */
+      if (
+        produits.length === 0 &&
+        reference.length >= 2 &&
+        reference !== designation
+      ) {
+        produits = await rechercherProduits(reference);
+      }
+
+      const premier = produits[0];
+      const second = produits[1];
+
+      const scorePremier = premier?.score ?? 0;
+      const scoreSecond = second?.score ?? 0;
+
+      /*
+       * Présélection uniquement si le résultat est suffisamment
+       * fiable et nettement meilleur que le suivant.
+       */
+      const selectionAutomatique =
+        premier &&
+        scorePremier >= 90 &&
+        (!second || scorePremier - scoreSecond >= 15)
+          ? premier.id
+          : null;
+
+      return {
+        ...ligne,
+        produitId: selectionAutomatique,
+        produitRecherche: "",
+        produitsProposes: produits,
+        rechercheProduitEnCours: false,
+      };
+    }),
+  );
+};
+
   const handleSoumettre = async () => {
     if (!fichierSelectionne) return;
 
@@ -166,7 +276,11 @@ export default function UploadFacture({ fournisseurs }: Props) {
       }
 
       const lignes = ocrData.extraction?.lignes || [];
-      setLignesEditables(lignes);
+
+const lignesAvecProduits =
+  await enrichirLignesAvecProduits(lignes);
+
+setLignesEditables(lignesAvecProduits);
 
       setEtat({
         type: "succes",
@@ -189,57 +303,56 @@ export default function UploadFacture({ fournisseurs }: Props) {
   };
 
   const rechercherProduitPourLigne = async (
-    index: number,
-    recherche: string,
-  ) => {
-    const q = recherche.trim();
+  index: number,
+  recherche: string,
+) => {
+  setLignesEditables((lignes) =>
+    lignes.map((ligne, i) =>
+      i === index
+        ? {
+            ...ligne,
+            produitRecherche: recherche,
+            produitId: null,
+            rechercheProduitEnCours: recherche.trim().length >= 2,
+          }
+        : ligne,
+    ),
+  );
 
-    setLignesEditables((lignes) =>
-      lignes.map((ligne, i) =>
-        i === index ? { ...ligne, produitRecherche: recherche } : ligne,
-      ),
-    );
+  const q = recherche.trim();
 
-    if (q.length < 2) {
-      setLignesEditables((lignes) =>
-        lignes.map((ligne, i) =>
-          i === index
-            ? { ...ligne, produitsProposes: [], produitId: null }
-            : ligne,
-        ),
-      );
-      return;
-    }
-
-    const ligne = lignesEditables[index];
-
-    const qComplet = [q, ligne?.reference, ligne?.designation]
-      .filter(Boolean)
-      .join(" ");
-
-    const params = new URLSearchParams({ q: qComplet });
-
-    if (fournisseurId) {
-      params.set("fournisseurId", fournisseurId);
-    }
-
-    const res = await fetch(`/api/produits/recherche?${params.toString()}`);
-    const data = await res.json();
-
-    const produits = Array.isArray(data.produits) ? data.produits : [];
-
+  if (q.length < 2) {
     setLignesEditables((lignes) =>
       lignes.map((ligne, i) =>
         i === index
           ? {
               ...ligne,
-              produitsProposes: produits,
-              produitId: produits.length === 1 ? produits[0].id : null,
+              produitsProposes: [],
+              produitId: null,
+              rechercheProduitEnCours: false,
             }
           : ligne,
       ),
     );
-  };
+
+    return;
+  }
+
+  const produits = await rechercherProduits(q);
+
+  setLignesEditables((lignes) =>
+    lignes.map((ligne, i) =>
+      i === index
+        ? {
+            ...ligne,
+            produitsProposes: produits,
+            produitId: null,
+            rechercheProduitEnCours: false,
+          }
+        : ligne,
+    ),
+  );
+};
 
   const selectionnerProduitPourLigne = (
     index: number,
