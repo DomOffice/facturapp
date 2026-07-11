@@ -41,6 +41,7 @@ function calculerConfianceLigne(ligne: LigneFactureExtraite): number {
   if (ligne.quantite !== undefined) points += 15
   if (ligne.prixUnitaireTtc !== undefined) points += 10
   if (ligne.totalTtc !== undefined) points += 15
+  if (ligne.tauxTva !== undefined) points += 5
 
   if (
     ligne.quantite !== undefined &&
@@ -120,12 +121,14 @@ export function construireLigneArticleDepuisGroupes(
 ): LigneFactureExtraite | null {
   const donnees = detecterDonneesArticle(groupes, profil)
 
-  if (!donnees.designationBrute || !donnees.tva || !donnees.pu || !donnees.qte || !donnees.total) {
+  if (!donnees.designationBrute || !donnees.pu || !donnees.qte || !donnees.total) {
     return null
   }
 
-  const tauxTvaMatch = donnees.tva.texte.match(/\b(20|10|7)\s*%/)
-  const refEtDesignation = extraireReferenceDepuisDesignation(donnees.designationBrute)
+  const tauxTvaMatch = donnees.tva?.texte.match(/\b(20|10|7)\s*%/)
+  const refEtDesignation = extraireReferenceDepuisDesignation(
+    donnees.designationBrute,
+  )
 
   const ligne: LigneFactureExtraite = {
     reference: refEtDesignation.reference,
@@ -142,6 +145,7 @@ export function construireLigneArticleDepuisGroupes(
   if (ligne.quantite === undefined) ligne.alertes.push('Quantité non détectée')
   if (ligne.prixUnitaireTtc === undefined) ligne.alertes.push('Prix unitaire non détecté')
   if (ligne.totalTtc === undefined) ligne.alertes.push('Total ligne non détecté')
+  if (ligne.tauxTva === undefined) ligne.alertes.push('TVA non détectée')
 
   ligne.confiance = calculerConfianceLigne(ligne)
 

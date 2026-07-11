@@ -268,7 +268,9 @@ function extraireLignesAvecFallback(
       lignes: lignesProfil,
       strategie: "profil",
       fallbackUtilise: false,
-      qualite: lignesProfil.every((l) => l.confiance > 95) ? "A" : "B",
+      qualite: lignesProfil.every((ligne) => ligne.confiance > 95)
+        ? "A"
+        : "B",
     };
   }
 
@@ -288,11 +290,22 @@ function extraireLignesAvecFallback(
 
   const lignesTexte = extraireLignesDepuisTexte(texteOcr);
 
+  if (lignesTexte.length > 0) {
+    return {
+      lignes: lignesTexte,
+      strategie: "fallback_texte",
+      fallbackUtilise: true,
+      qualite: "D",
+    };
+  }
+
+  const lignesBl = extraireLignesBlDepuisTexte(texteOcr);
+
   return {
-    lignes: lignesTexte,
+    lignes: lignesBl,
     strategie: "fallback_texte",
     fallbackUtilise: true,
-    qualite: lignesTexte.length > 0 ? "D" : "D",
+    qualite: lignesBl.length > 0 ? "C" : "D",
   };
 }
 
@@ -388,4 +401,61 @@ export function extraireFactureFournisseurDepuisOcr(
     confiance: points,
     alertes,
   };
+}
+
+function extraireLignesBlDepuisTexte(texteOcr: string): LigneFactureExtraite[] {
+  const lignesTexte = normaliserTexte(texteOcr)
+    .split("\n")
+    .map((ligne) => ligne.trim())
+    .filter(Boolean)
+
+  const lignes: LigneFactureExtraite[] = []
+
+  for (let i = 0; i < lignesTexte.length - 4; i += 1) {
+    const reference = lignesTexte[i]
+    const designation = lignesTexte[i + 1]
+    const quantiteTexte = lignesTexte[i + 2]
+    const prixTexte = lignesTexte[i + 3]
+    const totalTexte = lignesTexte[i + 4]
+
+    const estReference =
+      /^[A-Z0-9][A-Z0-9._/-]{4,}$/i.test(reference)
+
+    const estDesignation =
+      designation.length >= 5 &&
+      !/^(remarque|net à payer|net a payer|arrêté|arrete)$/i.test(designation)
+
+    const estQuantite = /^\d+$/.test(quantiteTexte)
+
+    const estPrix = /^\d[\d\s]*[,.]\d{2}$/.test(
+      prixTexte.replace(/\s/g, ""),
+    )
+
+    const estTotal = /^\d[\d\s]*[,.]\d{2}$/.test(
+      totalTexte.replace(/\s/g, ""),
+    )
+
+    if (!estReference || !estDesignation || !estQuantite || !estPrix || !estTotal) {
+      continue
+    }
+
+    const ligneExtraite: LigneFactureExtraite = {
+      reference,
+      designation,
+      quantite: Number(quantiteTexte),
+      prixUnitaireTtc: parseMontant(prixTexte),
+      tauxTva: undefined,
+      totalTtc: parseMontant(totalTexte),
+      confiance: 0,
+      alertes: ["Extraction fallback BL texte brut", "TVA non détectée"],
+    }
+
+    ligneExtraite.confiance = Math.min(85, calculerConfianceLigne(ligneExtraite))
+
+    lignes.push(ligneExtraite)
+
+    i += 4
+  }
+
+  return lignes
 }
