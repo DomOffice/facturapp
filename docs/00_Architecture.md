@@ -76,6 +76,9 @@ Pour le module factures fournisseurs :
 ```text
 /api/factures-fournisseurs/upload
 /api/factures-fournisseurs/ocr/[id]
+/api/factures-fournisseurs/valider-lignes/[id]
+/api/produits/recherche
+/api/produits/associations
 ```
 
 La route `upload` gère l'import physique du document et la création de la ligne `DocumentImporte`.
@@ -134,6 +137,26 @@ PaddleOCR
   ▼
 Texte OCR + JSON stockés dans PostgreSQL
 ```
+Architecture fonctionnelle du module
+
+Import du document
+        ↓
+OCR PaddleOCR
+        ↓
+Extraction structurée
+        ↓
+Lignes OCR éditables
+        ↓
+Recherche / rapprochement produits
+        ↓
+Validation humaine
+        ↓
+lignes_importees
+        ↓
+Mémorisation des associations
+        ↓
+Création future de la facture fournisseur
+
 
 Le moteur actuel est local : Python + PaddleOCR.
 
@@ -194,3 +217,21 @@ Le moteur OCR évolue vers une logique en deux niveaux :
 
 Le moteur ne doit pas dépendre directement d’un fournisseur précis.  
 Les drivers ne doivent pas contenir de logique complexe : uniquement des paramètres, alias, corrections ou particularités.
+
+## MAJ du 11/07/2026
+FacturApp n’est pas seulement un OCR. Il constitue un moteur de lecture intelligente de documents fournisseurs.
+
+e moteur dispose maintenant de deux voies :
+
+Extraction par coordonnées OCR
+Extraction séquentielle depuis le texte brut en fallback
+
+Le fallback séquentiel permet notamment de lire un tableau organisé sous la forme :
+
+Référence
+Désignation
+Quantité
+Prix
+Total
+
+Il a été validé sur un BL comportant 14 articles.

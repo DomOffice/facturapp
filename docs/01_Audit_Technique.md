@@ -156,3 +156,38 @@ MistralOcrProvider
 5. Ajouter une file de traitement OCR.
 6. Renforcer la sécurité fichier.
 
+## MAJ du 11/07/2026
+### Points validés
+extraction des champs principaux ;
+extraction intelligente des lignes ;
+ArticleBuilder supportant des articles sur plusieurs groupes OCR ;
+fallback texte brut ;
+validation et correction des lignes ;
+enregistrement dans lignes_importees ;
+association facultative avec Produit ;
+recherche produit manuelle ;
+recherche produit automatique initiale ;
+statuts associee et a_rapprocher.
+
+#### Points de vigilance
+Recherche produit approximative
+
+La recherche automatique peut produire des faux positifs.
+
+Exemple rencontré :
+
+AGRAFE EXPRESS XO-3343 24/6
+→ Agrafeuse 24/6 Express XO-3343
+
+La proposition est utile, mais ne doit pas être présélectionnée en dessous d’un seuil élevé.
+
+Concurrence des recherches frontend
+
+La saisie manuelle déclenche des requêtes réseau successives. Il faudra plus tard ajouter :
+
+un debounce ;
+éventuellement un AbortController ;
+une protection contre les réponses arrivant dans le désordre.
+Logique métier dans le frontend
+
+Le scoring et l’enrichissement automatique sont encore partiellement orchestrés dans upload-facture.tsx. À terme, le rapprochement devra être déplacé vers un service serveur.

@@ -165,3 +165,45 @@ MariaDB alimente PostgreSQL pour les données historiques.
 PostgreSQL reste maître pour les modules propres à FacturApp TS.
 ```
 
+## MAJ du 11/07/2026
+### lignes_importees
+
+Rôle :
+
+stocker les lignes OCR corrigées et validées ;
+conserver la référence détectée ;
+conserver la désignation ;
+stocker quantité, prix unitaire, TVA et total ;
+porter un produitId facultatif ;
+distinguer les lignes associées et celles restant à rapprocher.
+
+Cycle :
+
+Ligne OCR détectée
+        ↓
+Correction utilisateur
+        ↓
+Validation
+        ↓
+LigneImportee
+        ├── produitId défini → associee
+        └── produitId null   → a_rapprocher
+
+### table d’association
+
+associations_articles_fournisseurs
+Clé fonctionnelle proposée :
+fournisseurId + referenceNormalisee
+Rôle :
+référence fournisseur détectée
+        ↓
+produit FacturApp correspondant
+Mettre à jour le cycle documentaire
+Le cycle réel comprend maintenant :
+upload
+→ OCR
+→ extraction
+→ correction
+→ lignes_validees
+→ rapprochement
+→ facture fournisseur future

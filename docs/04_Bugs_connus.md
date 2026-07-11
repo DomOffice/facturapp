@@ -133,3 +133,39 @@ Pour Sprint 3, l’extraction des lignes articles est validée uniquement sur de
 
 Les documents inclinés ou de mauvaise qualité peuvent échouer à l’extraction des lignes.  
 La correction automatique d’inclinaison ou le redressement d’image n’est pas prioritaire à ce stade.
+
+## MAJ du 11/07/2026
+### Bugs corrigés
+# 1- Association identique affectée à plusieurs lignes
+- Symptôme :
+CANPG445 et CANCL446
+→ même produitId
+- Cause :
+conservation d’un ancien produitId lors d’une nouvelle recherche.
+- Correction :
+remise à null du produit sélectionné lors du changement de recherche.
+
+# 2- Option « À rapprocher » absente
+- Cause :
+le <select> n’était affiché que si une proposition existait.
+- Correction :
+affichage permanent du sélecteur et de l’option À rapprocher.
+
+# 3- Filtre fournisseur trop restrictif
+- Cause :
+la recherche imposait le même fournisseurId.
+- Correction :
+le fournisseur devient un bonus de score et non une condition d’exclusion.
+
+# 4- Fallback BL jamais appelé
+- Cause :
+extraireLignesBlDepuisTexte() existait mais n’était pas appelée.
+- Correction :
+ajout après l’échec du fallback texte historique.
+
+### Points à surveiller
+faux positifs dans le rapprochement lexical ;
+codes-barres fournisseurs absents de la fiche produit ;
+différences lexicales : agrafe / agrafeuse, CL446 / CL 446 ;
+multiplication des requêtes lors de la frappe ;
+risque de doublons lors de la future création de produits.

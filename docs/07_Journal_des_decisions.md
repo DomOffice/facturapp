@@ -206,3 +206,82 @@ Principe d’architecture :
 - les drivers fournisseurs restent déclaratifs ;
 - les fallbacks sont conservés ;
 - l’interface éditable existante n’est pas modifiée.
+
+## MAJ du 11/07/2026
+Décision — TVA facultative sur les lignes importées
+
+Motif :
+
+certains documents fournisseurs, notamment des BL, ne présentent pas la TVA par article.
+
+Conséquence :
+
+une ligne peut être complète avec désignation, quantité, prix et total ;
+l’absence de TVA génère une alerte, mais ne bloque plus l’extraction.
+Décision — Conservation des fallbacks
+
+Motif :
+
+les coordonnées OCR ne suffisent pas pour tous les formats ;
+le fallback séquentiel permet d’obtenir une V1 exploitable.
+
+Conséquence :
+
+profil
+→ fallback générique
+→ fallback texte
+→ fallback tableau séquentiel
+Décision — Validation avant création métier
+
+Motif :
+
+l’OCR ne doit jamais créer automatiquement une facture ou modifier le stock.
+
+Conséquence :
+
+les corrections sont d’abord enregistrées dans lignes_importees.
+Décision — Produit facultatif
+
+Motif :
+
+une ligne OCR doit pouvoir être validée même lorsqu’aucun produit n’est trouvé.
+
+Conséquence :
+
+produitId renseigné → associee
+produitId absent    → a_rapprocher
+Décision — Le fournisseur influence mais ne bloque pas la recherche
+
+Motif :
+
+un produit peut être acheté auprès de plusieurs fournisseurs ;
+les données synchronisées peuvent contenir un fournisseur principal différent.
+Décision — Présélection automatique prudente
+
+Motif :
+
+les correspondances lexicales peuvent confondre des produits proches.
+
+Conséquence :
+
+les résultats faibles restent des propositions ;
+la présélection exige un score élevé et une avance nette.
+Décision — Mémoriser les choix humains
+
+Motif :
+
+le choix validé par l’utilisateur est plus fiable qu’une nouvelle recherche approximative.
+
+Conséquence :
+
+Sprint 4.2.3 introduit une association stable entre fournisseur, référence détectée et produit.
+Décision — Création produit volontaire uniquement
+
+Motif :
+
+éviter les doublons provoqués par une mauvaise lecture OCR ou une désignation légèrement différente.
+
+Conséquence :
+
+aucun article ne sera créé automatiquement ;
+l’utilisateur disposera d’une action explicite « Créer un article »

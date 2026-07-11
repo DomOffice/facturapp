@@ -118,3 +118,49 @@ Permettre de rechercher et consulter les documents importés.
 | Extraction lignes articles OCR | En cours avancé |
 | ArticleBuilder OCR | À faire |
 | Drivers fournisseurs OCR | En cours |
+
+## MAJ du 11/07/2026
+Sprint 3 — Extraction intelligente
+Statut : terminé
+
+Réalisé :
+
+extraction des champs ;
+lignes depuis coordonnées OCR ;
+ArticleBuilder ;
+articles sur 1, 2, 3 ou N groupes OCR ;
+confiance par ligne ;
+drivers légers ;
+fallbacks ;
+diagnostic OCR ;
+fallback BL séquentiel ;
+prise en charge des lignes sans TVA.
+Sprint 4.1 — Validation
+Statut : terminé
+
+Réalisé :
+
+correction utilisateur ;
+endpoint de validation ;
+enregistrement dans lignes_importees ;
+statut lignes_validees ;
+association produit facultative.
+Sprint 4.2.1 — Recherche manuelle
+Statut : terminé
+Sprint 4.2.2 — Recherche automatique initiale
+Statut : V1 terminée, précision à améliorer
+Sprint 4.2.3 — Mémorisation
+Statut : prochaine étape
+
+Contenu :
+
+table d’associations ;
+sauvegarde lors de la validation ;
+priorité aux associations connues ;
+correction possible d’une association existante.
+Sprint 4.2.4 — Création d’un article
+Statut : à faire après 4.2.3
+Sprint 4.3 — Création facture fournisseur
+Statut : à faire
+Sprint 4.4 — Impact stock
+Statut : à faire séparément

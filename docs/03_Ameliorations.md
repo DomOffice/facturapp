@@ -141,3 +141,41 @@ Mettre en place un cycle : brouillon → validé → archivé.
 - Ajouter une documentation d'installation serveur.
 - Documenter la synchronisation MariaDB → PostgreSQL.
 
+## MAJ du 11/07/2026
+### Améliorations terminées 
+- Extraction OCR
+- extraction fournisseur, numéro, date, ICE et totaux ;
+- extraction des lignes article ;
+- coordonnées et confiance OCR ;
+- ArticleBuilder générique ;
+- drivers fournisseurs déclaratifs ;
+- fallback générique ;
+- fallback texte ;
+- extraction de BL sans TVA par ligne ;
+- diagnostic OCR ;
+- qualité A/B/C/D ;
+- édition des cellules.
+
+### Validation
+- endpoint valider-lignes/[id] ;
+- remplacement transactionnel des anciennes lignes ;
+- création de LigneImportee ;
+- conservation des corrections ;
+- association facultative à un produit ;
+- statuts associee et a_rapprocher.
+
+### Rapprochement
+- endpoint de recherche produit ;
+- recherche par référence et désignation ;
+- score de pertinence ;
+- bonus fournisseur non bloquant ;
+- sélection manuelle ;
+- option permanente « À rapprocher » ;
+- propositions automatiques initiales.
+
+### Nouvelle priorité haute
+- mémorisation des associations fournisseur–référence–produit ;
+- réutilisation automatique des associations ;
+- création d’un produit depuis une ligne OCR ;
+- création réelle de la facture fournisseur ;
+- impact stock dans une étape séparée.

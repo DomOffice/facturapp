@@ -143,3 +143,11 @@ Documents de référence :
 - `06_Conventions_de_code.md`
 - `07_Journal_des_decisions.md`
 
+## MAJ du 11/07/2026
+- Une recherche approximative ne doit jamais produire silencieusement une écriture métier définitive.
+- Une association automatique doit rester corrigeable par l’utilisateur.
+- Toute migration Prisma doit être accompagnée de :
+  npx prisma format
+  npx prisma validate
+  npx prisma migrate dev
+  npm run build
