@@ -22,17 +22,17 @@ model Role {
 }
 
 model Utilisateur {
-  id               Int            @id @default(autoincrement())
-  nom              String         @db.VarChar(100)
-  email            String         @unique @db.VarChar(150)
-  motDePasseHash   String         @map("mot_de_passe_hash") @db.VarChar(255)
-  roleId           Int            @map("role_id")
-  actif            Boolean        @default(true)
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-  role             Role           @relation(fields: [roleId], references: [id])
-  factures         Facture[]
-  journalAudit     JournalAudit[]
+  id                Int               @id @default(autoincrement())
+  nom               String            @db.VarChar(100)
+  email             String            @unique @db.VarChar(150)
+  motDePasseHash    String            @map("mot_de_passe_hash") @db.VarChar(255)
+  roleId            Int               @map("role_id")
+  actif             Boolean           @default(true)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  role              Role              @relation(fields: [roleId], references: [id])
+  factures          Facture[]
+  journalAudit      JournalAudit[]
   documentsImportes DocumentImporte[]
 
   @@map("utilisateurs")
@@ -41,23 +41,23 @@ model Utilisateur {
 // ─── PARAMÈTRES SOCIÉTÉ ─────────────────────────────────────────────
 
 model Entreprise {
-  id           Int      @id @default(autoincrement())
-  raisonSociale String  @map("raison_sociale") @db.VarChar(150)
-  adresse      String?  @db.Text
-  codePostal   String?  @map("code_postal") @db.VarChar(20)
-  ville        String?  @db.VarChar(100)
-  telephone    String?  @db.VarChar(50)
-  email        String?  @db.VarChar(150)
-  ice          String?  @db.VarChar(50)
-  identifiantFiscal String? @map("identifiant_fiscal") @db.VarChar(50)
-  rc           String?  @db.VarChar(50)
-  patente      String?  @db.VarChar(50)
-  logoUrl      String?  @map("logo_url") @db.VarChar(255)
-  compteBancaire String? @map("compte_bancaire") @db.VarChar(100)
-  devise       String   @default("MAD") @db.VarChar(20)
-  formatDate   String   @default("DD/MM/YYYY") @map("format_date") @db.VarChar(20)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                Int      @id @default(autoincrement())
+  raisonSociale     String   @map("raison_sociale") @db.VarChar(150)
+  adresse           String?  @db.Text
+  codePostal        String?  @map("code_postal") @db.VarChar(20)
+  ville             String?  @db.VarChar(100)
+  telephone         String?  @db.VarChar(50)
+  email             String?  @db.VarChar(150)
+  ice               String?  @db.VarChar(50)
+  identifiantFiscal String?  @map("identifiant_fiscal") @db.VarChar(50)
+  rc                String?  @db.VarChar(50)
+  patente           String?  @db.VarChar(50)
+  logoUrl           String?  @map("logo_url") @db.VarChar(255)
+  compteBancaire    String?  @map("compte_bancaire") @db.VarChar(100)
+  devise            String   @default("MAD") @db.VarChar(20)
+  formatDate        String   @default("DD/MM/YYYY") @map("format_date") @db.VarChar(20)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("entreprise")
 }
@@ -74,26 +74,26 @@ model ParametreType {
 }
 
 model Parametre {
-  id              Int           @id @default(autoincrement())
-  typeId          Int           @map("type_id")
-  code            String        @db.VarChar(100)
-  libelle         String        @db.VarChar(150)
-  valeurNum       Decimal?      @map("valeur_num") @db.Decimal(10, 2)
-  ordreAffichage  Int?          @map("ordre_affichage")
-  actif           Boolean       @default(true)
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  type            ParametreType @relation(fields: [typeId], references: [id])
+  id             Int           @id @default(autoincrement())
+  typeId         Int           @map("type_id")
+  code           String        @db.VarChar(100)
+  libelle        String        @db.VarChar(150)
+  valeurNum      Decimal?      @map("valeur_num") @db.Decimal(10, 2)
+  ordreAffichage Int?          @map("ordre_affichage")
+  actif          Boolean       @default(true)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  type           ParametreType @relation(fields: [typeId], references: [id])
 
   // Relations inverses
-  clients          Client[]       @relation("TypeClient")
-  fournisseurs     Fournisseur[]  @relation("TypeFournisseur")
-  produits         Produit[]      @relation("TypeProduit")
-  produitsUnite    Produit[]      @relation("UniteProduit")
-  produitsTva      Produit[]      @relation("TvaProduit")
-  prixTva          PrixProduit[]  @relation("TvaPrix")
-  paiementsMode    Paiement[]     @relation("ModeReglement")
-  charges          Charge[]       @relation("TypeCharge")
+  clients       Client[]      @relation("TypeClient")
+  fournisseurs  Fournisseur[] @relation("TypeFournisseur")
+  produits      Produit[]     @relation("TypeProduit")
+  produitsUnite Produit[]     @relation("UniteProduit")
+  produitsTva   Produit[]     @relation("TvaProduit")
+  prixTva       PrixProduit[] @relation("TvaPrix")
+  paiementsMode Paiement[]    @relation("ModeReglement")
+  charges       Charge[]      @relation("TypeCharge")
 
   @@map("parametres")
 }
@@ -101,19 +101,19 @@ model Parametre {
 // ─── TIERS ──────────────────────────────────────────────────────────
 
 model Client {
-  id            Int       @id @default(autoincrement())
-  typeClientId  Int?      @map("type_client_id")
-  raisonSociale String    @map("raison_sociale") @db.VarChar(150)
-  adresse       String?   @db.Text
-  codePostal    String?   @map("code_postal") @db.VarChar(20)
-  telephone     String?   @db.VarChar(50)
-  ville         String?   @db.VarChar(100)
-  ice           String?   @db.VarChar(50)
-  email         String?   @db.VarChar(150)
-  echeanceJours Int?      @map("echeance_jours")
-  actif         Boolean   @default(true)
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id            Int        @id @default(autoincrement())
+  typeClientId  Int?       @map("type_client_id")
+  raisonSociale String     @map("raison_sociale") @db.VarChar(150)
+  adresse       String?    @db.Text
+  codePostal    String?    @map("code_postal") @db.VarChar(20)
+  telephone     String?    @db.VarChar(50)
+  ville         String?    @db.VarChar(100)
+  ice           String?    @db.VarChar(50)
+  email         String?    @db.VarChar(150)
+  echeanceJours Int?       @map("echeance_jours")
+  actif         Boolean    @default(true)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
   typeClient    Parametre? @relation("TypeClient", fields: [typeClientId], references: [id])
   factures      Facture[]
   avoirs        Avoir[]
@@ -126,23 +126,24 @@ model Client {
 }
 
 model Fournisseur {
-  id                  Int         @id @default(autoincrement())
-  typeFournisseurId   Int?        @map("type_fournisseur_id")
-  raisonSociale       String      @map("raison_sociale") @db.VarChar(150)
-  adresse             String?     @db.Text
-  codePostal          String?     @map("code_postal") @db.VarChar(20)
-  telephone           String?     @db.VarChar(50)
-  ville               String?     @db.VarChar(100)
-  ice                 String?     @db.VarChar(50)
-  email               String?     @db.VarChar(150)
-  actif               Boolean     @default(true)
-  createdAt           DateTime    @default(now()) @map("created_at")
-  updatedAt           DateTime    @updatedAt @map("updated_at")
-  typeFournisseur     Parametre?  @relation("TypeFournisseur", fields: [typeFournisseurId], references: [id])
-  produits            Produit[]
-  prixProduits        PrixProduit[]
-  charges             Charge[]
-  documentsImportes DocumentImporte[]
+  id                   Int                             @id @default(autoincrement())
+  typeFournisseurId    Int?                            @map("type_fournisseur_id")
+  raisonSociale        String                          @map("raison_sociale") @db.VarChar(150)
+  adresse              String?                         @db.Text
+  codePostal           String?                         @map("code_postal") @db.VarChar(20)
+  telephone            String?                         @db.VarChar(50)
+  ville                String?                         @db.VarChar(100)
+  ice                  String?                         @db.VarChar(50)
+  email                String?                         @db.VarChar(150)
+  actif                Boolean                         @default(true)
+  createdAt            DateTime                        @default(now()) @map("created_at")
+  updatedAt            DateTime                        @updatedAt @map("updated_at")
+  typeFournisseur      Parametre?                      @relation("TypeFournisseur", fields: [typeFournisseurId], references: [id])
+  produits             Produit[]
+  prixProduits         PrixProduit[]
+  charges              Charge[]
+  documentsImportes    DocumentImporte[]
+  associationsArticles AssociationArticleFournisseur[]
 
   @@index([raisonSociale])
   @@index([telephone])
@@ -152,30 +153,31 @@ model Fournisseur {
 // ─── PRODUITS ───────────────────────────────────────────────────────
 
 model Produit {
-  id                   Int           @id @default(autoincrement())
-  typeProduitId        Int?          @map("type_produit_id")
-  reference            String        @db.VarChar(100)
-  description          String        @db.VarChar(255)
-  uniteId              Int?          @map("unite_id")
-  fournisseurId        Int?          @map("fournisseur_id")
-  tauxTvaId            Int?          @map("taux_tva_id")
-  dernierPrixAchatHt   Decimal       @default(0) @map("dernier_prix_achat_ht") @db.Decimal(14, 2)
-  dernierPrixAchatTtc  Decimal       @default(0) @map("dernier_prix_achat_ttc") @db.Decimal(14, 2)
-  prixVenteHt          Decimal       @default(0) @map("prix_vente_ht") @db.Decimal(14, 2)
-  prixVenteTtc         Decimal       @default(0) @map("prix_vente_ttc") @db.Decimal(14, 2)
-  margeHt              Decimal       @default(0) @map("marge_ht") @db.Decimal(14, 2)
-  actif                Boolean       @default(true)
-  createdAt            DateTime      @default(now()) @map("created_at")
-  updatedAt            DateTime      @updatedAt @map("updated_at")
-  typeProduit          Parametre?    @relation("TypeProduit", fields: [typeProduitId], references: [id])
-  unite                Parametre?    @relation("UniteProduit", fields: [uniteId], references: [id])
-  tauxTva              Parametre?    @relation("TvaProduit", fields: [tauxTvaId], references: [id])
-  fournisseur          Fournisseur?  @relation(fields: [fournisseurId], references: [id])
-  prixHistorique       PrixProduit[]
-  factureLignes        FactureLigne[]
-  avoirLignes          AvoirLigne[]
-  devisLignes          DevisLigne[]
-  lignesImportees LigneImportee[]
+  id                       Int                             @id @default(autoincrement())
+  typeProduitId            Int?                            @map("type_produit_id")
+  reference                String                          @db.VarChar(100)
+  description              String                          @db.VarChar(255)
+  uniteId                  Int?                            @map("unite_id")
+  fournisseurId            Int?                            @map("fournisseur_id")
+  tauxTvaId                Int?                            @map("taux_tva_id")
+  dernierPrixAchatHt       Decimal                         @default(0) @map("dernier_prix_achat_ht") @db.Decimal(14, 2)
+  dernierPrixAchatTtc      Decimal                         @default(0) @map("dernier_prix_achat_ttc") @db.Decimal(14, 2)
+  prixVenteHt              Decimal                         @default(0) @map("prix_vente_ht") @db.Decimal(14, 2)
+  prixVenteTtc             Decimal                         @default(0) @map("prix_vente_ttc") @db.Decimal(14, 2)
+  margeHt                  Decimal                         @default(0) @map("marge_ht") @db.Decimal(14, 2)
+  actif                    Boolean                         @default(true)
+  createdAt                DateTime                        @default(now()) @map("created_at")
+  updatedAt                DateTime                        @updatedAt @map("updated_at")
+  typeProduit              Parametre?                      @relation("TypeProduit", fields: [typeProduitId], references: [id])
+  unite                    Parametre?                      @relation("UniteProduit", fields: [uniteId], references: [id])
+  tauxTva                  Parametre?                      @relation("TvaProduit", fields: [tauxTvaId], references: [id])
+  fournisseur              Fournisseur?                    @relation(fields: [fournisseurId], references: [id])
+  prixHistorique           PrixProduit[]
+  factureLignes            FactureLigne[]
+  avoirLignes              AvoirLigne[]
+  devisLignes              DevisLigne[]
+  lignesImportees          LigneImportee[]
+  associationsFournisseurs AssociationArticleFournisseur[]
 
   @@index([reference])
   @@index([description])
@@ -237,24 +239,24 @@ model Facture {
 }
 
 model FactureLigne {
-  id                 Int      @id @default(autoincrement())
-  factureId          Int      @map("facture_id")
-  ordreLigne         Int      @map("ordre_ligne")
-  produitId          Int?     @map("produit_id")
-  designation        String   @db.VarChar(255)
-  quantite           Decimal  @db.Decimal(14, 2)
-  prixAchatHt        Decimal  @default(0) @map("prix_achat_ht") @db.Decimal(14, 2)
-  prixUnitaireHt     Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
-  remisePourcentage  Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
-  montantRemiseHt    Decimal  @default(0) @map("montant_remise_ht") @db.Decimal(14, 2)
-  tauxTva            Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
-  montantHt          Decimal  @map("montant_ht") @db.Decimal(14, 2)
-  montantTva         Decimal  @map("montant_tva") @db.Decimal(14, 2)
-  montantTtc         Decimal  @map("montant_ttc") @db.Decimal(14, 2)
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-  facture            Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
-  produit            Produit? @relation(fields: [produitId], references: [id])
+  id                Int      @id @default(autoincrement())
+  factureId         Int      @map("facture_id")
+  ordreLigne        Int      @map("ordre_ligne")
+  produitId         Int?     @map("produit_id")
+  designation       String   @db.VarChar(255)
+  quantite          Decimal  @db.Decimal(14, 2)
+  prixAchatHt       Decimal  @default(0) @map("prix_achat_ht") @db.Decimal(14, 2)
+  prixUnitaireHt    Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
+  remisePourcentage Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
+  montantRemiseHt   Decimal  @default(0) @map("montant_remise_ht") @db.Decimal(14, 2)
+  tauxTva           Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantHt         Decimal  @map("montant_ht") @db.Decimal(14, 2)
+  montantTva        Decimal  @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc        Decimal  @map("montant_ttc") @db.Decimal(14, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  facture           Facture  @relation(fields: [factureId], references: [id], onDelete: Cascade)
+  produit           Produit? @relation(fields: [produitId], references: [id])
 
   @@index([factureId])
   @@map("facture_lignes")
@@ -263,19 +265,19 @@ model FactureLigne {
 // ─── PAIEMENTS ──────────────────────────────────────────────────────
 
 model Paiement {
-  id               Int        @id @default(autoincrement())
-  factureId        Int        @unique @map("facture_id")
-  datePaiement     DateTime?  @map("date_paiement") @db.Date
-  modeReglementId  Int?       @map("mode_reglement_id")
-  numeroPiece      String?    @map("numero_piece") @db.VarChar(100)
-  remarque         String?    @db.VarChar(255)
-  justificatifUrl  String?    @map("justificatif_url") @db.VarChar(255)
-  montantHt        Decimal    @default(0) @map("montant_ht") @db.Decimal(14, 2)
-  montantTtc       Decimal    @default(0) @map("montant_ttc") @db.Decimal(14, 2)
-  createdAt        DateTime   @default(now()) @map("created_at")
-  updatedAt        DateTime   @updatedAt @map("updated_at")
-  facture          Facture    @relation(fields: [factureId], references: [id])
-  modeReglement    Parametre? @relation("ModeReglement", fields: [modeReglementId], references: [id])
+  id              Int        @id @default(autoincrement())
+  factureId       Int        @unique @map("facture_id")
+  datePaiement    DateTime?  @map("date_paiement") @db.Date
+  modeReglementId Int?       @map("mode_reglement_id")
+  numeroPiece     String?    @map("numero_piece") @db.VarChar(100)
+  remarque        String?    @db.VarChar(255)
+  justificatifUrl String?    @map("justificatif_url") @db.VarChar(255)
+  montantHt       Decimal    @default(0) @map("montant_ht") @db.Decimal(14, 2)
+  montantTtc      Decimal    @default(0) @map("montant_ttc") @db.Decimal(14, 2)
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  facture         Facture    @relation(fields: [factureId], references: [id])
+  modeReglement   Parametre? @relation("ModeReglement", fields: [modeReglementId], references: [id])
 
   @@index([datePaiement])
   @@map("paiements")
@@ -284,21 +286,21 @@ model Paiement {
 // ─── CHARGES ────────────────────────────────────────────────────────
 
 model Charge {
-  id             Int          @id @default(autoincrement())
-  dateCharge     DateTime     @map("date_charge") @db.Date
-  numeroFacture  String?      @map("numero_facture") @db.VarChar(100)
-  emetteur       String       @db.VarChar(150)
-  typeChargeId   Int          @map("type_charge_id")
-  montantHt      Decimal      @default(0) @map("montant_ht") @db.Decimal(14, 2)
-  tauxTva        Decimal      @default(0) @map("taux_tva") @db.Decimal(5, 2)
-  montantTva     Decimal      @default(0) @map("montant_tva") @db.Decimal(14, 2)
-  montantTtc     Decimal      @default(0) @map("montant_ttc") @db.Decimal(14, 2)
-  fournisseurId  Int?         @map("fournisseur_id")
-  remarque       String?      @db.VarChar(255)
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  typeCharge     Parametre    @relation("TypeCharge", fields: [typeChargeId], references: [id])
-  fournisseur    Fournisseur? @relation(fields: [fournisseurId], references: [id])
+  id            Int          @id @default(autoincrement())
+  dateCharge    DateTime     @map("date_charge") @db.Date
+  numeroFacture String?      @map("numero_facture") @db.VarChar(100)
+  emetteur      String       @db.VarChar(150)
+  typeChargeId  Int          @map("type_charge_id")
+  montantHt     Decimal      @default(0) @map("montant_ht") @db.Decimal(14, 2)
+  tauxTva       Decimal      @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantTva    Decimal      @default(0) @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc    Decimal      @default(0) @map("montant_ttc") @db.Decimal(14, 2)
+  fournisseurId Int?         @map("fournisseur_id")
+  remarque      String?      @db.VarChar(255)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  typeCharge    Parametre    @relation("TypeCharge", fields: [typeChargeId], references: [id])
+  fournisseur   Fournisseur? @relation(fields: [fournisseurId], references: [id])
 
   @@index([dateCharge])
   @@index([typeChargeId])
@@ -308,64 +310,63 @@ model Charge {
 // ─── AVOIRS ─────────────────────────────────────────────────────────
 
 model Avoir {
-  id              Int          @id @default(autoincrement())
-  annee           Int
-  numeroSequence  Int          @map("numero_sequence")
-  numeroAvoir     String       @unique @map("numero_avoir") @db.VarChar(30)
-  factureId       Int          @map("facture_id")
-  clientId        Int          @map("client_id")
-  dateAvoir       DateTime     @map("date_avoir") @db.Date
-  totalHt         Decimal      @default(0) @map("total_ht") @db.Decimal(14, 2)
-  totalTva        Decimal      @default(0) @map("total_tva") @db.Decimal(14, 2)
-  totalTtc        Decimal      @default(0) @map("total_ttc") @db.Decimal(14, 2)
-  statut          String       @default("valide") @db.VarChar(30)
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-  facture         Facture      @relation(fields: [factureId], references: [id])
-  client          Client       @relation(fields: [clientId], references: [id])
-  lignes          AvoirLigne[]
+  id             Int          @id @default(autoincrement())
+  annee          Int
+  numeroSequence Int          @map("numero_sequence")
+  numeroAvoir    String       @unique @map("numero_avoir") @db.VarChar(30)
+  factureId      Int          @map("facture_id")
+  clientId       Int          @map("client_id")
+  dateAvoir      DateTime     @map("date_avoir") @db.Date
+  totalHt        Decimal      @default(0) @map("total_ht") @db.Decimal(14, 2)
+  totalTva       Decimal      @default(0) @map("total_tva") @db.Decimal(14, 2)
+  totalTtc       Decimal      @default(0) @map("total_ttc") @db.Decimal(14, 2)
+  statut         String       @default("valide") @db.VarChar(30)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  facture        Facture      @relation(fields: [factureId], references: [id])
+  client         Client       @relation(fields: [clientId], references: [id])
+  lignes         AvoirLigne[]
 
   @@map("avoirs")
 }
 
 model AvoirLigne {
-  id                 Int      @id @default(autoincrement())
-  avoirId            Int      @map("avoir_id")
-  produitId          Int?     @map("produit_id")
-  designation        String   @db.VarChar(255)
-  quantite           Decimal  @db.Decimal(14, 2)
-  prixUnitaireHt     Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
-  remisePourcentage  Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
-  montantHt          Decimal  @map("montant_ht") @db.Decimal(14, 2)
-  tauxTva            Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
-  montantTva         Decimal  @map("montant_tva") @db.Decimal(14, 2)
-  montantTtc         Decimal  @map("montant_ttc") @db.Decimal(14, 2)
-  avoir              Avoir    @relation(fields: [avoirId], references: [id], onDelete: Cascade)
-  produit            Produit? @relation(fields: [produitId], references: [id])
+  id                Int      @id @default(autoincrement())
+  avoirId           Int      @map("avoir_id")
+  produitId         Int?     @map("produit_id")
+  designation       String   @db.VarChar(255)
+  quantite          Decimal  @db.Decimal(14, 2)
+  prixUnitaireHt    Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
+  remisePourcentage Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
+  montantHt         Decimal  @map("montant_ht") @db.Decimal(14, 2)
+  tauxTva           Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantTva        Decimal  @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc        Decimal  @map("montant_ttc") @db.Decimal(14, 2)
+  avoir             Avoir    @relation(fields: [avoirId], references: [id], onDelete: Cascade)
+  produit           Produit? @relation(fields: [produitId], references: [id])
 
   @@map("avoir_lignes")
 }
 
-
 // ─── DEVIS ──────────────────────────────────────────────────────────
 
 model Devis {
-  id              Int           @id @default(autoincrement())
-  annee           Int
-  numeroSequence  Int           @map("numero_sequence")
-  numeroDevis     String        @unique @map("numero_devis") @db.VarChar(30)
-  clientId        Int           @map("client_id")
-  dateDevis       DateTime      @map("date_devis") @db.Date
-  dateValidite    DateTime?     @map("date_validite") @db.Date
-  statut          String        @default("brouillon") @db.VarChar(30)
-  totalHt         Decimal       @default(0) @map("total_ht") @db.Decimal(14, 2)
-  totalTva        Decimal       @default(0) @map("total_tva") @db.Decimal(14, 2)
-  totalTtc        Decimal       @default(0) @map("total_ttc") @db.Decimal(14, 2)
-  remarque        String?       @db.Text
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  client          Client        @relation(fields: [clientId], references: [id])
-  lignes          DevisLigne[]
+  id             Int          @id @default(autoincrement())
+  annee          Int
+  numeroSequence Int          @map("numero_sequence")
+  numeroDevis    String       @unique @map("numero_devis") @db.VarChar(30)
+  clientId       Int          @map("client_id")
+  dateDevis      DateTime     @map("date_devis") @db.Date
+  dateValidite   DateTime?    @map("date_validite") @db.Date
+  statut         String       @default("brouillon") @db.VarChar(30)
+  totalHt        Decimal      @default(0) @map("total_ht") @db.Decimal(14, 2)
+  totalTva       Decimal      @default(0) @map("total_tva") @db.Decimal(14, 2)
+  totalTtc       Decimal      @default(0) @map("total_ttc") @db.Decimal(14, 2)
+  remarque       String?      @db.Text
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  client         Client       @relation(fields: [clientId], references: [id])
+  lignes         DevisLigne[]
 
   @@unique([annee, numeroSequence])
   @@index([clientId])
@@ -373,22 +374,22 @@ model Devis {
 }
 
 model DevisLigne {
-  id                 Int      @id @default(autoincrement())
-  devisId            Int      @map("devis_id")
-  ordreLigne         Int      @map("ordre_ligne")
-  produitId          Int?     @map("produit_id")
-  designation        String   @db.VarChar(255)
-  quantite           Decimal  @db.Decimal(14, 2)
-  prixUnitaireHt     Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
-  remisePourcentage  Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
-  montantRemiseHt    Decimal  @default(0) @map("montant_remise_ht") @db.Decimal(14, 2)
-  tauxTva            Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
-  montantHt          Decimal  @map("montant_ht") @db.Decimal(14, 2)
-  montantTva         Decimal  @map("montant_tva") @db.Decimal(14, 2)
-  montantTtc         Decimal  @map("montant_ttc") @db.Decimal(14, 2)
-  createdAt          DateTime @default(now()) @map("created_at")
-  devis              Devis    @relation(fields: [devisId], references: [id], onDelete: Cascade)
-  produit            Produit? @relation(fields: [produitId], references: [id])
+  id                Int      @id @default(autoincrement())
+  devisId           Int      @map("devis_id")
+  ordreLigne        Int      @map("ordre_ligne")
+  produitId         Int?     @map("produit_id")
+  designation       String   @db.VarChar(255)
+  quantite          Decimal  @db.Decimal(14, 2)
+  prixUnitaireHt    Decimal  @map("prix_unitaire_ht") @db.Decimal(14, 2)
+  remisePourcentage Decimal  @default(0) @map("remise_pourcentage") @db.Decimal(5, 2)
+  montantRemiseHt   Decimal  @default(0) @map("montant_remise_ht") @db.Decimal(14, 2)
+  tauxTva           Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantHt         Decimal  @map("montant_ht") @db.Decimal(14, 2)
+  montantTva        Decimal  @map("montant_tva") @db.Decimal(14, 2)
+  montantTtc        Decimal  @map("montant_ttc") @db.Decimal(14, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  devis             Devis    @relation(fields: [devisId], references: [id], onDelete: Cascade)
+  produit           Produit? @relation(fields: [produitId], references: [id])
 
   @@index([devisId])
   @@map("devis_lignes")
@@ -410,24 +411,24 @@ model JournalAudit {
 }
 
 model DocumentImporte {
-  id                  Int             @id @default(autoincrement())
-  fournisseurId       Int             @map("fournisseur_id")
-  nomFichierOriginal  String          @map("nom_fichier_original") @db.VarChar(255)
-  nomFichierStocke    String          @map("nom_fichier_stocke") @db.VarChar(255)
-  cheminFichier       String          @map("chemin_fichier") @db.VarChar(500)
-  typeMime            String          @map("type_mime") @db.VarChar(100)
-  tailleFichier       Int             @map("taille_fichier") // en octets
-  texteOcr            String?         @map("texte_ocr") @db.Text
-  statut              String          @default("brouillon") @db.VarChar(30) // brouillon | en_traitement | valide | rejete
-  dateImport          DateTime        @default(now()) @map("date_import")
-  dateMiseAJour       DateTime        @updatedAt @map("date_mise_a_jour")
-  utilisateurId       Int?            @map("utilisateur_id")
-  donneesExtraites    Json?           @map("donnees_extraites")
+  id                 Int      @id @default(autoincrement())
+  fournisseurId      Int      @map("fournisseur_id")
+  nomFichierOriginal String   @map("nom_fichier_original") @db.VarChar(255)
+  nomFichierStocke   String   @map("nom_fichier_stocke") @db.VarChar(255)
+  cheminFichier      String   @map("chemin_fichier") @db.VarChar(500)
+  typeMime           String   @map("type_mime") @db.VarChar(100)
+  tailleFichier      Int      @map("taille_fichier") // en octets
+  texteOcr           String?  @map("texte_ocr") @db.Text
+  statut             String   @default("brouillon") @db.VarChar(30) // brouillon | en_traitement | valide | rejete
+  dateImport         DateTime @default(now()) @map("date_import")
+  dateMiseAJour      DateTime @updatedAt @map("date_mise_a_jour")
+  utilisateurId      Int?     @map("utilisateur_id")
+  donneesExtraites   Json?    @map("donnees_extraites")
 
   // Relations
-  fournisseur         Fournisseur     @relation(fields: [fournisseurId], references: [id])
-  utilisateur         Utilisateur?    @relation(fields: [utilisateurId], references: [id])
-  lignes              LigneImportee[]
+  fournisseur Fournisseur     @relation(fields: [fournisseurId], references: [id])
+  utilisateur Utilisateur?    @relation(fields: [utilisateurId], references: [id])
+  lignes      LigneImportee[]
 
   @@index([fournisseurId])
   @@index([statut])
@@ -436,23 +437,46 @@ model DocumentImporte {
 }
 
 model LigneImportee {
-  id                  Int             @id @default(autoincrement())
-  documentImporteId   Int             @map("document_importe_id")
-  designation         String          @db.VarChar(255)
-  quantite            Decimal         @db.Decimal(14, 2)
-  prixUnitaire        Decimal         @map("prix_unitaire") @db.Decimal(14, 2)
-  tauxTva             Decimal         @default(0) @map("taux_tva") @db.Decimal(5, 2)
-  montantTotal        Decimal         @map("montant_total") @db.Decimal(14, 2)
-  referenceDetectee   String?         @map("reference_detectee") @db.VarChar(100)
-  produitId           Int?            @map("produit_id")
-  statut              String          @default("active") @db.VarChar(30)
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
+  id                Int      @id @default(autoincrement())
+  documentImporteId Int      @map("document_importe_id")
+  designation       String   @db.VarChar(255)
+  quantite          Decimal  @db.Decimal(14, 2)
+  prixUnitaire      Decimal  @map("prix_unitaire") @db.Decimal(14, 2)
+  tauxTva           Decimal  @default(0) @map("taux_tva") @db.Decimal(5, 2)
+  montantTotal      Decimal  @map("montant_total") @db.Decimal(14, 2)
+  referenceDetectee String?  @map("reference_detectee") @db.VarChar(100)
+  produitId         Int?     @map("produit_id")
+  statut            String   @default("active") @db.VarChar(30)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   // Relations
-  documentImporte     DocumentImporte @relation(fields: [documentImporteId], references: [id], onDelete: Cascade)
-  produit             Produit?        @relation(fields: [produitId], references: [id])
+  documentImporte DocumentImporte @relation(fields: [documentImporteId], references: [id], onDelete: Cascade)
+  produit         Produit?        @relation(fields: [produitId], references: [id])
 
   @@index([documentImporteId])
   @@map("lignes_importees")
+}
+
+model AssociationArticleFournisseur {
+  id Int @id @default(autoincrement())
+
+  fournisseurId Int
+  produitId     Int
+
+  referenceDetectee   String?
+  referenceNormalisee String
+
+  designationDetectee String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fournisseur Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Cascade)
+
+  produit Produit @relation(fields: [produitId], references: [id], onDelete: Cascade)
+
+  @@unique([fournisseurId, referenceNormalisee])
+  @@index([fournisseurId])
+  @@index([produitId])
 }
