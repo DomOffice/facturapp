@@ -108,13 +108,18 @@ export default function UploadFacture({ fournisseurs }: Props) {
     setEtat({ type: "idle" });
   }, []);
 
+type ResultatRechercheProduits = {
+  produits: ProduitRecherche[];
+  associationMemorisee: boolean;
+};
+
 const rechercherProduits = async (
   recherche: string,
-): Promise<ProduitRecherche[]> => {
+): Promise<ResultatRechercheProduits> => {
   const q = recherche.trim();
 
   if (q.length < 2) {
-    return [];
+    return { produits: [], associationMemorisee: false };
   }
 
   const params = new URLSearchParams({ q });
@@ -131,10 +136,13 @@ const rechercherProduits = async (
 
   if (!res.ok) {
     console.error("[RECHERCHE_PRODUITS_UI]", data);
-    return [];
+    return { produits: [], associationMemorisee: false };
   }
 
-  return Array.isArray(data.produits) ? data.produits : [];
+  return {
+    produits: Array.isArray(data.produits) ? data.produits : [],
+    associationMemorisee: data.associationMemorisee === true,
+  };
 };
 
 const enrichirLignesAvecProduits = async (
@@ -156,37 +164,35 @@ const enrichirLignesAvecProduits = async (
       }
 
       /*
-       * Première tentative :
-       * référence OCR + désignation.
+       * Priorité absolue à la référence fournisseur seule.
+       * C'est cette valeur exacte qui permet de retrouver une association
+       * déjà mémorisée pour Mechouar.
+       */
+      let resultat = reference.length >= 2
+        ? await rechercherProduits(reference)
+        : { produits: [], associationMemorisee: false };
+      let produits = resultat.produits;
+
+      /*
+       * Si aucune association exacte ni proposition n'est trouvée,
+       * on élargit à la référence + désignation.
        */
       const rechercheComplete = [reference, designation]
         .filter(Boolean)
         .join(" ")
         .trim();
 
-      let produits = await rechercherProduits(rechercheComplete);
-
-      /*
-       * Deuxième tentative :
-       * si aucune proposition pertinente, on cherche uniquement
-       * avec la désignation. C'est particulièrement utile pour
-       * les références fournisseur ou codes-barres absents de la BDD.
-       */
-      if (produits.length === 0 && designation.length >= 2) {
-        produits = await rechercherProduits(designation);
+      if (produits.length === 0 && rechercheComplete.length >= 2) {
+        resultat = await rechercherProduits(rechercheComplete);
+        produits = resultat.produits;
       }
 
       /*
-       * Dernier recours :
-       * référence seule, utile pour les références commerciales
-       * réellement présentes dans la BDD.
+       * Dernier recours : désignation seule.
        */
-      if (
-        produits.length === 0 &&
-        reference.length >= 2 &&
-        reference !== designation
-      ) {
-        produits = await rechercherProduits(reference);
+      if (produits.length === 0 && designation.length >= 2) {
+        resultat = await rechercherProduits(designation);
+        produits = resultat.produits;
       }
 
       const premier = produits[0];
@@ -200,11 +206,13 @@ const enrichirLignesAvecProduits = async (
        * fiable et nettement meilleur que le suivant.
        */
       const selectionAutomatique =
-        premier &&
-        scorePremier >= 90 &&
-        (!second || scorePremier - scoreSecond >= 15)
+        resultat.associationMemorisee && premier
           ? premier.id
-          : null;
+          : premier &&
+              scorePremier >= 90 &&
+              (!second || scorePremier - scoreSecond >= 15)
+            ? premier.id
+            : null;
 
       return {
         ...ligne,
@@ -275,10 +283,21 @@ const enrichirLignesAvecProduits = async (
         return;
       }
 
-      const lignes = ocrData.extraction?.lignes || [];
+      const lignesBrutes = Array.isArray(ocrData.extraction?.lignes)
+        ? ocrData.extraction.lignes
+        : [];
 
-const lignesAvecProduits =
-  await enrichirLignesAvecProduits(lignes);
+      const lignes = lignesBrutes
+        .filter((ligne: LigneFactureExtraite | null | undefined): ligne is LigneFactureExtraite =>
+          Boolean(ligne),
+        )
+        .map((ligne: LigneFactureExtraite) => ({
+          ...ligne,
+          confiance: Number(ligne.confiance) || 0,
+          alertes: Array.isArray(ligne.alertes) ? ligne.alertes : [],
+        }));
+
+      const lignesAvecProduits = await enrichirLignesAvecProduits(lignes);
 
 setLignesEditables(lignesAvecProduits);
 
@@ -338,7 +357,12 @@ setLignesEditables(lignesAvecProduits);
     return;
   }
 
-  const produits = await rechercherProduits(q);
+  const resultat = await rechercherProduits(q);
+  const produits = resultat.produits;
+  const produitMemoriseId =
+    resultat.associationMemorisee && produits.length === 1
+      ? produits[0].id
+      : null;
 
   setLignesEditables((lignes) =>
     lignes.map((ligne, i) =>
@@ -346,7 +370,7 @@ setLignesEditables(lignesAvecProduits);
         ? {
             ...ligne,
             produitsProposes: produits,
-            produitId: null,
+            produitId: produitMemoriseId,
             rechercheProduitEnCours: false,
           }
         : ligne,
@@ -626,10 +650,16 @@ setLignesEditables(lignesAvecProduits);
                     <strong>Confiance moyenne lignes :</strong>{" "}
                     {lignesEditables.length > 0
                       ? `${Math.round(
-                          lignesEditables.reduce(
-                            (total, ligne) => total + ligne.confiance,
-                            0,
-                          ) / lignesEditables.length,
+                          lignesEditables
+                            .filter((ligne): ligne is LigneFactureExtraite =>
+                              Boolean(ligne),
+                            )
+                            .reduce(
+                              (total, ligne) =>
+                                total + (Number(ligne.confiance) || 0),
+                              0,
+                            ) /
+                            lignesEditables.filter(Boolean).length,
                         )}%`
                       : "Non évaluée"}
                   </p>

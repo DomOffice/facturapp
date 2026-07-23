@@ -462,19 +462,17 @@ model AssociationArticleFournisseur {
   id Int @id @default(autoincrement())
 
   fournisseurId Int
-  produitId     Int
+  produitId     Int?
 
   referenceDetectee   String?
-  referenceNormalisee String
-
+  referenceNormalisee String?
   designationDetectee String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   fournisseur Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Cascade)
-
-  produit Produit @relation(fields: [produitId], references: [id], onDelete: Cascade)
+  produit     Produit?    @relation(fields: [produitId], references: [id], onDelete: Cascade)
 
   @@unique([fournisseurId, referenceNormalisee])
   @@index([fournisseurId])

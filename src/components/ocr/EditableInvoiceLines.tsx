@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import ConfidenceBadge from "./ConfidenceBadge";
 
 export type ProduitRecherche = {
@@ -23,7 +24,6 @@ export type LigneFactureExtraite = {
   totalTtc?: number;
   confiance: number;
   alertes: string[];
-
   produitId?: number | null;
   produitRecherche?: string;
   produitsProposes?: ProduitRecherche[];
@@ -33,15 +33,16 @@ export type LigneFactureExtraite = {
 type Props = {
   lignes: LigneFactureExtraite[];
   onChange: (lignes: LigneFactureExtraite[]) => void;
-  onRechercheProduit?: (
-    index: number,
-    recherche: string,
-  ) => void | Promise<void>;
-  onSelectionProduit?: (
-    index: number,
-    produitId: number | null,
-  ) => void;
+  onRechercheProduit?: (index: number, recherche: string) => void | Promise<void>;
+  onSelectionProduit?: (index: number, produitId: number | null) => void;
 };
+
+const CHAMPS_NUMERIQUES = new Set<keyof LigneFactureExtraite>([
+  "quantite",
+  "prixUnitaireTtc",
+  "tauxTva",
+  "totalTtc",
+]);
 
 export default function EditableInvoiceLines({
   lignes,
@@ -49,21 +50,28 @@ export default function EditableInvoiceLines({
   onRechercheProduit,
   onSelectionProduit,
 }: Props) {
+  const timersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => Object.values(timers).forEach(clearTimeout);
+  }, []);
+
   function modifierLigne(
     index: number,
     champ: keyof LigneFactureExtraite,
-    valeur: string,
+    valeur: LigneFactureExtraite[keyof LigneFactureExtraite] | string,
   ) {
-    const lignesMaj = lignes.map((ligne, i) => {
+    const lignesValides = lignes.filter(
+      (ligne): ligne is LigneFactureExtraite => Boolean(ligne),
+    );
+
+    const lignesMaj = lignesValides.map((ligne, i) => {
       if (i !== index) return ligne;
 
-      if (
-        champ === "quantite" ||
-        champ === "prixUnitaireTtc" ||
-        champ === "tauxTva" ||
-        champ === "totalTtc"
-      ) {
-        const nombre = Number(valeur.replace(",", "."));
+      if (CHAMPS_NUMERIQUES.has(champ)) {
+        const texte = String(valeur ?? "").trim().replace(",", ".");
+        const nombre = texte === "" ? undefined : Number(texte);
 
         return {
           ...ligne,
@@ -71,30 +79,35 @@ export default function EditableInvoiceLines({
         };
       }
 
-      return {
-        ...ligne,
-        [champ]: valeur,
-      };
+      return { ...ligne, [champ]: valeur };
     });
 
     onChange(lignesMaj);
   }
 
   function libelleProduit(produit: ProduitRecherche) {
-    return [produit.reference, produit.description]
+    return [
+      produit.reference,
+      produit.description,
+      produit.dernierPrixAchatTtc
+        ? `(Prix achat TTC: ${produit.dernierPrixAchatTtc})`
+        : null,
+    ]
       .filter(Boolean)
       .join(" — ");
   }
 
-  if (lignes.length === 0) return null;
+  const lignesAffichables = lignes.filter(
+    (ligne): ligne is LigneFactureExtraite => Boolean(ligne),
+  );
+
+  if (lignesAffichables.length === 0) return null;
 
   return (
     <div className="mt-6">
-      <h4 className="font-semibold mb-3">
-        Lignes articles détectées
-      </h4>
+      <h4 className="mb-3 font-semibold">Lignes articles détectées</h4>
 
-      <div className="overflow-x-auto border rounded-lg">
+      <div className="overflow-x-auto rounded-lg border">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
@@ -110,7 +123,7 @@ export default function EditableInvoiceLines({
           </thead>
 
           <tbody>
-            {lignes.map((ligne, index) => {
+            {lignesAffichables.map((ligne, index) => {
               const produits = ligne.produitsProposes || [];
 
               return (
@@ -118,115 +131,99 @@ export default function EditableInvoiceLines({
                   <td className="px-3 py-2">
                     <input
                       value={ligne.reference || ""}
-                      onChange={(e) =>
-                        modifierLigne(
-                          index,
-                          "reference",
-                          e.target.value,
-                        )
+                      onChange={(event) =>
+                        modifierLigne(index, "reference", event.target.value)
                       }
-                      className="w-28 border rounded px-2 py-1"
+                      className="w-28 rounded border px-2 py-1"
                     />
                   </td>
 
                   <td className="px-3 py-2">
                     <textarea
                       value={ligne.designation || ""}
-                      onChange={(e) =>
-                        modifierLigne(
-                          index,
-                          "designation",
-                          e.target.value,
-                        )
+                      onChange={(event) =>
+                        modifierLigne(index, "designation", event.target.value)
                       }
-                      className="w-full min-w-[260px] max-w-[420px] border rounded px-2 py-1"
+                      className="w-full min-w-[200px] max-w-[320px] rounded border px-2 py-1"
                       rows={2}
                     />
                   </td>
 
                   <td className="px-3 py-2 text-right">
                     <input
+                      inputMode="decimal"
                       value={ligne.quantite ?? ""}
-                      onChange={(e) =>
-                        modifierLigne(
-                          index,
-                          "quantite",
-                          e.target.value,
-                        )
+                      onChange={(event) =>
+                        modifierLigne(index, "quantite", event.target.value)
                       }
-                      className="w-20 border rounded px-2 py-1 text-right"
+                      className="w-12 rounded border px-2 py-1 text-right"
                     />
                   </td>
 
                   <td className="px-3 py-2 text-right">
                     <input
+                      inputMode="decimal"
                       value={ligne.prixUnitaireTtc ?? ""}
-                      onChange={(e) =>
-                        modifierLigne(
-                          index,
-                          "prixUnitaireTtc",
-                          e.target.value,
-                        )
+                      onChange={(event) =>
+                        modifierLigne(index, "prixUnitaireTtc", event.target.value)
                       }
-                      className="w-24 border rounded px-2 py-1 text-right"
+                      className="w-14 rounded border px-2 py-1 text-right"
                     />
                   </td>
 
                   <td className="px-3 py-2 text-right">
                     <input
+                      inputMode="decimal"
                       value={ligne.tauxTva ?? ""}
-                      onChange={(e) =>
-                        modifierLigne(
-                          index,
-                          "tauxTva",
-                          e.target.value,
-                        )
+                      onChange={(event) =>
+                        modifierLigne(index, "tauxTva", event.target.value)
                       }
-                      className="w-20 border rounded px-2 py-1 text-right"
+                      className="w-12 rounded border px-2 py-1 text-right"
                     />
                   </td>
 
                   <td className="px-3 py-2 text-right">
                     <input
+                      inputMode="decimal"
                       value={ligne.totalTtc ?? ""}
-                      onChange={(e) =>
-                        modifierLigne(
-                          index,
-                          "totalTtc",
-                          e.target.value,
-                        )
+                      onChange={(event) =>
+                        modifierLigne(index, "totalTtc", event.target.value)
                       }
-                      className="w-24 border rounded px-2 py-1 text-right"
+                      className="w-14 rounded border px-2 py-1 text-right"
                     />
                   </td>
 
-                  <td className="px-3 py-2 min-w-[320px]">
+                  <td className="min-w-[160px] px-3 py-2">
                     <input
                       value={ligne.produitRecherche ?? ""}
-                      onChange={(e) =>
-                        onRechercheProduit?.(
-                          index,
-                          e.target.value,
-                        )
-                      }
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        modifierLigne(index, "produitRecherche", value);
+
+                        clearTimeout(timersRef.current[index]);
+                        timersRef.current[index] = setTimeout(() => {
+                          void onRechercheProduit?.(index, value);
+                        }, 300);
+                      }}
                       placeholder="Rechercher par référence ou désignation..."
-                      className="w-full border rounded px-2 py-1"
+                      className="w-full rounded border px-2 py-1"
                     />
 
                     <select
                       value={ligne.produitId ?? ""}
-                      onChange={(e) =>
+                      onChange={(event) =>
                         onSelectionProduit?.(
                           index,
-                          e.target.value
-                            ? Number(e.target.value)
-                            : null,
+                          event.target.value ? Number(event.target.value) : null,
                         )
                       }
-                      className="mt-2 w-full border rounded px-2 py-1"
+                      className="mt-2 w-full rounded border px-2 py-1"
                     >
-                      <option value="">À rapprocher</option>
-
+                      <option value="">
+                        {ligne.rechercheProduitEnCours
+                          ? "Recherche en cours…"
+                          : "À rapprocher"}
+                      </option>
                       {produits.map((produit) => (
                         <option key={produit.id} value={produit.id}>
                           {libelleProduit(produit)}
@@ -236,39 +233,10 @@ export default function EditableInvoiceLines({
                         </option>
                       ))}
                     </select>
-
-                    {ligne.rechercheProduitEnCours && (
-                      <div className="mt-1 text-xs text-gray-500">
-                        Recherche en cours…
-                      </div>
-                    )}
-
-                    {!ligne.rechercheProduitEnCours &&
-                      ligne.produitId && (
-                        <div className="mt-1 text-xs text-green-700">
-                          Article associé #{ligne.produitId}
-                        </div>
-                      )}
-
-                    {!ligne.rechercheProduitEnCours &&
-                      !ligne.produitId &&
-                      produits.length > 0 && (
-                        <div className="mt-1 text-xs text-orange-600">
-                          Sélection à confirmer
-                        </div>
-                      )}
-
-                    {!ligne.rechercheProduitEnCours &&
-                      !ligne.produitId &&
-                      produits.length === 0 && (
-                        <div className="mt-1 text-xs text-orange-600">
-                          Aucun article associé
-                        </div>
-                      )}
                   </td>
 
                   <td className="px-3 py-2 text-center">
-                    <ConfidenceBadge confiance={ligne.confiance} />
+                    <ConfidenceBadge confiance={ligne.confiance ?? 0} />
                   </td>
                 </tr>
               );
