@@ -46,3 +46,6 @@ Le développement doit se faire uniquement sur ta machine.
 
 Accès à la BDD :
 npx prisma studio
+
+Verifier qu'il n'y a pas d'erreur :
+npx tsc --noEmit

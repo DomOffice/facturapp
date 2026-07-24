@@ -97,6 +97,58 @@ export async function POST(
 
     const resultatOcr = extraireJsonDepuisSortie(stdout);
 
+    const diagnosticCoordonnees = Array.isArray(resultatOcr.pages)
+  ? resultatOcr.pages.flatMap(
+      (
+        page: {
+          lignes?: Array<{
+            texte?: string
+            text?: string
+            position?: Array<[number, number]>
+            score?: number
+            confiance?: number
+          }>
+        },
+        pageIndex: number,
+      ) =>
+        Array.isArray(page.lignes)
+          ? page.lignes.map((ligne) => {
+              const texte = String(
+                ligne.texte || ligne.text || "",
+              ).trim()
+
+              const position = Array.isArray(ligne.position)
+                ? ligne.position
+                : []
+
+              const xs = position.map((point) => point[0])
+              const ys = position.map((point) => point[1])
+
+              return {
+                page: pageIndex + 1,
+                texte,
+                xMin:
+                  xs.length > 0
+                    ? Math.min.apply(null, xs)
+                    : null,
+                xMax:
+                  xs.length > 0
+                    ? Math.max.apply(null, xs)
+                    : null,
+                y:
+                  ys.length > 0
+                    ? ys.reduce(
+                        (somme, valeur) => somme + valeur,
+                        0,
+                      ) / ys.length
+                    : null,
+                position,
+              }
+            })
+          : [],
+    )
+  : []
+
     if (!resultatOcr.success) {
       await prisma.documentImporte.update({
         where: { id: documentId },
@@ -138,6 +190,7 @@ export async function POST(
       statut: documentMaj.statut,
       texte: resultatOcr.texte || "",
       extraction,
+      diagnosticCoordonnees,
     });
   } catch (error) {
     console.error("[OCR_FACTURE_FOURNISSEUR]", error);

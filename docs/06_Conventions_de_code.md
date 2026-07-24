@@ -151,3 +151,18 @@ Documents de référence :
   npx prisma validate
   npx prisma migrate dev
   npm run build
+
+  ## MAJ du 24/07/2026
+  ## Conventions du moteur OCR
+
+- Aucun `if` fondé sur le nom d’un fournisseur dans le moteur générique.
+- Les particularités fournisseurs sont placées dans les drivers.
+- Les drivers restent déclaratifs et sans logique métier complexe.
+- Toute option de driver doit posséder un comportement générique par défaut.
+- Les regex globales doivent être réinstanciées avant utilisation afin
+  d’éviter les effets de bord liés à `lastIndex`.
+- Les patches doivent rester petits et testables.
+- Après chaque modification :
+  - lancer `npx tsc --noEmit` ;
+  - tester au moins un document Mechouar ;
+  - tester au moins un document CasInfo.

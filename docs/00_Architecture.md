@@ -235,3 +235,43 @@ Prix
 Total
 
 Il a été validé sur un BL comportant 14 articles.
+
+
+## MAJ du 24/07/2026
+### Drivers OCR fournisseurs
+
+Les particularités des documents fournisseurs sont décrites dans :
+src/lib/ocr/drivers/
+├── generic.ts
+├── casinfo.ts
+└── mechouar.ts
+
+Le driver peut configurer :
+
+les alias du fournisseur ;
+les coordonnées des colonnes ;
+les marqueurs de début, d’en-tête et de fin du tableau ;
+le type de document : facture ou bon de livraison ;
+les motifs du numéro et de la date ;
+les motifs ICE et totaux ;
+les champs obligatoires pour la validation.
+
+Le moteur d’extraction ne doit contenir aucune condition métier liée
+directement à un fournisseur.
+
+
+### Modifier la partie pré-validation
+
+Le document affirme actuellement que les lignes ne créent pas encore de facture fournisseur réelle. :contentReference[oaicite:6]{index=6}
+
+À remplacer selon l’état réel par :
+
+```md
+Les données OCR sont d’abord placées dans un état de pré-validation.
+
+Après correction et validation :
+
+- les données du document sont persistées ;
+- chaque ligne doit être rapprochée d’un produit existant ou donner lieu
+  à la création d’un produit ;
+- le branchement des mouvements de stock reste à réaliser.

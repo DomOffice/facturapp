@@ -179,3 +179,58 @@ Mettre en place un cycle : brouillon → validé → archivé.
 - création d’un produit depuis une ligne OCR ;
 - création réelle de la facture fournisseur ;
 - impact stock dans une étape séparée.
+
+## MAJ du 24/07/2026
+
+### Profils OCR fournisseurs
+### les améliorations terminées
+- architecture par drivers déclaratifs ;
+- driver générique ;
+- driver CasInfo ;
+- driver Mechouar ;
+- sélection par alias fournisseur ;
+- fallback générique ;
+- colonnes OCR configurables ;
+- marqueurs de tableau configurables ;
+- motifs numéro, date, ICE et totaux configurables ;
+- règles de validation configurables ;
+- distinction facture / bon de livraison.
+
+### les éléments terminés
+### Validation des documents fournisseurs
+
+- édition des lignes extraites ;
+- persistance du document validé ;
+- contrôle empêchant la validation des lignes non rapprochées ;
+- fonctionnement validé sur plusieurs documents Mechouar et CasInfo.
+
+## Priorité haute
+
+### Rapprochement automatique des produits
+
+- exploiter la référence fournisseur lorsqu’elle existe ;
+- comparer les désignations normalisées ;
+- proposer des produits candidats ;
+- calculer un score de rapprochement ;
+- exiger une confirmation en cas d’ambiguïté.
+
+### Création des produits absents
+
+- préremplir le formulaire produit depuis la ligne OCR ;
+- conserver le lien avec la ligne importée ;
+- éviter les doublons ;
+- rattacher immédiatement le produit créé.
+
+### Apprentissage des correspondances
+
+- mémoriser les choix validés ;
+- réutiliser les correspondances fournisseur/produit ;
+- distinguer correspondance automatique et validation manuelle ;
+- permettre la correction d’une correspondance erronée.
+
+### Branchement du stock
+
+- créer les mouvements de stock uniquement après validation complète ;
+- garantir l’idempotence ;
+- utiliser une transaction ;
+- empêcher le double mouvement lors d’une nouvelle validation.

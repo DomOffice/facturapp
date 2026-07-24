@@ -164,3 +164,42 @@ Sprint 4.3 — Création facture fournisseur
 Statut : à faire
 Sprint 4.4 — Impact stock
 Statut : à faire séparément
+
+## MAJ du 24/07/2026
+## Phase actuelle — Stabilisation OCR
+
+1. Nettoyage limité du moteur OCR.
+2. Centralisation des motifs par défaut.
+3. Découpage léger de la fonction principale.
+4. Vérification TypeScript et tests CasInfo/Mechouar.
+
+## Phase suivante — Catalogue produits
+
+1. Audit du modèle Produit et des lignes fournisseurs.
+2. Recherche de candidats.
+3. Score de rapprochement.
+4. Validation manuelle des propositions.
+5. Création d’un produit depuis une ligne OCR.
+
+## Phase suivante — Apprentissage
+
+1. Persistance des correspondances fournisseur/produit.
+2. Réutilisation automatique.
+3. Gestion des corrections.
+4. Mesure du niveau de confiance.
+
+## Phase suivante — Nouveaux drivers
+
+1. Saham.
+2. Disway.
+3. HP.
+4. Dell.
+5. Autres fournisseurs selon les documents disponibles.
+
+## Phase suivante — Stock
+
+1. Audit du module stock existant.
+2. Définition de l’événement déclencheur.
+3. Création transactionnelle des mouvements.
+4. Protection contre les doublons.
+5. Tests de validation, annulation et revalidation.

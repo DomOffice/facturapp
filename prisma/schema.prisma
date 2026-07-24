@@ -22,18 +22,19 @@ model Role {
 }
 
 model Utilisateur {
-  id                Int               @id @default(autoincrement())
-  nom               String            @db.VarChar(100)
-  email             String            @unique @db.VarChar(150)
-  motDePasseHash    String            @map("mot_de_passe_hash") @db.VarChar(255)
-  roleId            Int               @map("role_id")
-  actif             Boolean           @default(true)
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-  role              Role              @relation(fields: [roleId], references: [id])
+  id                Int                @id @default(autoincrement())
+  nom               String             @db.VarChar(100)
+  email             String             @unique @db.VarChar(150)
+  motDePasseHash    String             @map("mot_de_passe_hash") @db.VarChar(255)
+  roleId            Int                @map("role_id")
+  actif             Boolean            @default(true)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  role              Role               @relation(fields: [roleId], references: [id])
   factures          Facture[]
   journalAudit      JournalAudit[]
   documentsImportes DocumentImporte[]
+  integrationsStock IntegrationStock[]
 
   @@map("utilisateurs")
 }
@@ -165,6 +166,7 @@ model Produit {
   prixVenteHt              Decimal                         @default(0) @map("prix_vente_ht") @db.Decimal(14, 2)
   prixVenteTtc             Decimal                         @default(0) @map("prix_vente_ttc") @db.Decimal(14, 2)
   margeHt                  Decimal                         @default(0) @map("marge_ht") @db.Decimal(14, 2)
+  stockActuel              Decimal                         @default(0) @map("stock_actuel") @db.Decimal(14, 2)
   actif                    Boolean                         @default(true)
   createdAt                DateTime                        @default(now()) @map("created_at")
   updatedAt                DateTime                        @updatedAt @map("updated_at")
@@ -178,6 +180,7 @@ model Produit {
   devisLignes              DevisLigne[]
   lignesImportees          LigneImportee[]
   associationsFournisseurs AssociationArticleFournisseur[]
+  mouvementsStock          MouvementStock[]
 
   @@index([reference])
   @@index([description])
@@ -426,9 +429,10 @@ model DocumentImporte {
   donneesExtraites   Json?    @map("donnees_extraites")
 
   // Relations
-  fournisseur Fournisseur     @relation(fields: [fournisseurId], references: [id])
-  utilisateur Utilisateur?    @relation(fields: [utilisateurId], references: [id])
-  lignes      LigneImportee[]
+  fournisseur      Fournisseur       @relation(fields: [fournisseurId], references: [id])
+  utilisateur      Utilisateur?      @relation(fields: [utilisateurId], references: [id])
+  lignes           LigneImportee[]
+  integrationStock IntegrationStock?
 
   @@index([fournisseurId])
   @@index([statut])
@@ -453,6 +457,7 @@ model LigneImportee {
   // Relations
   documentImporte DocumentImporte @relation(fields: [documentImporteId], references: [id], onDelete: Cascade)
   produit         Produit?        @relation(fields: [produitId], references: [id])
+  mouvementStock  MouvementStock?
 
   @@index([documentImporteId])
   @@map("lignes_importees")
@@ -477,4 +482,42 @@ model AssociationArticleFournisseur {
   @@unique([fournisseurId, referenceNormalisee])
   @@index([fournisseurId])
   @@index([produitId])
+}
+
+// ─── GESTION DE STOCK ────────────────────────────────────────────────
+
+model IntegrationStock {
+  id                Int      @id @default(autoincrement())
+  documentImporteId Int      @unique @map("document_importe_id")
+  utilisateurId     Int?     @map("utilisateur_id")
+  dateIntegration   DateTime @default(now()) @map("date_integration")
+
+  documentImporte DocumentImporte  @relation(fields: [documentImporteId], references: [id], onDelete: Restrict)
+  utilisateur     Utilisateur?     @relation(fields: [utilisateurId], references: [id], onDelete: SetNull)
+  mouvements      MouvementStock[]
+
+  @@index([dateIntegration])
+  @@index([utilisateurId])
+  @@map("integrations_stock")
+}
+
+model MouvementStock {
+  id                 Int      @id @default(autoincrement())
+  integrationStockId Int      @map("integration_stock_id")
+  produitId          Int      @map("produit_id")
+  ligneImporteeId    Int?     @unique @map("ligne_importee_id")
+  type               String   @default("entree_fournisseur") @db.VarChar(30)
+  quantite           Decimal  @db.Decimal(14, 2)
+  stockAvant         Decimal  @map("stock_avant") @db.Decimal(14, 2)
+  stockApres         Decimal  @map("stock_apres") @db.Decimal(14, 2)
+  dateMouvement      DateTime @default(now()) @map("date_mouvement")
+
+  integrationStock IntegrationStock @relation(fields: [integrationStockId], references: [id], onDelete: Restrict)
+  produit          Produit          @relation(fields: [produitId], references: [id], onDelete: Restrict)
+  ligneImportee    LigneImportee?   @relation(fields: [ligneImporteeId], references: [id], onDelete: SetNull)
+
+  @@index([integrationStockId])
+  @@index([produitId])
+  @@index([dateMouvement])
+  @@map("mouvements_stock")
 }

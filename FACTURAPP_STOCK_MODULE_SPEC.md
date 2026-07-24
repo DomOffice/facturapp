@@ -158,3 +158,17 @@ Le modèle de données PostgreSQL actuel comprend:
 ## Conclusion
 
 Le module de gestion de stock est un complément essentiel pour FacturApp qui nécessite une refonte significative du modèle de données et de la logique métier. La présence de champs de stock dans la base MariaDB VB6 indique que cette fonctionnalité était prévue ou existait dans l'ancien système, ce qui renforce la pertinence de son implémentation dans la version moderne.
+
+## MAJ du 24/07/2026
+## Intégration future avec les factures fournisseurs OCR
+
+Le stock ne doit être mouvementé qu’après :
+
+1. validation du document fournisseur ;
+2. rapprochement de toutes les lignes avec un produit ;
+3. contrôle de l’absence d’un mouvement antérieur pour ce document ;
+4. exécution de la création de la facture et des mouvements dans une
+   transaction atomique.
+
+La conception détaillée sera alignée avec les modèles Prisma et le
+fonctionnement actuel du module stock.

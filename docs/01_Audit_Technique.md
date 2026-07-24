@@ -191,3 +191,25 @@ une protection contre les réponses arrivant dans le désordre.
 Logique métier dans le frontend
 
 Le scoring et l’enrichissement automatique sont encore partiellement orchestrés dans upload-facture.tsx. À terme, le rapprochement devra être déplacé vers un service serveur.
+
+## MAJ du 24/07/2026
+## État du moteur OCR fournisseurs
+
+Points désormais stabilisés :
+
+- architecture par drivers fournisseurs ;
+- fallback générique ;
+- extraction par coordonnées OCR ;
+- motifs documentaires configurables ;
+- validation configurable selon le type de document ;
+- fonctionnement validé avec CasInfo et Mechouar ;
+- compilation TypeScript propre avec `npx tsc --noEmit`.
+
+Points techniques encore à traiter :
+
+- découpage de la fonction principale d’extraction ;
+- tests automatisés des drivers ;
+- centralisation des motifs génériques ;
+- rapprochement produit ;
+- apprentissage des associations ;
+- transactions de validation et de stock.

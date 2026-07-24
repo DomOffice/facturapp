@@ -109,3 +109,25 @@ Ouvrir le navigateur sur : **http://localhost:3000**
 | `npm run db:push` | Créer/mettre à jour les tables |
 | `npm run db:seed` | Insérer les données initiales |
 | `npm run db:studio` | Interface visuelle de la base |
+
+## État actuel du module OCR fournisseurs
+
+Le module d’import des documents fournisseurs prend actuellement en charge :
+
+- l’import des PDF et images ;
+- l’OCR local avec PaddleOCR ;
+- l’extraction du numéro, de la date, de l’ICE et des totaux ;
+- l’extraction des lignes articles à partir des coordonnées OCR ;
+- des drivers déclaratifs par fournisseur ;
+- les profils CasInfo et Mechouar ;
+- un fallback générique ;
+- l’édition et la validation des données extraites ;
+- la persistance du document validé.
+
+Travaux en cours :
+
+- rapprochement automatique des articles avec le catalogue ;
+- création guidée des produits absents ;
+- apprentissage des correspondances fournisseur/produit ;
+- ajout de nouveaux drivers fournisseurs ;
+- branchement des mouvements de stock.

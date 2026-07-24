@@ -169,3 +169,31 @@ codes-barres fournisseurs absents de la fiche produit ;
 différences lexicales : agrafe / agrafeuse, CL446 / CL 446 ;
 multiplication des requêtes lors de la frappe ;
 risque de doublons lors de la future création de produits.
+
+## MAJ du 24/07/2026
+## Lignes fournisseurs non rapprochées
+
+### Symptôme
+
+La validation affiche :
+
+> X ligne(s) ne sont pas rapprochée(s). Associez chaque ligne à un
+> produit existant ou créez un nouveau produit avant la validation.
+
+### État
+
+Le contrôle est volontaire et protège la cohérence métier.
+
+### Limite actuelle
+
+Le rapprochement est manuel. Le système ne propose pas encore
+automatiquement les produits les plus probables.
+
+### Correction prévue
+
+Mettre en place :
+
+- une recherche par référence fournisseur ;
+- une comparaison de désignation ;
+- un score de similarité ;
+- un historique des correspondances validées.

@@ -207,3 +207,18 @@ upload
 → lignes_validees
 → rapprochement
 → facture fournisseur future
+
+## MAJ du 24/07/2026
+## Correspondances articles fournisseurs
+
+Le modèle devra permettre de mémoriser une relation entre :
+
+- un fournisseur ;
+- une référence ou désignation fournisseur ;
+- un produit interne ;
+- éventuellement un score de confiance ;
+- la date de dernière utilisation ;
+- le nombre de validations confirmées.
+
+Le nom exact de la table et ses contraintes seront définis après audit
+du schéma Prisma existant.

@@ -285,3 +285,60 @@ Conséquence :
 
 aucun article ne sera créé automatiquement ;
 l’utilisateur disposera d’une action explicite « Créer un article »
+
+## MAJ du 24/07/2026
+## 2026-07-24 — Drivers OCR documentaires déclaratifs
+
+### Décision
+
+Les drivers OCR fournisseurs peuvent désormais déclarer :
+
+- les coordonnées des colonnes ;
+- les marqueurs du tableau ;
+- le type de document ;
+- les motifs du numéro et de la date ;
+- les motifs ICE et totaux ;
+- les champs obligatoires pour la validation.
+
+### Motif
+
+Les factures et bons de livraison ne présentent pas les mêmes champs
+et ne doivent pas être validés selon les mêmes règles.
+
+### Conséquence
+
+Le moteur générique ne contient plus de logique spécifique à Mechouar
+ou CasInfo pour ces éléments.
+
+## 2026-07-24 — Validation selon le type de document
+
+### Décision
+
+Les champs obligatoires sont configurables par driver.
+
+### Motif
+
+Un bon de livraison Mechouar peut présenter un net à payer sans afficher
+séparément le total HT, la TVA ou l’ICE.
+
+### Conséquence
+
+L’absence de ces champs ne produit plus d’alertes injustifiées et ne
+dégrade plus artificiellement la confiance OCR.
+
+## 2026-07-24 — Rapprochement obligatoire avant validation
+
+### Décision
+
+Une ligne fournisseur doit être associée à un produit existant ou à un
+nouveau produit avant la validation définitive.
+
+### Motif
+
+Éviter la création de lignes d’achat et de mouvements de stock sans
+référence au catalogue interne.
+
+### Suite prévue
+
+Automatiser les propositions de rapprochement et mémoriser les choix
+validés.

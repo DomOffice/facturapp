@@ -29,6 +29,7 @@ export type LigneFactureExtraite = {
   quantite?: number
   prixUnitaireTtc?: number
   tauxTva?: number
+  remisePourcentage?: number
   totalTtc?: number
   confiance: number
   alertes: string[]
@@ -57,16 +58,47 @@ export type FactureFournisseurExtraite = {
   alertes: string[]
 }
 
+export type ZoneColonneOcr = {
+  xMin: number
+  xMax: number
+}
+
 export type ProfilOcrFournisseur = {
-  code: 'generic' | 'generic_large' | 'casinfo'
+  code: string
   nom: string
   aliases: string[]
-  //ligneArticleSurDeuxLignes: boolean
+
+  ligneArticleSurDeuxLignes?: boolean
+
+  tableau?: {
+    marqueursEntete?: string[]
+    marqueursDebut?: string[]
+    marqueursFin?: string[]
+  }
+
+  document?: {
+  type?: "facture" | "bon_livraison"
+  motifsNumero?: RegExp[]
+  motifsDate?: RegExp[]
+  motifsIceFournisseur?: RegExp[]
+  motifsTotalHt?: RegExp[]
+  motifsTotalTva?: RegExp[]
+  motifsTotalTtc?: RegExp[]
+  validation?: {
+  exigeTotalHt?: boolean
+  exigeTotalTva?: boolean
+  exigeTotalTtc?: boolean
+  exigeIceFournisseur?: boolean
+}
+}
+
   colonnes: {
-    designation: { xMin: number; xMax: number }
-    tva: { xMin: number; xMax: number }
-    puTtc: { xMin: number; xMax: number }
-    quantite: { xMin: number; xMax: number }
-    totalTtc: { xMin: number; xMax: number }
+    reference?: ZoneColonneOcr
+    designation: ZoneColonneOcr
+    tva?: ZoneColonneOcr
+    remise?: ZoneColonneOcr
+    puTtc: ZoneColonneOcr
+    quantite: ZoneColonneOcr
+    totalTtc: ZoneColonneOcr
   }
 }
