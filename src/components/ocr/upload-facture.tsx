@@ -758,6 +758,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
       }
 
       router.push("/factures-fournisseurs");
+      router.refresh();
     } catch (error) {
       console.error("[VALIDER_LIGNES_UI]", error);
 
@@ -938,8 +939,22 @@ export default function UploadFacture({ fournisseurs }: Props) {
       )}
 
       {etat.type === "ocr_en_cours" && (
-        <div className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md p-3">
-          Upload terminé. OCR en cours sur le document #{etat.documentId}…
+        <div className="flex items-center gap-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md p-3">
+          <span
+            className="inline-block text-2xl animate-spin"
+            role="status"
+            aria-label="Analyse OCR en cours"
+          >
+            ⏳
+          </span>
+
+          <div>
+            <p className="font-medium">Reconnaissance OCR en cours…</p>
+
+            <p className="text-xs text-blue-600">
+              Analyse du document #{etat.documentId} — {etat.nomFichier}
+            </p>
+          </div>
         </div>
       )}
 
@@ -1292,9 +1307,16 @@ export default function UploadFacture({ fournisseurs }: Props) {
             }
             className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
-            {etat.type === "ocr_en_cours"
-              ? "OCR en cours…"
-              : "Uploader et lancer OCR"}
+            {etat.type === "ocr_en_cours" ? (
+              <span className="flex items-center gap-2">
+                <span className="inline-block animate-spin">⏳</span>
+                OCR en cours…
+              </span>
+            ) : etat.type === "uploading" ? (
+              "Upload en cours…"
+            ) : (
+              "Uploader et lancer OCR"
+            )}
           </button>
         ) : (
           <button

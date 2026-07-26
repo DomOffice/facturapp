@@ -21,6 +21,7 @@ export default async function ProduitsPage() {
         tauxTva: p.tauxTva?.valeurNum ? Number(p.tauxTva.valeurNum) : null,
         dernierPrixAchatTtc: Number(p.dernierPrixAchatTtc),
         prixVenteTtc: Number(p.prixVenteTtc),
+        stockActuel: Number(p.stockActuel),
         actif: p.actif,
       }))}
     />

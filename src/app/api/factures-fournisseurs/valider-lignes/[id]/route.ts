@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth/auth";
 import { prisma } from "@/lib/db/prisma";
@@ -218,14 +219,13 @@ export async function POST(
         prixAchatTtc: number | null;
       }
     >();
-   
 
     for (const ligne of lignesValides) {
       if (!ligne.produitId || ligne.mettreAJourPrixProduit !== true) {
         continue;
       }
 
-            const prixAchatTtc =
+      const prixAchatTtc =
         ligne.prixAchatTtcFacture !== null &&
         Number.isFinite(ligne.prixAchatTtcFacture)
           ? ligne.prixAchatTtcFacture
@@ -236,11 +236,9 @@ export async function POST(
        * Si aucune TVA n'est configurée, tauxTvaParProduit
        * contient déjà la valeur par défaut de 20 %.
        */
-      const tauxTvaProduit =
-        tauxTvaParProduit.get(ligne.produitId) ?? 20;
+      const tauxTvaProduit = tauxTvaParProduit.get(ligne.produitId) ?? 20;
 
-      const coefficientTva =
-        1 + tauxTvaProduit / 100;
+      const coefficientTva = 1 + tauxTvaProduit / 100;
 
       /*
        * Pour Mechouar, le prix OCR est TTC.
@@ -253,9 +251,7 @@ export async function POST(
        */
       const prixAchatHt =
         prixAchatTtc !== null && coefficientTva > 0
-          ? arrondirMontant(
-              prixAchatTtc / coefficientTva,
-            )
+          ? arrondirMontant(prixAchatTtc / coefficientTva)
           : ligne.prixAchatHtFacture !== null &&
               Number.isFinite(ligne.prixAchatHtFacture)
             ? ligne.prixAchatHtFacture
@@ -506,12 +502,16 @@ export async function POST(
       };
     });
 
+    revalidatePath("/produits");
+    revalidatePath("/factures-fournisseurs");
+
     return NextResponse.json({
       success: true,
       documentId,
       statut: "stock_integre",
       ...resultat,
     });
+    
   } catch (error) {
     if (error instanceof Error && error.message === "DOCUMENT_INTROUVABLE") {
       return NextResponse.json(

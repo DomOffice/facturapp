@@ -53,3 +53,13 @@ npx tsc --noEmit
 Si erreur persiste :
 Ctrl + Shift + P -> reload Window
 Ctrl + Shift + P -> Restart TS Server
+
+Commit convention :
+feat: → nouvelle fonctionnalité
+fix: → correction de bug
+refactor: → réorganisation du code sans changement fonctionnel
+perf: → amélioration des performances
+docs: → documentation
+style: → mise en forme (sans changement logique)
+test: → ajout ou modification des tests
+chore: → maintenance (configuration, dépendances, scripts…)

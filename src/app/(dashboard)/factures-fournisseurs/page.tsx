@@ -6,6 +6,48 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+function lireExtraction(
+  donneesExtraites: unknown,
+): Record<string, unknown> | null {
+  if (
+    !donneesExtraites ||
+    typeof donneesExtraites !== "object" ||
+    Array.isArray(donneesExtraites)
+  ) {
+    return null;
+  }
+
+  const extraction = (donneesExtraites as Record<string, unknown>).extraction;
+
+  if (
+    !extraction ||
+    typeof extraction !== "object" ||
+    Array.isArray(extraction)
+  ) {
+    return null;
+  }
+
+  return extraction as Record<string, unknown>;
+}
+
+function lireNombre(
+  objet: Record<string, unknown> | null,
+  cle: string,
+): number | null {
+  const valeur = objet?.[cle];
+
+  if (typeof valeur === "number" && Number.isFinite(valeur)) {
+    return valeur;
+  }
+
+  if (typeof valeur === "string") {
+    const nombre = Number(valeur.trim().replace(/\s/g, "").replace(",", "."));
+
+    return Number.isFinite(nombre) ? nombre : null;
+  }
+
+  return null;
+}
 export default async function FacturesFournisseursPage() {
   const session = await auth();
 
@@ -25,12 +67,56 @@ export default async function FacturesFournisseursPage() {
   if (!["ADMIN", "SAISIE"].includes(userRole)) redirect("/");
 
   // Récupération des charges fournisseurs (utilisation du modèle existant pour simuler les factures fournisseurs)
-  const facturesFournisseurs = await prisma.charge.findMany({
+  const documentsImportes = await prisma.documentImporte.findMany({
     include: {
-      fournisseur: true,
-      typeCharge: true,
+      fournisseur: {
+        select: {
+          raisonSociale: true,
+        },
+      },
+      integrationStock: {
+        select: {
+          id: true,
+          dateIntegration: true,
+        },
+      },
+      _count: {
+        select: {
+          lignes: true,
+        },
+      },
     },
-    orderBy: { dateCharge: "desc" },
+    orderBy: {
+      dateImport: "desc",
+    },
+  });
+
+  const facturesFournisseurs = documentsImportes.map((document) => {
+    const extraction = lireExtraction(document.donneesExtraites);
+
+    const numeroFacture =
+      typeof extraction?.numeroFacture === "string"
+        ? extraction.numeroFacture
+        : null;
+
+    const dateFacture =
+      typeof extraction?.dateFacture === "string"
+        ? extraction.dateFacture
+        : null;
+
+    return {
+      id: document.id,
+      numeroFacture,
+      nomFichierOriginal: document.nomFichierOriginal,
+      fournisseur: document.fournisseur.raisonSociale,
+      dateFacture,
+      dateImport: document.dateImport,
+      totalHt: lireNombre(extraction, "totalHt"),
+      totalTtc: lireNombre(extraction, "totalTtc"),
+      statut: document.statut,
+      estIntegree: document.integrationStock !== null,
+      nombreLignes: document._count.lignes,
+    };
   });
 
   return (
@@ -58,7 +144,7 @@ export default async function FacturesFournisseursPage() {
           <Link
             href="/factures-fournisseurs/nouveau"
             className="btn-primary text-sm"
-              >
+          >
             <svg
               width="14"
               height="14"
@@ -91,50 +177,72 @@ export default async function FacturesFournisseursPage() {
               <path d="M12 1h-4v3h4V1z" />
               <path d="M5 8h6M5 11h4M8 5v6" />
             </svg>
-            <p>Aucune facture fournisseur enregistrée</p>
+            <p>Aucune facture fournisseur importée</p>
             <p className="text-sm mt-1">
-              Commencez par ajouter une charge depuis votre espace fournisseur
+              Commencez par importer une facture fournisseur
             </p>
           </div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>Référence</th>
+                <th>Facture</th>
                 <th>Fournisseur</th>
                 <th>Date</th>
                 <th>Montant HT</th>
                 <th>Montant TTC</th>
-                <th>Status</th>
-                <th></th>
+                <th>Lignes</th>
+                <th>Statut</th>
               </tr>
             </thead>
             <tbody>
-              {facturesFournisseurs.map((charge) => (
-                <tr key={charge.id}>
-                  <td className="font-medium">
-                    {charge.numeroFacture || `CHG-${charge.id}`}
-                  </td>
-                  <td>{charge.fournisseur?.raisonSociale || "N/A"}</td>
+              {facturesFournisseurs.map((facture) => (
+                <tr key={facture.id}>
                   <td>
-                    {new Date(charge.dateCharge).toLocaleDateString("fr-FR")}
-                  </td>
-                  <td className="text-right">
-                    {Number(charge.montantHt).toFixed(2)} MAD
-                  </td>
-                  <td className="text-right font-medium">
-                    {Number(charge.montantTtc).toFixed(2)} MAD
-                  </td>
-                  <td>
-                    <span className={`badge badge-warning`}>En attente</span>
-                  </td>
-                  <td className="text-right">
-                    <Link
-                      href={`/charges/${charge.id}`}
-                      className="btn-ghost btn-sm"
+                    <div className="font-medium text-gray-900">
+                      {facture.numeroFacture || `IMP-${facture.id}`}
+                    </div>
+
+                    <div
+                      className="max-w-xs truncate text-xs text-gray-500"
+                      title={facture.nomFichierOriginal}
                     >
-                      Voir
-                    </Link>
+                      {facture.nomFichierOriginal}
+                    </div>
+                  </td>
+
+                  <td>{facture.fournisseur}</td>
+
+                  <td>
+                    {facture.dateFacture
+                      ? facture.dateFacture
+                      : facture.dateImport.toLocaleDateString("fr-FR")}
+                  </td>
+
+                  <td className="text-right">
+                    {facture.totalHt !== null
+                      ? `${facture.totalHt.toFixed(2)} MAD`
+                      : "—"}
+                  </td>
+
+                  <td className="text-right font-medium">
+                    {facture.totalTtc !== null
+                      ? `${facture.totalTtc.toFixed(2)} MAD`
+                      : "—"}
+                  </td>
+
+                  <td className="text-center">{facture.nombreLignes}</td>
+
+                  <td>
+                    {facture.estIntegree ? (
+                      <span className="badge badge-success">
+                        Intégrée au stock
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning">
+                        {facture.statut}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
