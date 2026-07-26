@@ -221,7 +221,7 @@ Les drivers ne doivent pas contenir de logique complexe : uniquement des paramè
 ## MAJ du 11/07/2026
 FacturApp n’est pas seulement un OCR. Il constitue un moteur de lecture intelligente de documents fournisseurs.
 
-e moteur dispose maintenant de deux voies :
+Le moteur dispose maintenant de deux voies :
 
 Extraction par coordonnées OCR
 Extraction séquentielle depuis le texte brut en fallback
@@ -275,3 +275,35 @@ Après correction et validation :
 - chaque ligne doit être rapprochée d’un produit existant ou donner lieu
   à la création d’un produit ;
 - le branchement des mouvements de stock reste à réaliser.
+
+## MAJ du 26/07/2026
+Les lignes extraites suivent désormais le cycle suivant :
+
+1. affichage des lignes OCR dans l’interface ;
+2. correction manuelle éventuelle ;
+3. rapprochement avec un produit existant ;
+4. comparaison du prix OCR avec le dernier prix d’achat enregistré ;
+5. confirmation utilisateur en cas d’écart ;
+6. validation atomique en base ;
+7. création des lignes importées ;
+8. mémorisation des associations fournisseur → produit ;
+9. mise à jour du stock ;
+10. création des mouvements de stock ;
+11. mise à jour éventuelle du dernier prix d’achat.
+
+Les produits existants conservent toujours leur TVA enregistrée en base.
+La TVA détectée par OCR n’écrase pas la TVA d’un produit existant.
+
+La création d’une véritable facture fournisseur comptable reste une étape
+distincte à finaliser.
+
+la route : facturapp\src\app\api\factures-fournisseurs\valider-lignes\[id] :
+assure une transaction atomique regroupant :
+validation ;
+persistance des lignes corrigées ;
+associations ;
+stock ;
+mouvements ;
+prix d’achat ;
+changement du statut du document.
+

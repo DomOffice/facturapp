@@ -49,3 +49,7 @@ npx prisma studio
 
 Verifier qu'il n'y a pas d'erreur :
 npx tsc --noEmit
+
+Si erreur persiste :
+Ctrl + Shift + P -> reload Window
+Ctrl + Shift + P -> Restart TS Server

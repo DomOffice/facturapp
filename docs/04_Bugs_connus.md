@@ -197,3 +197,69 @@ Mettre en place :
 - une comparaison de désignation ;
 - un score de similarité ;
 - un historique des correspondances validées.
+
+## MAJ du 26/07/2026
+Bugs ou risques à ajouter
+### Prisma Migrate non initialisé
+
+Symptôme :
+`npx prisma migrate status` affiche :
+`No migration found in prisma/migrations`.
+
+Cause :
+le projet ne possède pas encore d’historique Prisma Migrate.
+
+Impact :
+impossibilité d’utiliser normalement le cycle `migrate dev` sans préparer
+un baseline.
+
+Statut :
+à traiter après stabilisation immédiate des bugs applicatifs.
+Ne pas utiliser `prisma migrate reset`.
+### Réécriture de `schema.prisma` par `prisma db pull`
+
+Symptôme :
+`prisma db pull` réorganise et réécrit le schéma Prisma.
+
+Risque :
+perte de commentaires ou de précisions Prisma telles que certaines options
+de relations, annotations de types natifs ou choix de modélisation.
+
+Contournement :
+sauvegarder le schéma avant introspection, comparer les fichiers et ne jamais
+remplacer automatiquement le schéma de référence.
+
+Statut :
+correctif à intégrer dans `facturapp-db-tools`.
+### Verrouillage du moteur Prisma sous Windows
+
+Symptôme :
+erreur `EPERM` sur `query_engine-windows.dll.node` pendant
+`prisma generate`.
+
+Cause probable :
+un processus Node.js conserve le moteur Prisma ouvert.
+
+Contournement :
+arrêter le serveur de développement, terminer les processus Node.js,
+puis régénérer Prisma.
+
+Statut :
+à surveiller.
+
+
+## Format des nouveaux bugs
+
+Chaque bug doit contenir :
+
+- identifiant ;
+- module ;
+- priorité ;
+- symptôme ;
+- procédure de reproduction ;
+- résultat attendu ;
+- résultat obtenu ;
+- cause, si connue ;
+- correction ;
+- test de non-régression ;
+- statut.

@@ -1,4 +1,12 @@
 import { construireLigneArticleDepuisGroupes } from "./article-builder";
+import {
+  motifsDateParDefaut,
+  motifsIceFournisseurParDefaut,
+  motifsNumeroParDefaut,
+  motifsTotalHtParDefaut,
+  motifsTotalTtcParDefaut,
+  motifsTotalTvaParDefaut,
+} from "./default-ocr-patterns";
 import { chargerDriverOcr, genericLargeDriver } from "./drivers";
 import type {
   FactureFournisseurExtraite,
@@ -8,6 +16,7 @@ import type {
   ResultatOcr,
   StrategieExtractionLignes,
 } from "./types";
+
 
 export type { FactureFournisseurExtraite, LigneFactureExtraite };
 
@@ -44,6 +53,14 @@ function chercherAvecMotifs(
   return undefined;
 }
 
+function extraireMontantAvecMotifs(
+  motifs: RegExp[],
+  texte: string,
+): number | undefined {
+  const valeur = chercherAvecMotifs(motifs, texte);
+
+  return valeur ? parseMontant(valeur) : undefined;
+}
 function normaliserTexte(value: string): string {
   return value.replace(/\r/g, "\n");
 }
@@ -389,15 +406,6 @@ export function extraireFactureFournisseurDepuisOcr(
 
 const profil = chargerDriverOcr(fournisseurNom);
 
-  const motifsNumeroParDefaut: RegExp[] = [
-  /(?:BL\s*\/\s*)?FACTURE\s*N[°º�]?\s*:?\s*([A-Z]{1,5}\d{4}[-/]\d{3,8})/i,
-  /(?:N[°º�]\s*:?\s*)([A-Z]{1,5}\d{4}[-/]\d{3,8})/i,
-  /\b([A-Z]{1,5}\d{4}[-/]\d{3,8})\b/i,
-];
-
-const motifsDateParDefaut: RegExp[] = [
-  /(?:date\s*(?:facturation|facture)?\s*:?\s*)(\d{2}\/\d{2}\/\d{4})/i,
-];
 
 const numeroFacture = chercherAvecMotifs(
   profil.document?.motifsNumero?.length
@@ -414,10 +422,7 @@ const dateFacture = chercherAvecMotifs(
 );
 
   const iceMatches = Array.from(texte.matchAll(/ICE\s*:?\s*(\d{10,20})/gi));
-  const motifsIceFournisseurParDefaut: RegExp[] = [
-  /(?:ice|identifiant\s+commun\s+de\s+l['’]?entreprise)\s*:?\s*(\d{15})/i,
-];
-
+  
 const iceFournisseur = chercherAvecMotifs(
   profil.document?.motifsIceFournisseur?.length
     ? profil.document.motifsIceFournisseur
@@ -425,43 +430,25 @@ const iceFournisseur = chercherAvecMotifs(
   texte,
 );
 
-  const motifsTotalHtParDefaut: RegExp[] = [
-  /total\s*ht\s*\n?\s*([\d\s]+[,.]\d{2})/i,
-];
-
-const motifsTotalTvaParDefaut: RegExp[] = [
-  /total\s*tva(?:\s*\d+%)?\s*\n?\s*([\d\s]+[,.]\d{2})/i,
-];
-
-const motifsTotalTtcParDefaut: RegExp[] = [
-  /total\s*ttc\s*\n?\s*([\d\s]+[,.]\d{2})/i,
-];
-
-const totalHt = parseMontant(
-  chercherAvecMotifs(
-    profil.document?.motifsTotalHt?.length
-      ? profil.document.motifsTotalHt
-      : motifsTotalHtParDefaut,
-    texte,
-  ) || "",
+  const totalHt = extraireMontantAvecMotifs(
+  profil.document?.motifsTotalHt?.length
+    ? profil.document.motifsTotalHt
+    : motifsTotalHtParDefaut,
+  texte,
 );
 
-const totalTva = parseMontant(
-  chercherAvecMotifs(
-    profil.document?.motifsTotalTva?.length
-      ? profil.document.motifsTotalTva
-      : motifsTotalTvaParDefaut,
-    texte,
-  ) || "",
+const totalTva = extraireMontantAvecMotifs(
+  profil.document?.motifsTotalTva?.length
+    ? profil.document.motifsTotalTva
+    : motifsTotalTvaParDefaut,
+  texte,
 );
 
-const totalTtc = parseMontant(
-  chercherAvecMotifs(
-    profil.document?.motifsTotalTtc?.length
-      ? profil.document.motifsTotalTtc
-      : motifsTotalTtcParDefaut,
-    texte,
-  ) || "",
+const totalTtc = extraireMontantAvecMotifs(
+  profil.document?.motifsTotalTtc?.length
+    ? profil.document.motifsTotalTtc
+    : motifsTotalTtcParDefaut,
+  texte,
 );
 
   const devise = /dirham|mad|dh/i.test(texte) ? "MAD" : undefined;

@@ -203,3 +203,45 @@ Statut : à faire séparément
 3. Création transactionnelle des mouvements.
 4. Protection contre les doublons.
 5. Tests de validation, annulation et revalidation.
+
+## MAJ du 26/07/2026
+### Phase 3 — Extraction intelligente
+
+Statut : fonctionnelle, à consolider.
+
+Réalisé :
+
+- extraction d’entête et de totaux ;
+- extraction des lignes ;
+- stratégies par coordonnées et fallback séquentiel ;
+- drivers fournisseurs ;
+- édition des lignes ;
+- rapprochement produit ;
+- mémorisation des associations ;
+- gestion des écarts de prix ;
+- règle TVA des produits existants.
+### Phase 4 — Validation et stock
+
+Statut : implémentée, tests de non-régression à compléter.
+
+Réalisé :
+
+- validation atomique ;
+- lignes importées ;
+- intégration de stock ;
+- mouvements de stock ;
+- idempotence par document ;
+- mise à jour contrôlée des prix d’achat.
+### Phase 5 — Stabilisation générale
+
+Statut : prochaine étape.
+
+Objectifs :
+
+- recenser les bugs de tous les modules ;
+- les classer par criticité ;
+- corriger par petits patches ;
+- ajouter un test de non-régression à chaque correction ;
+- vérifier `npx tsc --noEmit` après chaque patch ;
+- tester également factures, devis, avoirs, paiements, produits,
+  fournisseurs, charges, authentification et navigation.

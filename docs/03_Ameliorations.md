@@ -234,3 +234,36 @@ Mettre en place un cycle : brouillon → validé → archivé.
 - garantir l’idempotence ;
 - utiliser une transaction ;
 - empêcher le double mouvement lors d’une nouvelle validation.
+
+## MAJ du 26/07/2026
+### Améliorations terminées 
+#### Rapprochement et validation des lignes OCR
+- recherche des produits existants ;
+- association manuelle des lignes non rapprochées ;
+- mémorisation fournisseur → produit ;
+- validation impossible tant qu’une ligne reste non rapprochée ;
+- conservation de la TVA du produit existant ;
+- comparaison entre prix OCR et dernier prix d’achat ;
+- dialogue de confirmation en cas d’écart de prix.
+
+#### Intégration du stock
+
+- validation transactionnelle ;
+- création des lignes importées ;
+- création d’une intégration de stock ;
+- mise à jour atomique du stock actuel ;
+- création d’un mouvement par ligne ;
+- protection contre une seconde intégration ;
+- mise à jour contrôlée du dernier prix d’achat.
+
+### Priorités suivantes
+la priorité exclusivement OCR :
+
+1. campagne de correction des bugs fonctionnels de l’ensemble de FacturApp ;
+2. sécurisation de la gestion du schéma et des restaurations DEV ;
+3. finalisation des tests de non-régression OCR/stock ;
+4. création guidée des nouveaux produits depuis une ligne OCR ;
+5. création de la facture fournisseur comptable ;
+6. baseline Prisma Migrate ;
+7. poursuite des drivers fournisseurs ;
+8. amélioration de la file de traitement OCR.

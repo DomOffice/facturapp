@@ -166,3 +166,28 @@ Documents de référence :
   - lancer `npx tsc --noEmit` ;
   - tester au moins un document Mechouar ;
   - tester au moins un document CasInfo.
+
+## MAJ du 26/07/2026
+### Méthode de modification
+
+Le propriétaire fonctionnel du projet est novice en TypeScript.
+
+Toute proposition de correction doit donc indiquer :
+
+1. le chemin exact du fichier ;
+2. la zone exacte à rechercher ;
+3. le bloc exact à ajouter, supprimer ou remplacer ;
+4. une explication métier simple ;
+5. les commandes de contrôle ;
+6. le test fonctionnel à exécuter.
+
+Éviter les réécritures complètes lorsqu’un petit patch suffit.
+Ne pas regrouper plusieurs corrections sans rapport dans un même patch.
+Ajouter dans Prisma
+Avant toute commande susceptible de modifier la base ou le schéma :
+
+- expliquer le sens de la commande ;
+- préciser si elle agit sur la base ou seulement sur les fichiers ;
+- sauvegarder le schéma si nécessaire ;
+- ne jamais proposer `migrate reset` sur la base restaurée ;
+- ne jamais intégrer `db pull` automatiquement au processus de restauration.

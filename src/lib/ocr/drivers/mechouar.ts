@@ -22,8 +22,8 @@ export const mechouarDriver: ProfilOcrFournisseur = {
     ],
 
     motifsTotalTtc: [
-  /net\s+[àa]\s+payer[\s\S]{0,60}?([\d\s]+[,.]\d{2})/i,
-  /([\d\s]+[,.]\d{2})[\s\S]{0,60}?net\s+[àa]\s+payer/i,
+  /net\s+[àa]\s+payer[ \t]*:?[ \t]*(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})/i,
+  /(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})(?:[ \t]*\r?\n[^\r\n]*){0,2}[ \t]*\r?\n[ \t]*net\s+[àa]\s+payer/i,
 ],
 
   validation: {

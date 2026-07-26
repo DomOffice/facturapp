@@ -28,13 +28,24 @@ export type LigneFactureExtraite = {
   produitRecherche?: string;
   produitsProposes?: ProduitRecherche[];
   rechercheProduitEnCours?: boolean;
+  prixAchatHtFacture?: number;
+  prixAchatTtcFacture?: number;
+
+  prixProduitActuelHt?: number;
+  prixProduitActuelTtc?: number;
+
+  mettreAJourPrixProduit?: boolean;
 };
 
 type Props = {
   lignes: LigneFactureExtraite[];
   onChange: (lignes: LigneFactureExtraite[]) => void;
-  onRechercheProduit?: (index: number, recherche: string) => void | Promise<void>;
+  onRechercheProduit?: (
+    index: number,
+    recherche: string,
+  ) => void | Promise<void>;
   onSelectionProduit?: (index: number, produitId: number | null) => void;
+  onCreerProduit?: (index: number) => void;
 };
 
 const CHAMPS_NUMERIQUES = new Set<keyof LigneFactureExtraite>([
@@ -49,6 +60,7 @@ export default function EditableInvoiceLines({
   onChange,
   onRechercheProduit,
   onSelectionProduit,
+  onCreerProduit,
 }: Props) {
   const timersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
@@ -70,7 +82,9 @@ export default function EditableInvoiceLines({
       if (i !== index) return ligne;
 
       if (CHAMPS_NUMERIQUES.has(champ)) {
-        const texte = String(valeur ?? "").trim().replace(",", ".");
+        const texte = String(valeur ?? "")
+          .trim()
+          .replace(",", ".");
         const nombre = texte === "" ? undefined : Number(texte);
 
         return {
@@ -165,7 +179,11 @@ export default function EditableInvoiceLines({
                       inputMode="decimal"
                       value={ligne.prixUnitaireTtc ?? ""}
                       onChange={(event) =>
-                        modifierLigne(index, "prixUnitaireTtc", event.target.value)
+                        modifierLigne(
+                          index,
+                          "prixUnitaireTtc",
+                          event.target.value,
+                        )
                       }
                       className="w-14 rounded border px-2 py-1 text-right"
                     />
@@ -211,12 +229,19 @@ export default function EditableInvoiceLines({
 
                     <select
                       value={ligne.produitId ?? ""}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const valeur = event.target.value;
+
+                        if (valeur === "__creer_produit__") {
+                          onCreerProduit?.(index);
+                          return;
+                        }
+
                         onSelectionProduit?.(
                           index,
-                          event.target.value ? Number(event.target.value) : null,
-                        )
-                      }
+                          valeur ? Number(valeur) : null,
+                        );
+                      }}
                       className="mt-2 w-full rounded border px-2 py-1"
                     >
                       <option value="">
@@ -224,6 +249,11 @@ export default function EditableInvoiceLines({
                           ? "Recherche en cours…"
                           : "À rapprocher"}
                       </option>
+
+                      <option value="__creer_produit__">
+                        ➕ Créer un nouveau produit…
+                      </option>
+
                       {produits.map((produit) => (
                         <option key={produit.id} value={produit.id}>
                           {libelleProduit(produit)}

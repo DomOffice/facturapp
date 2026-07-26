@@ -213,3 +213,25 @@ Points techniques encore à traiter :
 - rapprochement produit ;
 - apprentissage des associations ;
 - transactions de validation et de stock.
+
+## MAJ du 26/07/2026
+### les points positifs
+- Validation atomique des lignes OCR et de l’intégration en stock.
+- Protection contre la double intégration d’un document.
+- Traçabilité par `IntegrationStock` et `MouvementStock`.
+- Mémorisation déterministe des associations fournisseur → produit.
+- Conservation de la TVA de référence des produits existants.
+- Confirmation explicite des écarts de prix d’achat.
+
+### les points de vigilance
+- Le projet ne possède pas encore de dossier `prisma/migrations`.
+- La base actuelle n’est pas encore baselinée avec Prisma Migrate.
+- `prisma db pull` peut réécrire le schéma Prisma et perdre des informations
+  déclaratives non restituées à l’identique.
+- Le schéma Prisma doit être sauvegardé et comparé avant toute introspection.
+- Les scripts de restauration DEV doivent restaurer uniquement les données,
+  sans remplacer le schéma DEV ni le fichier `schema.prisma`.
+
+### recommandation prioritaire
+Mettre en place un baseline Prisma contrôlé lorsque le schéma OCR/stock sera
+stabilisé, sans réinitialiser la base existante.

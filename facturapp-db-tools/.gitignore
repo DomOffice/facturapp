@@ -1,0 +1,19 @@
+# Dumps PostgreSQL
+backups/
+*.dump
+
+# Sauvegardes du schema Prisma
+backups_schema/
+*.backup
+
+# Journaux
+*.log
+
+# Fichiers temporaires Windows
+Thumbs.db
+Desktop.ini
+
+# Fichiers temporaires des editeurs
+*.tmp
+*.swp
+*~

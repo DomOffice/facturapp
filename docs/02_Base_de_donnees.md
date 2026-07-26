@@ -222,3 +222,73 @@ Le modèle devra permettre de mémoriser une relation entre :
 
 Le nom exact de la table et ses contraintes seront définis après audit
 du schéma Prisma existant.
+
+## MAJ du 26/07/2026
+### lignes_importees
+Contient la version corrigée et validée des lignes extraites par OCR.
+
+Chaque ligne peut être reliée à un produit existant et conserve notamment :
+
+- référence détectée ;
+- désignation ;
+- quantité ;
+- prix unitaire ;
+- TVA détectée à titre documentaire ;
+- montant total ;
+- produit associé ;
+- statut de traitement.
+
+### AssociationArticleFournisseur
+Mémorise les correspondances validées entre une référence fournisseur et un
+produit FacturApp.
+
+L’apprentissage est déterministe : aucune association n’est créée sans
+validation métier.
+
+### IntegrationStock
+Représente une intégration globale d’un document fournisseur dans le stock.
+
+Une contrainte unique sur le document protège contre la double intégration.
+
+### MouvementStock
+Trace chaque entrée de stock générée depuis une ligne importée :
+
+- produit ;
+- ligne importée ;
+- quantité ;
+- stock avant ;
+- stock après ;
+- type de mouvement ;
+- date du mouvement.
+
+### Nouveau cycle réel
+Upload
+→ OCR
+→ extraction structurée
+→ correction
+→ rapprochement produit
+→ comparaison des prix
+→ confirmation utilisateur
+→ transaction de validation
+→ lignes importées
+→ associations mémorisées
+→ stock mis à jour
+→ mouvements tracés
+→ document marqué comme intégré
+
+#### Ajouter une section Prisma
+## Gestion actuelle du schéma Prisma
+
+Le projet ne dispose pas encore d’un historique `prisma/migrations`.
+
+Conséquences :
+
+- `prisma migrate status` signale que la base n’est pas gérée par Prisma Migrate ;
+- ne pas lancer `prisma migrate reset` ;
+- ne pas utiliser `prisma db pull` comme étape automatique de restauration ;
+- sauvegarder `prisma/schema.prisma` avant toute introspection ;
+- comparer et valider les différences après introspection ;
+- utiliser `prisma validate`, `prisma generate` et `npx tsc --noEmit`
+  comme contrôles non destructifs.
+
+Un baseline Prisma devra être créé ultérieurement.

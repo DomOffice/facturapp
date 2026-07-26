@@ -16,6 +16,9 @@ type LignePayload = {
   tauxTva?: number | string;
   totalTtc?: number | string;
   produitId?: number | null;
+  prixAchatHtFacture?: number | string;
+  prixAchatTtcFacture?: number | string;
+  mettreAJourPrixProduit?: boolean;
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -27,6 +30,10 @@ function toNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function arrondirMontant(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -35,10 +42,7 @@ export async function POST(
     const session = await auth();
 
     if (!session?.user) {
-      return NextResponse.json(
-        { error: "Non authentifié" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const userRole = String(
@@ -46,19 +50,13 @@ export async function POST(
     ).toLowerCase();
 
     if (!["admin", "saisie"].includes(userRole)) {
-      return NextResponse.json(
-        { error: "Accès refusé" },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
     const documentId = Number(params.id);
 
     if (!Number.isInteger(documentId) || documentId <= 0) {
-      return NextResponse.json(
-        { error: "Document invalide" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Document invalide" }, { status: 400 });
     }
 
     const body = await req.json();
@@ -89,6 +87,20 @@ export async function POST(
           Number(ligne.produitId) > 0
             ? Number(ligne.produitId)
             : null,
+
+        prixAchatHtFacture:
+          ligne.prixAchatHtFacture === undefined ||
+          ligne.prixAchatHtFacture === null
+            ? null
+            : toNumber(ligne.prixAchatHtFacture),
+
+        prixAchatTtcFacture:
+          ligne.prixAchatTtcFacture === undefined ||
+          ligne.prixAchatTtcFacture === null
+            ? null
+            : toNumber(ligne.prixAchatTtcFacture),
+
+        mettreAJourPrixProduit: ligne.mettreAJourPrixProduit === true,
       }))
       .filter((ligne) => ligne.designation.length > 0);
 
@@ -103,9 +115,7 @@ export async function POST(
      * Toutes les lignes doivent être rapprochées avant
      * l'intégration au stock.
      */
-    const lignesSansProduit = lignesValides.filter(
-      (ligne) => !ligne.produitId,
-    );
+    const lignesSansProduit = lignesValides.filter((ligne) => !ligne.produitId);
 
     if (lignesSansProduit.length > 0) {
       return NextResponse.json(
@@ -146,10 +156,8 @@ export async function POST(
      * Vérification préalable de l'existence des produits.
      */
     const produitIds = Array.from(
-  new Set(
-    lignesValides.map((ligne) => ligne.produitId as number),
-  ),
-);
+      new Set(lignesValides.map((ligne) => ligne.produitId as number)),
+    );
 
     const produitsExistants = await prisma.produit.findMany({
       where: {
@@ -158,12 +166,35 @@ export async function POST(
       },
       select: {
         id: true,
+
+        tauxTva: {
+          select: {
+            valeurNum: true,
+          },
+        },
       },
     });
 
     const idsExistants = new Set(
       produitsExistants.map((produit) => produit.id),
     );
+
+    const tauxTvaParProduit = new Map<number, number>();
+
+    for (const produit of produitsExistants) {
+      const tauxTvaProduit = Number(produit.tauxTva?.valeurNum);
+
+      /*
+       * Lorsqu'aucune TVA n'est configurée sur le produit,
+       * on utilise 20 % par défaut.
+       */
+      tauxTvaParProduit.set(
+        produit.id,
+        Number.isFinite(tauxTvaProduit) && tauxTvaProduit >= 0
+          ? tauxTvaProduit
+          : 20,
+      );
+    }
 
     const idsInvalides = produitIds.filter(
       (produitId) => !idsExistants.has(produitId),
@@ -178,6 +209,70 @@ export async function POST(
         },
         { status: 400 },
       );
+    }
+
+    const misesAJourPrixParProduit = new Map<
+      number,
+      {
+        prixAchatHt: number | null;
+        prixAchatTtc: number | null;
+      }
+    >();
+   
+
+    for (const ligne of lignesValides) {
+      if (!ligne.produitId || ligne.mettreAJourPrixProduit !== true) {
+        continue;
+      }
+
+            const prixAchatTtc =
+        ligne.prixAchatTtcFacture !== null &&
+        Number.isFinite(ligne.prixAchatTtcFacture)
+          ? ligne.prixAchatTtcFacture
+          : null;
+
+      /*
+       * La TVA utilisée vient de la fiche produit en BDD.
+       * Si aucune TVA n'est configurée, tauxTvaParProduit
+       * contient déjà la valeur par défaut de 20 %.
+       */
+      const tauxTvaProduit =
+        tauxTvaParProduit.get(ligne.produitId) ?? 20;
+
+      const coefficientTva =
+        1 + tauxTvaProduit / 100;
+
+      /*
+       * Pour Mechouar, le prix OCR est TTC.
+       * Le HT est recalculé avec la TVA de la fiche produit.
+       *
+       * Exemple :
+       * TTC = 120 MAD
+       * TVA produit = 20 %
+       * HT = 120 / 1,20 = 100 MAD
+       */
+      const prixAchatHt =
+        prixAchatTtc !== null && coefficientTva > 0
+          ? arrondirMontant(
+              prixAchatTtc / coefficientTva,
+            )
+          : ligne.prixAchatHtFacture !== null &&
+              Number.isFinite(ligne.prixAchatHtFacture)
+            ? ligne.prixAchatHtFacture
+            : null;
+
+      if (prixAchatHt === null && prixAchatTtc === null) {
+        continue;
+      }
+
+      /*
+       * Si le même produit apparaît plusieurs fois,
+       * la dernière ligne de la facture est retenue.
+       */
+      misesAJourPrixParProduit.set(ligne.produitId, {
+        prixAchatHt,
+        prixAchatTtc,
+      });
     }
 
     const utilisateurIdRaw = (
@@ -250,6 +345,12 @@ export async function POST(
 
       let quantiteTotaleIntegree = new Prisma.Decimal(0);
 
+      /*
+       * Empêche de mettre plusieurs fois à jour le prix
+       * lorsqu'un même produit apparaît sur plusieurs lignes.
+       */
+      const prixProduitsDejaMisAJour = new Set<number>();
+
       for (const ligne of lignesValides) {
         const produitId = ligne.produitId as number;
         const quantite = new Prisma.Decimal(ligne.quantite);
@@ -263,13 +364,9 @@ export async function POST(
             referenceDetectee: ligne.referenceDetectee,
             designation: ligne.designation,
             quantite,
-            prixUnitaire: new Prisma.Decimal(
-              ligne.prixUnitaire,
-            ),
+            prixUnitaire: new Prisma.Decimal(ligne.prixUnitaire),
             tauxTva: new Prisma.Decimal(ligne.tauxTva),
-            montantTotal: new Prisma.Decimal(
-              ligne.montantTotal,
-            ),
+            montantTotal: new Prisma.Decimal(ligne.montantTotal),
             produitId,
             statut: "integree_stock",
           },
@@ -294,21 +391,16 @@ export async function POST(
 
               update: {
                 produitId,
-                referenceDetectee:
-                  ligne.referenceDetectee,
-                designationDetectee:
-                  ligne.designation,
+                referenceDetectee: ligne.referenceDetectee,
+                designationDetectee: ligne.designation,
               },
 
               create: {
-                fournisseurId:
-                  document.fournisseurId,
+                fournisseurId: document.fournisseurId,
                 produitId,
-                referenceDetectee:
-                  ligne.referenceDetectee,
+                referenceDetectee: ligne.referenceDetectee,
                 referenceNormalisee,
-                designationDetectee:
-                  ligne.designation,
+                designationDetectee: ligne.designation,
               },
             });
 
@@ -319,40 +411,66 @@ export async function POST(
         /*
          * Augmentation atomique du stock courant.
          */
-        const produitMisAJour =
-          await tx.produit.update({
-            where: {
-              id: produitId,
+        const miseAJourPrix = prixProduitsDejaMisAJour.has(produitId)
+          ? undefined
+          : misesAJourPrixParProduit.get(produitId);
+
+        const produitMisAJour = await tx.produit.update({
+          where: {
+            id: produitId,
+          },
+
+          data: {
+            stockActuel: {
+              increment: quantite,
             },
 
-            data: {
-              stockActuel: {
-                increment: quantite,
-              },
-            },
+            ...(miseAJourPrix
+              ? {
+                  ...(miseAJourPrix.prixAchatHt !== null
+                    ? {
+                        dernierPrixAchatHt: new Prisma.Decimal(
+                          miseAJourPrix.prixAchatHt,
+                        ),
+                      }
+                    : {}),
 
-            select: {
-              stockActuel: true,
-            },
-          });
+                  ...(miseAJourPrix.prixAchatTtc !== null
+                    ? {
+                        dernierPrixAchatTtc: new Prisma.Decimal(
+                          miseAJourPrix.prixAchatTtc,
+                        ),
+                      }
+                    : {}),
+                }
+              : {}),
+          },
 
-        const stockApres =
-          produitMisAJour.stockActuel;
+          select: {
+            stockActuel: true,
+          },
+        });
 
-        const stockAvant =
-          stockApres.minus(quantite);
+        /*
+         * Le prix vient d'être appliqué à ce produit.
+         * Les éventuelles lignes suivantes ne modifieront que le stock.
+         */
+        if (miseAJourPrix) {
+          prixProduitsDejaMisAJour.add(produitId);
+        }
+
+        const stockApres = produitMisAJour.stockActuel;
+        const stockAvant = stockApres.minus(quantite);
 
         /*
          * Création de la trace détaillée du mouvement.
          */
         await tx.mouvementStock.create({
           data: {
-            integrationStockId:
-              integration.id,
+            integrationStockId: integration.id,
 
             produitId,
-            ligneImporteeId:
-              ligneImportee.id,
+            ligneImporteeId: ligneImportee.id,
 
             type: "entree_fournisseur",
             quantite,
@@ -361,8 +479,7 @@ export async function POST(
           },
         });
 
-        quantiteTotaleIntegree =
-          quantiteTotaleIntegree.plus(quantite);
+        quantiteTotaleIntegree = quantiteTotaleIntegree.plus(quantite);
 
         mouvementsCrees += 1;
       }
@@ -385,8 +502,7 @@ export async function POST(
         mouvementsCrees,
         associationsMemorisees,
 
-        quantiteTotaleIntegree:
-          quantiteTotaleIntegree.toString(),
+        quantiteTotaleIntegree: quantiteTotaleIntegree.toString(),
       };
     });
 
@@ -397,24 +513,17 @@ export async function POST(
       ...resultat,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "DOCUMENT_INTROUVABLE"
-    ) {
+    if (error instanceof Error && error.message === "DOCUMENT_INTROUVABLE") {
       return NextResponse.json(
         { error: "Document importé introuvable" },
         { status: 404 },
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "DOCUMENT_DEJA_INTEGRE"
-    ) {
+    if (error instanceof Error && error.message === "DOCUMENT_DEJA_INTEGRE") {
       return NextResponse.json(
         {
-          error:
-            "Ce document a déjà été validé et intégré au stock.",
+          error: "Ce document a déjà été validé et intégré au stock.",
         },
         { status: 409 },
       );
@@ -425,23 +534,18 @@ export async function POST(
      * unique. Cela protège aussi contre deux clics simultanés.
      */
     if (
-      error instanceof
-        Prisma.PrismaClientKnownRequestError &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
       return NextResponse.json(
         {
-          error:
-            "Ce document a déjà été intégré au stock.",
+          error: "Ce document a déjà été intégré au stock.",
         },
         { status: 409 },
       );
     }
 
-    console.error(
-      "[VALIDER_LIGNES_ET_STOCK_FOURNISSEUR]",
-      error,
-    );
+    console.error("[VALIDER_LIGNES_ET_STOCK_FOURNISSEUR]", error);
 
     return NextResponse.json(
       {

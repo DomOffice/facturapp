@@ -6,6 +6,8 @@ import EditableInvoiceLines, {
   LigneFactureExtraite,
   ProduitRecherche,
 } from "./EditableInvoiceLines";
+import ProduitFormModal from "@/components/forms/ProduitFormModal";
+import Modal from "@/components/ui/Modal";
 
 type Fournisseur = {
   id: number;
@@ -53,6 +55,18 @@ type Props = {
   fournisseurs: Fournisseur[];
 };
 
+type EcartPrixProduit = {
+  produitId: number;
+  reference: string;
+  description: string;
+  prixProduitActuelHt?: number;
+  prixProduitActuelTtc?: number;
+  prixFactureHt?: number;
+  prixFactureTtc?: number;
+  comparaisonEnTtc: boolean;
+  mettreAJourPrixProduit?: boolean;
+};
+
 const FORMATS_ACCEPTES = ["application/pdf", "image/jpeg", "image/png"];
 
 function formaterTaille(octets: number): string {
@@ -70,6 +84,248 @@ function formaterMontant(value?: number, devise = "MAD") {
   })} ${devise}`;
 }
 
+function lireNombreLigne(
+  ligne: LigneFactureExtraite | null,
+  cles: string[],
+): number | undefined {
+  if (!ligne) return undefined;
+
+  const donnees = ligne as unknown as Record<string, unknown>;
+
+  for (const cle of cles) {
+    const valeur = donnees[cle];
+
+    if (typeof valeur === "number" && Number.isFinite(valeur)) {
+      return valeur;
+    }
+
+    if (typeof valeur === "string") {
+      const nombre = Number(valeur.trim().replace(/\s/g, "").replace(",", "."));
+
+      if (Number.isFinite(nombre)) {
+        return nombre;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+// Tolérance ecart de prix entre facture scannée et prix de la BDD
+const TOLERANCE_PRIX_ACHAT = 0.01;
+function arrondirMontant(valeur: number): number {
+  return Math.round((valeur + Number.EPSILON) * 100) / 100;
+}
+
+function lirePrixProduit(
+  valeur: string | number | null | undefined,
+): number | undefined {
+  if (valeur === null || valeur === undefined || valeur === "") {
+    return undefined;
+  }
+
+  const nombre =
+    typeof valeur === "string"
+      ? Number(valeur.trim().replace(/\s/g, "").replace(",", "."))
+      : Number(valeur);
+
+  return Number.isFinite(nombre) ? arrondirMontant(nombre) : undefined;
+}
+
+function determinerMiseAJourPrixProduit(
+  prixFactureTtc: number | undefined,
+  prixProduitTtc: number | undefined,
+  prixFactureHt: number | undefined,
+  prixProduitHt: number | undefined,
+): boolean | undefined {
+  /*
+   * Priorité au TTC :
+   * c'est la valeur directement lue sur les BL Mechouar
+   * et affichée lors du rapprochement.
+   */
+  if (prixFactureTtc !== undefined && prixProduitTtc !== undefined) {
+    const ecartTtc = Math.abs(
+      arrondirMontant(prixFactureTtc) - arrondirMontant(prixProduitTtc),
+    );
+
+    return ecartTtc <= TOLERANCE_PRIX_ACHAT ? false : undefined;
+  }
+
+  /*
+   * Secours en HT lorsque le TTC produit n'est pas disponible.
+   */
+  if (prixFactureHt !== undefined && prixProduitHt !== undefined) {
+    const ecartHt = Math.abs(
+      arrondirMontant(prixFactureHt) - arrondirMontant(prixProduitHt),
+    );
+
+    return ecartHt <= TOLERANCE_PRIX_ACHAT ? false : undefined;
+  }
+
+  /*
+   * Dès qu'une valeur de facture existe, mais qu'aucun prix
+   * produit comparable n'est enregistré, une décision est requise.
+   */
+  if (prixFactureTtc !== undefined || prixFactureHt !== undefined) {
+    return undefined;
+  }
+
+  /*
+   * Aucun prix exploitable sur la ligne.
+   */
+  return false;
+}
+function enrichirLigneAvecPrixProduit(
+  ligne: LigneFactureExtraite,
+  produitId: number | null,
+  produits: ProduitRecherche[],
+): LigneFactureExtraite {
+  const produit =
+    produitId !== null
+      ? produits.find((produitPropose) => produitPropose.id === produitId)
+      : undefined;
+
+  if (!produit) {
+    return {
+      ...ligne,
+      produitId,
+      prixAchatHtFacture: undefined,
+      prixAchatTtcFacture: undefined,
+      prixProduitActuelHt: undefined,
+      prixProduitActuelTtc: undefined,
+      mettreAJourPrixProduit: undefined,
+    };
+  }
+
+  const prixAchatTtcFactureBrut = lireNombreLigne(ligne, [
+    "prixUnitaireTtc",
+    "prixAchatTtc",
+    "prixTtc",
+  ]);
+
+  const prixAchatTtcFacture =
+    prixAchatTtcFactureBrut !== undefined
+      ? arrondirMontant(prixAchatTtcFactureBrut)
+      : undefined;
+
+  const tauxTva =
+    lireNombreLigne(ligne, [
+      "tauxTva",
+      "tauxTvaPourcentage",
+      "pourcentageTva",
+    ]) ?? 0;
+
+  const coefficientTva = 1 + tauxTva / 100;
+
+  const prixAchatHtFacture =
+    prixAchatTtcFacture !== undefined && coefficientTva > 0
+      ? arrondirMontant(prixAchatTtcFacture / coefficientTva)
+      : undefined;
+
+  const prixProduitActuelHt = lirePrixProduit(produit.dernierPrixAchatHt);
+
+  const prixProduitActuelTtc = lirePrixProduit(produit.dernierPrixAchatTtc);
+
+  return {
+    ...ligne,
+    produitId,
+    prixAchatHtFacture,
+    prixAchatTtcFacture,
+    prixProduitActuelHt,
+    prixProduitActuelTtc,
+    mettreAJourPrixProduit: determinerMiseAJourPrixProduit(
+      prixAchatTtcFacture,
+      prixProduitActuelTtc,
+      prixAchatHtFacture,
+      prixProduitActuelHt,
+    ),
+  };
+}
+
+function regrouperEcartsPrixProduits(
+  lignes: LigneFactureExtraite[],
+): EcartPrixProduit[] {
+  const ecartsParProduit = new Map<number, EcartPrixProduit>();
+
+  for (const ligne of lignes) {
+    const produitId = Number(ligne.produitId);
+
+    if (!Number.isInteger(produitId) || produitId <= 0) {
+      continue;
+    }
+
+    /*
+     * false signifie que les prix sont identiques.
+     * true signifie que l'utilisateur a déjà choisi la mise à jour.
+     * undefined signifie qu'une décision est nécessaire.
+     *
+     * Les lignes ayant déjà reçu une décision doivent également
+     * rester visibles lorsque la fenêtre est rouverte.
+     */
+    const possedePrixFacture =
+      ligne.prixAchatTtcFacture !== undefined ||
+      ligne.prixAchatHtFacture !== undefined;
+
+    if (!possedePrixFacture) {
+      continue;
+    }
+
+    const comparaisonEnTtc =
+      ligne.prixAchatTtcFacture !== undefined &&
+      ligne.prixProduitActuelTtc !== undefined;
+
+    const prixFactureComparable = comparaisonEnTtc
+      ? ligne.prixAchatTtcFacture
+      : ligne.prixAchatHtFacture;
+
+    const prixProduitComparable = comparaisonEnTtc
+      ? ligne.prixProduitActuelTtc
+      : ligne.prixProduitActuelHt;
+
+    const prixDifferent =
+      prixProduitComparable === undefined ||
+      prixFactureComparable === undefined ||
+      Math.abs(
+        arrondirMontant(prixFactureComparable) -
+          arrondirMontant(prixProduitComparable),
+      ) > TOLERANCE_PRIX_ACHAT;
+
+    if (!prixDifferent) {
+      continue;
+    }
+
+    const produitSelectionne = ligne.produitsProposes?.find(
+      (produit) => produit.id === produitId,
+    );
+
+    /*
+     * Si le même produit apparaît plusieurs fois,
+     * la dernière ligne du document est conservée.
+     */
+    ecartsParProduit.set(produitId, {
+      produitId,
+
+      reference:
+        produitSelectionne?.reference?.trim() ||
+        ligne.reference?.trim() ||
+        `Produit #${produitId}`,
+
+      description:
+        produitSelectionne?.description?.trim() ||
+        ligne.designation?.trim() ||
+        "Sans description",
+
+      prixProduitActuelHt: ligne.prixProduitActuelHt,
+      prixProduitActuelTtc: ligne.prixProduitActuelTtc,
+      prixFactureHt: ligne.prixAchatHtFacture,
+      prixFactureTtc: ligne.prixAchatTtcFacture,
+      comparaisonEnTtc,
+      mettreAJourPrixProduit: ligne.mettreAJourPrixProduit,
+    });
+  }
+
+  return Array.from(ecartsParProduit.values());
+}
 export default function UploadFacture({ fournisseurs }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -82,6 +338,12 @@ export default function UploadFacture({ fournisseurs }: Props) {
   const [lignesEditables, setLignesEditables] = useState<
     LigneFactureExtraite[]
   >([]);
+
+  const [indexLigneCreationProduit, setIndexLigneCreationProduit] = useState<
+    number | null
+  >(null);
+
+  const [validationPrixOuverte, setValidationPrixOuverte] = useState(false);
 
   const validerFichier = (fichier: File): string | null => {
     if (!FORMATS_ACCEPTES.includes(fichier.type)) {
@@ -108,122 +370,124 @@ export default function UploadFacture({ fournisseurs }: Props) {
     setEtat({ type: "idle" });
   }, []);
 
-type ResultatRechercheProduits = {
-  produits: ProduitRecherche[];
-  associationMemorisee: boolean;
-};
-
-const rechercherProduits = async (
-  recherche: string,
-): Promise<ResultatRechercheProduits> => {
-  const q = recherche.trim();
-
-  if (q.length < 2) {
-    return { produits: [], associationMemorisee: false };
-  }
-
-  const params = new URLSearchParams({ q });
-
-  if (fournisseurId) {
-    params.set("fournisseurId", fournisseurId);
-  }
-
-  const res = await fetch(
-    `/api/produits/recherche?${params.toString()}`,
-  );
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    console.error("[RECHERCHE_PRODUITS_UI]", data);
-    return { produits: [], associationMemorisee: false };
-  }
-
-  return {
-    produits: Array.isArray(data.produits) ? data.produits : [],
-    associationMemorisee: data.associationMemorisee === true,
+  type ResultatRechercheProduits = {
+    produits: ProduitRecherche[];
+    associationMemorisee: boolean;
   };
-};
 
-const enrichirLignesAvecProduits = async (
-  lignes: LigneFactureExtraite[],
-): Promise<LigneFactureExtraite[]> => {
-  return Promise.all(
-    lignes.map(async (ligne) => {
-      const reference = ligne.reference?.trim() || "";
-      const designation = ligne.designation?.trim() || "";
+  const rechercherProduits = async (
+    recherche: string,
+  ): Promise<ResultatRechercheProduits> => {
+    const q = recherche.trim();
 
-      if (!reference && designation.length < 2) {
-        return {
-          ...ligne,
-          produitId: null,
-          produitRecherche: "",
-          produitsProposes: [],
-          rechercheProduitEnCours: false,
-        };
-      }
+    if (q.length < 2) {
+      return { produits: [], associationMemorisee: false };
+    }
 
-      /*
-       * Priorité absolue à la référence fournisseur seule.
-       * C'est cette valeur exacte qui permet de retrouver une association
-       * déjà mémorisée pour Mechouar.
-       */
-      let resultat = reference.length >= 2
-        ? await rechercherProduits(reference)
-        : { produits: [], associationMemorisee: false };
-      let produits = resultat.produits;
+    const params = new URLSearchParams({ q });
 
-      /*
-       * Si aucune association exacte ni proposition n'est trouvée,
-       * on élargit à la référence + désignation.
-       */
-      const rechercheComplete = [reference, designation]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+    if (fournisseurId) {
+      params.set("fournisseurId", fournisseurId);
+    }
 
-      if (produits.length === 0 && rechercheComplete.length >= 2) {
-        resultat = await rechercherProduits(rechercheComplete);
-        produits = resultat.produits;
-      }
+    const res = await fetch(`/api/produits/recherche?${params.toString()}`);
 
-      /*
-       * Dernier recours : désignation seule.
-       */
-      if (produits.length === 0 && designation.length >= 2) {
-        resultat = await rechercherProduits(designation);
-        produits = resultat.produits;
-      }
+    const data = await res.json();
 
-      const premier = produits[0];
-      const second = produits[1];
+    if (!res.ok) {
+      console.error("[RECHERCHE_PRODUITS_UI]", data);
+      return { produits: [], associationMemorisee: false };
+    }
 
-      const scorePremier = premier?.score ?? 0;
-      const scoreSecond = second?.score ?? 0;
+    return {
+      produits: Array.isArray(data.produits) ? data.produits : [],
+      associationMemorisee: data.associationMemorisee === true,
+    };
+  };
 
-      /*
-       * Présélection uniquement si le résultat est suffisamment
-       * fiable et nettement meilleur que le suivant.
-       */
-      const selectionAutomatique =
-        resultat.associationMemorisee && premier
-          ? premier.id
-          : premier &&
-              scorePremier >= 90 &&
-              (!second || scorePremier - scoreSecond >= 15)
+  const enrichirLignesAvecProduits = async (
+    lignes: LigneFactureExtraite[],
+  ): Promise<LigneFactureExtraite[]> => {
+    return Promise.all(
+      lignes.map(async (ligne) => {
+        const reference = ligne.reference?.trim() || "";
+        const designation = ligne.designation?.trim() || "";
+
+        if (!reference && designation.length < 2) {
+          return {
+            ...ligne,
+            produitId: null,
+            produitRecherche: "",
+            produitsProposes: [],
+            rechercheProduitEnCours: false,
+          };
+        }
+
+        /*
+         * Priorité absolue à la référence fournisseur seule.
+         * C'est cette valeur exacte qui permet de retrouver une association
+         * déjà mémorisée pour Mechouar.
+         */
+        let resultat =
+          reference.length >= 2
+            ? await rechercherProduits(reference)
+            : { produits: [], associationMemorisee: false };
+        let produits = resultat.produits;
+
+        /*
+         * Si aucune association exacte ni proposition n'est trouvée,
+         * on élargit à la référence + désignation.
+         */
+        const rechercheComplete = [reference, designation]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+
+        if (produits.length === 0 && rechercheComplete.length >= 2) {
+          resultat = await rechercherProduits(rechercheComplete);
+          produits = resultat.produits;
+        }
+
+        /*
+         * Dernier recours : désignation seule.
+         */
+        if (produits.length === 0 && designation.length >= 2) {
+          resultat = await rechercherProduits(designation);
+          produits = resultat.produits;
+        }
+
+        const premier = produits[0];
+        const second = produits[1];
+
+        const scorePremier = premier?.score ?? 0;
+        const scoreSecond = second?.score ?? 0;
+
+        /*
+         * Présélection uniquement si le résultat est suffisamment
+         * fiable et nettement meilleur que le suivant.
+         */
+        const selectionAutomatique =
+          resultat.associationMemorisee && premier
             ? premier.id
-            : null;
+            : premier &&
+                scorePremier >= 90 &&
+                (!second || scorePremier - scoreSecond >= 15)
+              ? premier.id
+              : null;
 
-      return {
-        ...ligne,
-        produitId: selectionAutomatique,
-        produitRecherche: "",
-        produitsProposes: produits,
-        rechercheProduitEnCours: false,
-      };
-    }),
-  );
-};
+        return enrichirLigneAvecPrixProduit(
+          {
+            ...ligne,
+            produitRecherche: "",
+            produitsProposes: produits,
+            rechercheProduitEnCours: false,
+          },
+          selectionAutomatique,
+          produits,
+        );
+      }),
+    );
+  };
 
   const handleSoumettre = async () => {
     if (!fichierSelectionne) return;
@@ -288,8 +552,10 @@ const enrichirLignesAvecProduits = async (
         : [];
 
       const lignes = lignesBrutes
-        .filter((ligne: LigneFactureExtraite | null | undefined): ligne is LigneFactureExtraite =>
-          Boolean(ligne),
+        .filter(
+          (
+            ligne: LigneFactureExtraite | null | undefined,
+          ): ligne is LigneFactureExtraite => Boolean(ligne),
         )
         .map((ligne: LigneFactureExtraite) => ({
           ...ligne,
@@ -299,7 +565,7 @@ const enrichirLignesAvecProduits = async (
 
       const lignesAvecProduits = await enrichirLignesAvecProduits(lignes);
 
-setLignesEditables(lignesAvecProduits);
+      setLignesEditables(lignesAvecProduits);
 
       setEtat({
         type: "succes",
@@ -322,72 +588,150 @@ setLignesEditables(lignesAvecProduits);
   };
 
   const rechercherProduitPourLigne = async (
-  index: number,
-  recherche: string,
-) => {
-  setLignesEditables((lignes) =>
-    lignes.map((ligne, i) =>
-      i === index
-        ? {
-            ...ligne,
-            produitRecherche: recherche,
-            produitId: null,
-            rechercheProduitEnCours: recherche.trim().length >= 2,
-          }
-        : ligne,
-    ),
-  );
-
-  const q = recherche.trim();
-
-  if (q.length < 2) {
+    index: number,
+    recherche: string,
+  ) => {
     setLignesEditables((lignes) =>
       lignes.map((ligne, i) =>
         i === index
           ? {
               ...ligne,
-              produitsProposes: [],
+              produitRecherche: recherche,
               produitId: null,
-              rechercheProduitEnCours: false,
+              rechercheProduitEnCours: recherche.trim().length >= 2,
             }
           : ligne,
       ),
     );
 
-    return;
-  }
+    const q = recherche.trim();
 
-  const resultat = await rechercherProduits(q);
-  const produits = resultat.produits;
-  const produitMemoriseId =
-    resultat.associationMemorisee && produits.length === 1
-      ? produits[0].id
-      : null;
+    if (q.length < 2) {
+      setLignesEditables((lignes) =>
+        lignes.map((ligne, i) =>
+          i === index
+            ? {
+                ...ligne,
+                produitsProposes: [],
+                produitId: null,
+                rechercheProduitEnCours: false,
+              }
+            : ligne,
+        ),
+      );
 
-  setLignesEditables((lignes) =>
-    lignes.map((ligne, i) =>
-      i === index
-        ? {
+      return;
+    }
+
+    const resultat = await rechercherProduits(q);
+    const produits = resultat.produits;
+    const produitMemoriseId =
+      resultat.associationMemorisee && produits.length === 1
+        ? produits[0].id
+        : null;
+
+    setLignesEditables((lignes) =>
+      lignes.map((ligne, i) =>
+        i === index
+          ? enrichirLigneAvecPrixProduit(
+              {
+                ...ligne,
+                produitsProposes: produits,
+                rechercheProduitEnCours: false,
+              },
+              produitMemoriseId,
+              produits,
+            )
+          : ligne,
+      ),
+    );
+  };
+
+  const ouvrirCreationProduit = (index: number) => {
+    setIndexLigneCreationProduit(index);
+  };
+
+  const fermerCreationProduit = () => {
+    setIndexLigneCreationProduit(null);
+  };
+
+  const rattacherProduitCree = async (produit: {
+    id: number;
+    reference?: string;
+  }) => {
+    const index = indexLigneCreationProduit;
+
+    if (index === null) {
+      return;
+    }
+
+    const reference = produit.reference?.trim() ?? "";
+
+    let produitsProposes: ProduitRecherche[] = [];
+
+    if (reference.length >= 2) {
+      const resultat = await rechercherProduits(reference);
+      produitsProposes = resultat.produits;
+    }
+
+    setLignesEditables((lignes) =>
+      lignes.map((ligne, i) => {
+        if (i !== index) {
+          return ligne;
+        }
+
+        return enrichirLigneAvecPrixProduit(
+          {
             ...ligne,
-            produitsProposes: produits,
-            produitId: produitMemoriseId,
+            produitRecherche: "",
+            produitsProposes,
             rechercheProduitEnCours: false,
-          }
-        : ligne,
-    ),
-  );
-};
+          },
+          produit.id,
+          produitsProposes,
+        );
+      }),
+    );
+
+    setIndexLigneCreationProduit(null);
+  };
 
   const selectionnerProduitPourLigne = (
     index: number,
     produitId: number | null,
   ) => {
     setLignesEditables((lignes) =>
-      lignes.map((ligne, i) => (i === index ? { ...ligne, produitId } : ligne)),
+      lignes.map((ligne, i) => {
+        if (i !== index) {
+          return ligne;
+        }
+
+        return enrichirLigneAvecPrixProduit(
+          ligne,
+          produitId,
+          ligne.produitsProposes ?? [],
+        );
+      }),
     );
   };
 
-  const validerLignes = async () => {
+  const definirDecisionPrixProduit = (
+    produitId: number,
+    mettreAJour: boolean,
+  ) => {
+    setLignesEditables((lignes) =>
+      lignes.map((ligne) =>
+        ligne.produitId === produitId
+          ? {
+              ...ligne,
+              mettreAJourPrixProduit: mettreAJour,
+            }
+          : ligne,
+      ),
+    );
+  };
+
+  const envoyerValidationLignes = async () => {
     if (etat.type !== "succes") return;
 
     try {
@@ -403,21 +747,44 @@ setLignesEditables(lignesAvecProduits);
       const data = await res.json();
 
       if (!res.ok) {
+        setValidationPrixOuverte(false);
+
         setEtat({
           type: "erreur",
           message: data.error || "Erreur de validation.",
         });
+
         return;
       }
 
       router.push("/factures-fournisseurs");
     } catch (error) {
       console.error("[VALIDER_LIGNES_UI]", error);
+
+      setValidationPrixOuverte(false);
+
       setEtat({
         type: "erreur",
         message: "Erreur réseau lors de la validation des lignes.",
       });
     }
+  };
+
+  const validerLignes = async () => {
+    if (etat.type !== "succes") return;
+
+    const ecartsPrix = regrouperEcartsPrixProduits(lignesEditables);
+
+    const decisionsManquantes = ecartsPrix.some(
+      (ecart) => typeof ecart.mettreAJourPrixProduit !== "boolean",
+    );
+
+    if (decisionsManquantes) {
+      setValidationPrixOuverte(true);
+      return;
+    }
+
+    await envoyerValidationLignes();
   };
 
   const reinitialiser = () => {
@@ -426,6 +793,59 @@ setLignesEditables(lignesAvecProduits);
     setEtat({ type: "idle" });
     if (inputRef.current) inputRef.current.value = "";
   };
+
+  const ligneCreationProduit =
+    indexLigneCreationProduit !== null
+      ? (lignesEditables[indexLigneCreationProduit] ?? null)
+      : null;
+
+  const prixAchatTtcCreationProduit = lireNombreLigne(ligneCreationProduit, [
+    "prixUnitaireTtc",
+    "prixAchatTtc",
+    "prixTtc",
+  ]);
+
+  /*
+   * Lorsqu'aucune TVA n'est détectée par l'OCR,
+   * la création d'un nouveau produit utilise 20 %.
+   */
+  const tauxTvaCreationProduit =
+    lireNombreLigne(ligneCreationProduit, [
+      "tauxTva",
+      "tauxTvaPourcentage",
+      "pourcentageTva",
+    ]) ?? 20;
+
+  const prixAchatHtOcr = lireNombreLigne(ligneCreationProduit, [
+    "prixUnitaireHt",
+    "prixAchatHt",
+    "prixHt",
+  ]);
+
+  const coefficientTvaCreationProduit = 1 + tauxTvaCreationProduit / 100;
+
+  /*
+   * Priorité au prix TTC OCR.
+   * Le HT est calculé avec la TVA, 20 % par défaut.
+   *
+   * Le prix HT OCR direct reste uniquement une solution
+   * de secours pour les autres formats de documents.
+   */
+  const prixAchatHtCreationProduit =
+    prixAchatTtcCreationProduit !== undefined &&
+    coefficientTvaCreationProduit > 0
+      ? arrondirMontant(
+          prixAchatTtcCreationProduit / coefficientTvaCreationProduit,
+        )
+      : prixAchatHtOcr;
+
+  const ecartsPrixProduits = regrouperEcartsPrixProduits(lignesEditables);
+
+  const toutesLesDecisionsPrixSontPrises =
+    ecartsPrixProduits.length > 0 &&
+    ecartsPrixProduits.every(
+      (ecart) => typeof ecart.mettreAJourPrixProduit === "boolean",
+    );
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
@@ -658,8 +1078,7 @@ setLignesEditables(lignesAvecProduits);
                               (total, ligne) =>
                                 total + (Number(ligne.confiance) || 0),
                               0,
-                            ) /
-                            lignesEditables.filter(Boolean).length,
+                            ) / lignesEditables.filter(Boolean).length,
                         )}%`
                       : "Non évaluée"}
                   </p>
@@ -671,6 +1090,7 @@ setLignesEditables(lignesAvecProduits);
                 onChange={setLignesEditables}
                 onRechercheProduit={rechercherProduitPourLigne}
                 onSelectionProduit={selectionnerProduitPourLigne}
+                onCreerProduit={ouvrirCreationProduit}
               />
             </div>
           )}
@@ -683,6 +1103,173 @@ setLignesEditables(lignesAvecProduits);
           </div>
         </div>
       )}
+
+      <ProduitFormModal
+        ouvert={indexLigneCreationProduit !== null}
+        reference={ligneCreationProduit?.reference ?? ""}
+        description={ligneCreationProduit?.designation ?? ""}
+        fournisseurId={fournisseurId ? Number(fournisseurId) : null}
+        prixAchatHt={prixAchatHtCreationProduit}
+        tauxTvaPourcentage={tauxTvaCreationProduit}
+        onFermer={fermerCreationProduit}
+        onProduitCree={rattacherProduitCree}
+      />
+
+      <Modal
+        ouvert={validationPrixOuverte}
+        titre="Contrôle des prix d’achat"
+        onFermer={() => setValidationPrixOuverte(false)}
+        enfants={
+          <div className="space-y-6">
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-medium">
+                Des différences de prix d’achat ont été détectées.
+              </p>
+
+              <p className="mt-1">
+                Choisissez séparément, pour chaque produit, si le dernier prix
+                d’achat de sa fiche doit être mis à jour.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {ecartsPrixProduits.map((ecart) => (
+                <div
+                  key={ecart.produitId}
+                  className="rounded-lg border border-gray-200 p-4"
+                >
+                  <div className="mb-4">
+                    <p className="font-semibold text-gray-900">
+                      {ecart.reference}
+                    </p>
+
+                    <p className="text-sm text-gray-600">{ecart.description}</p>
+                  </div>
+
+                  <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-md bg-gray-50 p-3">
+                      <p className="text-xs font-medium uppercase text-gray-500">
+                        Prix actuellement enregistré
+                      </p>
+
+                      <p className="mt-1 font-semibold text-gray-900">
+                        {ecart.comparaisonEnTtc &&
+                        ecart.prixProduitActuelTtc !== undefined
+                          ? `${ecart.prixProduitActuelTtc.toLocaleString(
+                              "fr-FR",
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              },
+                            )} MAD TTC`
+                          : ecart.prixProduitActuelHt !== undefined
+                            ? `${ecart.prixProduitActuelHt.toLocaleString(
+                                "fr-FR",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                },
+                              )} MAD HT`
+                            : "Aucun prix enregistré"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-md bg-blue-50 p-3">
+                      <p className="text-xs font-medium uppercase text-blue-600">
+                        Prix de cette facture
+                      </p>
+
+                      <p className="mt-1 font-semibold text-blue-900">
+                        {ecart.comparaisonEnTtc &&
+                        ecart.prixFactureTtc !== undefined
+                          ? `${ecart.prixFactureTtc.toLocaleString("fr-FR", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })} MAD TTC`
+                          : ecart.prixFactureHt !== undefined
+                            ? `${ecart.prixFactureHt.toLocaleString("fr-FR", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })} MAD HT`
+                            : "Prix non exploitable"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name={`decision-prix-${ecart.produitId}`}
+                        checked={ecart.mettreAJourPrixProduit === false}
+                        onChange={() =>
+                          definirDecisionPrixProduit(ecart.produitId, false)
+                        }
+                        className="mt-1"
+                      />
+
+                      <span>
+                        <span className="block text-sm font-medium text-gray-900">
+                          Conserver le prix actuel
+                        </span>
+
+                        <span className="block text-xs text-gray-500">
+                          La fiche produit ne sera pas modifiée.
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name={`decision-prix-${ecart.produitId}`}
+                        checked={ecart.mettreAJourPrixProduit === true}
+                        onChange={() =>
+                          definirDecisionPrixProduit(ecart.produitId, true)
+                        }
+                        className="mt-1"
+                      />
+
+                      <span>
+                        <span className="block text-sm font-medium text-gray-900">
+                          Mettre à jour la fiche produit
+                        </span>
+
+                        <span className="block text-xs text-gray-500">
+                          Le prix de cette facture deviendra le dernier prix
+                          d’achat du produit.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t pt-4">
+              <button
+                type="button"
+                onClick={() => setValidationPrixOuverte(false)}
+                className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                disabled={!toutesLesDecisionsPrixSontPrises}
+                onClick={async () => {
+                  setValidationPrixOuverte(false);
+                  await envoyerValidationLignes();
+                }}
+                className="rounded-md bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Confirmer et valider
+              </button>
+            </div>
+          </div>
+        }
+      />
 
       <div className="flex justify-end gap-3">
         <button

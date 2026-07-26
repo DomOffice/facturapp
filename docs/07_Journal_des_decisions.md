@@ -342,3 +342,80 @@ référence au catalogue interne.
 
 Automatiser les propositions de rapprochement et mémoriser les choix
 validés.
+
+## MAJ du 26/07/2026
+TVA des produits existants
+## 2026-07 — La TVA produit reste la référence
+
+### Décision
+
+Lorsqu’une ligne OCR est rapprochée avec un produit existant, le taux de TVA
+du produit enregistré en base est conservé.
+
+### Motif
+
+La TVA OCR peut être mal reconnue et ne doit pas écraser une donnée métier
+déjà validée.
+
+### Conséquence
+
+La TVA OCR reste une information documentaire mais n’est pas utilisée pour
+modifier automatiquement la TVA du produit existant.
+Confirmation des écarts de prix
+## 2026-07 — Les écarts de prix exigent une confirmation
+
+### Décision
+
+Un écart entre le prix OCR et le dernier prix d’achat enregistré est présenté
+à l’utilisateur avant validation.
+
+### Conséquence
+
+La mise à jour du prix n’est pas silencieuse et reste contrôlée.
+Transaction stock
+## 2026-07 — Validation OCR et stock atomiques
+
+### Décision
+
+La persistance des lignes, la mémorisation des associations, la mise à jour du
+stock et la création des mouvements sont exécutées dans une transaction Prisma.
+
+### Conséquence
+
+Soit toute l’intégration réussit, soit aucune modification n’est conservée.
+Restauration DEV
+## 2026-07 — Le schéma DEV est conservé pendant les restaurations
+
+### Décision
+
+Les restaurations de production vers DEV sont réalisées en `data-only`.
+Les tables DEV sont vidées puis les données sont restaurées sans remplacer le
+schéma PostgreSQL de DEV.
+
+### Motif
+
+DEV contient des tables OCR/stock qui ne sont pas encore présentes en production.
+
+### Conséquence
+
+`facturapp-db-tools` doit exclure les données de `_prisma_migrations`,
+désactiver temporairement les triggers pendant la restauration, recalculer les
+séquences et exécuter les vérifications.
+db pull
+## 2026-07 — `prisma db pull` n’est pas une étape de restauration
+
+### Décision
+
+Le processus de réinitialisation DEV ne lance pas automatiquement
+`prisma db pull`.
+
+### Motif
+
+L’introspection réécrit `schema.prisma` et peut perdre des informations
+déclaratives du schéma de référence.
+
+### Conséquence
+
+Toute introspection doit être volontaire, précédée d’une sauvegarde et suivie
+d’une comparaison.
+

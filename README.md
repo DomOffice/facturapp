@@ -131,3 +131,52 @@ Travaux en cours :
 - apprentissage des correspondances fournisseur/produit ;
 - ajout de nouveaux drivers fournisseurs ;
 - branchement des mouvements de stock.
+
+## MAJ du 26/07/2026
+## État actuel du projet
+
+FacturApp est en développement actif.
+
+Fonctionnalités principales disponibles :
+
+- gestion commerciale : clients, fournisseurs, produits, devis, factures,
+  avoirs, charges et paiements ;
+- import de factures fournisseurs PDF ou image ;
+- OCR local avec Python et PaddleOCR ;
+- extraction structurée des informations et lignes articles ;
+- rapprochement des lignes OCR avec les produits existants ;
+- correction manuelle avant validation ;
+- mémorisation des associations fournisseur → produit ;
+- intégration atomique des lignes validées dans le stock ;
+- détection des écarts entre prix OCR et prix d’achat enregistrés.
+
+Le projet utilise actuellement Prisma sans historique local Prisma Migrate.
+Ne pas exécuter `prisma migrate reset` sur une base contenant des données utiles.
+
+## Base de développement
+
+Les outils de sauvegarde de la production et de réinitialisation de la base DEV
+sont conservés séparément dans le dossier/projet `facturapp-db-tools`.
+
+Le principe retenu est :
+
+1. sauvegarder les données de production ;
+2. conserver le schéma PostgreSQL de DEV ;
+3. vider les données DEV ;
+4. restaurer uniquement les données de production ;
+5. recalculer les séquences ;
+6. vérifier les comptages.
+
+Les tables spécifiques à FacturApp et à l’OCR doivent rester présentes dans DEV.
+
+`npm run db:push` est réservé à la création initiale d’une base vide ou à une
+évolution explicitement validée du schéma.
+
+Ne pas lancer `prisma db push`, `prisma migrate reset` ou `prisma db pull`
+automatiquement sur une base restaurée.
+
+Prévilégié :
+npx prisma format
+npx prisma validate
+npx prisma generate
+npx tsc --noEmit
