@@ -33,6 +33,12 @@ type ExtractionFacture = {
   qualiteExtraction?: "A" | "B" | "C" | "D";
 };
 
+type DoublonFacture = {
+  documentId: number;
+  numeroFacture: string;
+  dateIntegration: string;
+};
+
 type UploadEtat =
   | { type: "idle" }
   | { type: "drag_over" }
@@ -48,6 +54,7 @@ type UploadEtat =
       taille: number;
       texteOcr: string;
       extraction?: ExtractionFacture;
+      doublonFacture?: DoublonFacture | null;
     }
   | { type: "erreur"; message: string };
 
@@ -345,6 +352,8 @@ export default function UploadFacture({ fournisseurs }: Props) {
 
   const [validationPrixOuverte, setValidationPrixOuverte] = useState(false);
 
+  const [autoriserReintegration, setAutoriserReintegration] = useState(false);
+
   const validerFichier = (fichier: File): string | null => {
     if (!FORMATS_ACCEPTES.includes(fichier.type)) {
       return "Format non autorisé.\nFormats acceptés : PDF, JPEG, PNG.";
@@ -367,6 +376,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
 
     setFichierSelectionne(fichier);
     setLignesEditables([]);
+    setAutoriserReintegration(false);
     setEtat({ type: "idle" });
   }, []);
 
@@ -577,6 +587,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
         taille: uploadData.fichier.taille,
         texteOcr: ocrData.texte || "",
         extraction: ocrData.extraction,
+        doublonFacture: ocrData.doublonFacture ?? null,
       });
     } catch (error) {
       console.error("[UPLOAD_OCR_FACTURE]", error);
@@ -740,7 +751,10 @@ export default function UploadFacture({ fournisseurs }: Props) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lignes: lignesEditables }),
+          body: JSON.stringify({
+            lignes: lignesEditables,
+            autoriserReintegration,
+          }),
         },
       );
 
@@ -791,6 +805,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
   const reinitialiser = () => {
     setFichierSelectionne(null);
     setLignesEditables([]);
+    setAutoriserReintegration(false);
     setEtat({ type: "idle" });
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -968,6 +983,57 @@ export default function UploadFacture({ fournisseurs }: Props) {
         <div className="space-y-6">
           <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3">
             <h3 className="font-semibold">OCR terminé avec succès</h3>
+
+            {etat.doublonFacture && (
+              <div className="rounded-lg border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
+                <h3 className="font-semibold">
+                  Facture potentiellement déjà intégrée
+                </h3>
+
+                <p className="mt-2">
+                  Une facture du même fournisseur portant le numéro{" "}
+                  <strong>{etat.doublonFacture.numeroFacture}</strong> a déjà
+                  été intégrée au stock.
+                </p>
+
+                <p className="mt-1">
+                  Document précédent : #{etat.doublonFacture.documentId}
+                </p>
+
+                <p className="mt-1">
+                  Date d’intégration :{" "}
+                  {new Date(etat.doublonFacture.dateIntegration).toLocaleString(
+                    "fr-FR",
+                  )}
+                </p>
+
+                <p className="mt-3 font-medium">
+                  Une nouvelle validation ajoutera une seconde fois les
+                  quantités au stock.
+                </p>
+
+                <div className="mt-4 rounded-md border border-orange-200 bg-white p-3">
+                  <p className="font-semibold">Options de développement</p>
+
+                  <label className="mt-2 flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={autoriserReintegration}
+                      onChange={(event) =>
+                        setAutoriserReintegration(event.target.checked)
+                      }
+                      className="mt-1"
+                    />
+
+                    <span>
+                      Autoriser exceptionnellement cette réintégration pendant
+                      les tests
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+
             <p>
               Document #{etat.documentId} — {etat.nomFichier}
             </p>
@@ -1322,9 +1388,12 @@ export default function UploadFacture({ fournisseurs }: Props) {
           <button
             type="button"
             onClick={validerLignes}
-            className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+            disabled={Boolean(etat.doublonFacture) && !autoriserReintegration}
+            className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Valider les lignes
+            {etat.doublonFacture
+              ? "Intégrer à nouveau malgré l’avertissement"
+              : "Valider les lignes"}
           </button>
         )}
       </div>

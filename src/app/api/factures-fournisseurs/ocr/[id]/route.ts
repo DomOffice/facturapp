@@ -22,6 +22,40 @@ const OCR_SCRIPT_PATH =
   process.env.OCR_SCRIPT_PATH ||
   path.join(process.cwd(), "ocr-service", "ocr_document.py");
 
+function lireNumeroFacture(donneesExtraites: unknown): string | null {
+  if (
+    !donneesExtraites ||
+    typeof donneesExtraites !== "object" ||
+    Array.isArray(donneesExtraites)
+  ) {
+    return null;
+  }
+
+  const extraction = (donneesExtraites as Record<string, unknown>).extraction;
+
+  if (
+    !extraction ||
+    typeof extraction !== "object" ||
+    Array.isArray(extraction)
+  ) {
+    return null;
+  }
+
+  const numeroFacture = (extraction as Record<string, unknown>).numeroFacture;
+
+  return typeof numeroFacture === "string" && numeroFacture.trim().length > 0
+    ? numeroFacture.trim()
+    : null;
+}
+
+function normaliserNumeroFacture(numeroFacture: string): string {
+  return numeroFacture
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
 function extraireJsonDepuisSortie(stdout: string) {
   const debut = stdout.lastIndexOf('{"success"');
 
@@ -98,56 +132,46 @@ export async function POST(
     const resultatOcr = extraireJsonDepuisSortie(stdout);
 
     const diagnosticCoordonnees = Array.isArray(resultatOcr.pages)
-  ? resultatOcr.pages.flatMap(
-      (
-        page: {
-          lignes?: Array<{
-            texte?: string
-            text?: string
-            position?: Array<[number, number]>
-            score?: number
-            confiance?: number
-          }>
-        },
-        pageIndex: number,
-      ) =>
-        Array.isArray(page.lignes)
-          ? page.lignes.map((ligne) => {
-              const texte = String(
-                ligne.texte || ligne.text || "",
-              ).trim()
+      ? resultatOcr.pages.flatMap(
+          (
+            page: {
+              lignes?: Array<{
+                texte?: string;
+                text?: string;
+                position?: Array<[number, number]>;
+                score?: number;
+                confiance?: number;
+              }>;
+            },
+            pageIndex: number,
+          ) =>
+            Array.isArray(page.lignes)
+              ? page.lignes.map((ligne) => {
+                  const texte = String(ligne.texte || ligne.text || "").trim();
 
-              const position = Array.isArray(ligne.position)
-                ? ligne.position
-                : []
+                  const position = Array.isArray(ligne.position)
+                    ? ligne.position
+                    : [];
 
-              const xs = position.map((point) => point[0])
-              const ys = position.map((point) => point[1])
+                  const xs = position.map((point) => point[0]);
+                  const ys = position.map((point) => point[1]);
 
-              return {
-                page: pageIndex + 1,
-                texte,
-                xMin:
-                  xs.length > 0
-                    ? Math.min.apply(null, xs)
-                    : null,
-                xMax:
-                  xs.length > 0
-                    ? Math.max.apply(null, xs)
-                    : null,
-                y:
-                  ys.length > 0
-                    ? ys.reduce(
-                        (somme, valeur) => somme + valeur,
-                        0,
-                      ) / ys.length
-                    : null,
-                position,
-              }
-            })
-          : [],
-    )
-  : []
+                  return {
+                    page: pageIndex + 1,
+                    texte,
+                    xMin: xs.length > 0 ? Math.min.apply(null, xs) : null,
+                    xMax: xs.length > 0 ? Math.max.apply(null, xs) : null,
+                    y:
+                      ys.length > 0
+                        ? ys.reduce((somme, valeur) => somme + valeur, 0) /
+                          ys.length
+                        : null,
+                    position,
+                  };
+                })
+              : [],
+        )
+      : [];
 
     if (!resultatOcr.success) {
       await prisma.documentImporte.update({
@@ -184,12 +208,79 @@ export async function POST(
       },
     });
 
+    let doublonFacture: {
+      documentId: number;
+      numeroFacture: string;
+      dateIntegration: string;
+    } | null = null;
+
+    const numeroFacture =
+      typeof extraction.numeroFacture === "string"
+        ? extraction.numeroFacture.trim()
+        : "";
+
+    const numeroFactureNormalise = numeroFacture
+      ? normaliserNumeroFacture(numeroFacture)
+      : "";
+
+    if (numeroFactureNormalise) {
+      const documentsDejaIntegres = await prisma.documentImporte.findMany({
+        where: {
+          id: {
+            not: documentId,
+          },
+
+          fournisseurId: document.fournisseurId,
+
+          integrationStock: {
+            isNot: null,
+          },
+        },
+
+        select: {
+          id: true,
+          donneesExtraites: true,
+
+          integrationStock: {
+            select: {
+              dateIntegration: true,
+            },
+          },
+        },
+
+        orderBy: {
+          dateImport: "desc",
+        },
+      });
+
+      const documentDoublon = documentsDejaIntegres.find((documentExistant) => {
+        const numeroExistant = lireNumeroFacture(
+          documentExistant.donneesExtraites,
+        );
+
+        return (
+          numeroExistant !== null &&
+          normaliserNumeroFacture(numeroExistant) === numeroFactureNormalise
+        );
+      });
+
+      if (documentDoublon && documentDoublon.integrationStock) {
+        doublonFacture = {
+          documentId: documentDoublon.id,
+          numeroFacture,
+          dateIntegration:
+            documentDoublon.integrationStock.dateIntegration.toISOString(),
+        };
+      }
+    }
+
     return NextResponse.json({
       success: true,
       documentId: documentMaj.id,
       statut: documentMaj.statut,
       texte: resultatOcr.texte || "",
       extraction,
+      doublonFacture,
       diagnosticCoordonnees,
     });
   } catch (error) {

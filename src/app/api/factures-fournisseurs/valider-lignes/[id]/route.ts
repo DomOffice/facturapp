@@ -35,6 +35,40 @@ function arrondirMontant(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function lireNumeroFacture(donneesExtraites: unknown): string | null {
+  if (
+    !donneesExtraites ||
+    typeof donneesExtraites !== "object" ||
+    Array.isArray(donneesExtraites)
+  ) {
+    return null;
+  }
+
+  const extraction = (donneesExtraites as Record<string, unknown>).extraction;
+
+  if (
+    !extraction ||
+    typeof extraction !== "object" ||
+    Array.isArray(extraction)
+  ) {
+    return null;
+  }
+
+  const numeroFacture = (extraction as Record<string, unknown>).numeroFacture;
+
+  return typeof numeroFacture === "string" && numeroFacture.trim().length > 0
+    ? numeroFacture.trim()
+    : null;
+}
+
+function normaliserNumeroFacture(numeroFacture: string): string {
+  return numeroFacture
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -61,6 +95,8 @@ export async function POST(
     }
 
     const body = await req.json();
+
+    const autoriserReintegration = body?.autoriserReintegration === true;
 
     const lignes = Array.isArray(body?.lignes)
       ? (body.lignes as LignePayload[])
@@ -298,6 +334,7 @@ export async function POST(
         select: {
           id: true,
           fournisseurId: true,
+          donneesExtraites: true,
 
           integrationStock: {
             select: {
@@ -313,6 +350,48 @@ export async function POST(
 
       if (document.integrationStock) {
         throw new Error("DOCUMENT_DEJA_INTEGRE");
+      }
+
+      const numeroFacture = lireNumeroFacture(document.donneesExtraites);
+
+      if (numeroFacture && !autoriserReintegration) {
+        const numeroFactureNormalise = normaliserNumeroFacture(numeroFacture);
+
+        const documentsDejaIntegres = await tx.documentImporte.findMany({
+          where: {
+            id: {
+              not: documentId,
+            },
+
+            fournisseurId: document.fournisseurId,
+
+            integrationStock: {
+              isNot: null,
+            },
+          },
+
+          select: {
+            id: true,
+            donneesExtraites: true,
+          },
+        });
+
+        const factureDejaIntegree = documentsDejaIntegres.some(
+          (documentExistant) => {
+            const numeroExistant = lireNumeroFacture(
+              documentExistant.donneesExtraites,
+            );
+
+            return (
+              numeroExistant !== null &&
+              normaliserNumeroFacture(numeroExistant) === numeroFactureNormalise
+            );
+          },
+        );
+
+        if (factureDejaIntegree) {
+          throw new Error("FACTURE_DEJA_INTEGREE");
+        }
       }
 
       /*
@@ -511,8 +590,19 @@ export async function POST(
       statut: "stock_integre",
       ...resultat,
     });
-    
   } catch (error) {
+    if (error instanceof Error && error.message === "FACTURE_DEJA_INTEGREE") {
+      return NextResponse.json(
+        {
+          error:
+            "Une facture portant ce numéro a déjà été intégrée pour ce fournisseur. " +
+            "Cochez l’option de développement uniquement si vous souhaitez volontairement la réintégrer.",
+          code: "FACTURE_DEJA_INTEGREE",
+        },
+        { status: 409 },
+      );
+    }
+
     if (error instanceof Error && error.message === "DOCUMENT_INTROUVABLE") {
       return NextResponse.json(
         { error: "Document importé introuvable" },

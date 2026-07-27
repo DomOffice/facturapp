@@ -1,7 +1,8 @@
 "use client";
 // src/app/(dashboard)/factures/nouvelle/page-client.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import SmartSearch, { fuzzyMatch } from "@/components/ui/smart-search";
 import {
   calculerLigne,
   calculerTotauxFacture,
@@ -91,15 +92,29 @@ export default function NouvelleFactureClient({
   const [popupRemiseVal, setPopupRemiseVal] = useState("0");
 
   useEffect(() => {
-    fetch(`/api/produits?q=${encodeURIComponent(searchProduit)}&actif=true`)
-      .then((r) => r.json())
-      .then(setProduits)
-      .catch(() => {});
-  }, [searchProduit]);
+    fetch("/api/produits?actif=true")
+      .then((response) => response.json())
+      .then((data) => {
+        setProduits(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        setProduits([]);
+      });
+  }, []);
 
   useEffect(() => {
     if (popupOpen) setTimeout(() => qteInputRef.current?.focus(), 50);
   }, [popupOpen]);
+
+  const produitsFiltres = useMemo(() => {
+    if (!searchProduit || searchProduit.trim().length < 2) {
+      return produits;
+    }
+
+    return produits.filter((produit) =>
+      fuzzyMatch(`${produit.reference} ${produit.description}`, searchProduit),
+    );
+  }, [produits, searchProduit]);
 
   const totaux = calculerTotauxFacture(
     lignes.map((l) => ({
@@ -438,11 +453,15 @@ export default function NouvelleFactureClient({
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Articles
             </span>
-            <input
-              placeholder="Rechercher..."
-              value={searchProduit}
-              onChange={(e) => setSearchProduit(e.target.value)}
-              className="form-input flex-1 text-xs py-1"
+            <span className="text-xs text-slate-400">
+              {produitsFiltres.length} / {produits.length}
+            </span>
+            <SmartSearch
+              placeholder="Rechercher par fragments..."
+              apiUrl="/api/produits?q="
+              mode="filter"
+              onSearch={setSearchProduit}
+              className="flex-1"
             />
           </div>
           <div className="overflow-y-auto max-h-80">
@@ -458,7 +477,7 @@ export default function NouvelleFactureClient({
                 </tr>
               </thead>
               <tbody>
-                {produits.map((p) => (
+                {produitsFiltres.map((p) => (
                   <tr
                     key={p.id}
                     onDoubleClick={() => ouvrirPopupQte(p)}
@@ -491,6 +510,16 @@ export default function NouvelleFactureClient({
                     </td>
                   </tr>
                 ))}
+                {produitsFiltres.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="py-6 text-center text-xs text-slate-400"
+                    >
+                      Aucun article trouvé pour « {searchProduit} »
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
