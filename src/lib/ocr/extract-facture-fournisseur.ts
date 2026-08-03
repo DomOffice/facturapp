@@ -7,7 +7,11 @@ import {
   motifsTotalTtcParDefaut,
   motifsTotalTvaParDefaut,
 } from "./default-ocr-patterns";
+
 import { chargerDriverOcr, genericLargeDriver } from "./drivers";
+
+import type { TypeDocumentMechouar } from "./drivers";
+
 import type {
   FactureFournisseurExtraite,
   LigneFactureExtraite,
@@ -16,7 +20,6 @@ import type {
   ResultatOcr,
   StrategieExtractionLignes,
 } from "./types";
-
 
 export type { FactureFournisseurExtraite, LigneFactureExtraite };
 
@@ -74,10 +77,7 @@ function normaliserPourComparaison(value: string): string {
     .trim();
 }
 
-function contientUnMarqueur(
-  texte: string,
-  marqueurs: string[],
-): boolean {
+function contientUnMarqueur(texte: string, marqueurs: string[]): boolean {
   const texteNormalise = normaliserPourComparaison(texte);
 
   return marqueurs.some((marqueur) =>
@@ -85,7 +85,7 @@ function contientUnMarqueur(
   );
 }
 
-function extraireMotsOcr(resultatOcr?: ResultatOcr): MotOcrNormalise[] {
+function extraireMotsOcrPage(resultatOcr?: ResultatOcr): MotOcrNormalise[] {
   const mots: MotOcrNormalise[] = [];
 
   if (!resultatOcr || !Array.isArray(resultatOcr.pages)) return mots;
@@ -181,40 +181,35 @@ function calculerConfianceLigne(ligne: LigneFactureExtraite): number {
   return Math.max(0, Math.min(100, points));
 }
 
-function extraireLignesParProfil(
+function extraireLignesParProfilPage(
   resultatOcr: ResultatOcr | undefined,
   profil: ProfilOcrFournisseur,
 ): LigneFactureExtraite[] {
-  const mots = extraireMotsOcr(resultatOcr);
+  const mots = extraireMotsOcrPage(resultatOcr);
   const lignes: LigneFactureExtraite[] = [];
 
-  const marqueursDebut =
-  profil.tableau?.marqueursDebut?.length
+  const marqueursDebut = profil.tableau?.marqueursDebut?.length
     ? profil.tableau.marqueursDebut
     : ["désignation", "designation"];
 
-const marqueursFin =
-  profil.tableau?.marqueursFin?.length
+  const marqueursFin = profil.tableau?.marqueursFin?.length
     ? profil.tableau.marqueursFin
     : ["total ht"];
 
-const ligneDebutTableau = mots.find((mot) =>
-  contientUnMarqueur(mot.texte, marqueursDebut),
-);
+  const ligneDebutTableau = mots.find((mot) =>
+    contientUnMarqueur(mot.texte, marqueursDebut),
+  );
 
-const debutTableauY = ligneDebutTableau
-  ? ligneDebutTableau.y + 10
-  : 0;
+  const debutTableauY = ligneDebutTableau ? ligneDebutTableau.y + 10 : 0;
 
-const ligneFinTableau = mots.find(
-  (mot) =>
-    mot.y > debutTableauY + 30 &&
-    contientUnMarqueur(mot.texte, marqueursFin),
-);
+  const ligneFinTableau = mots.find(
+    (mot) =>
+      mot.y > debutTableauY + 30 && contientUnMarqueur(mot.texte, marqueursFin),
+  );
 
-const finTableauY = ligneFinTableau
-  ? ligneFinTableau.y - 10
-  : Number.MAX_SAFE_INTEGER;
+  const finTableauY = ligneFinTableau
+    ? ligneFinTableau.y - 10
+    : Number.MAX_SAFE_INTEGER;
 
   const groupes = grouperParLignes(
     mots.filter((m) => m.y >= debutTableauY && m.y <= finTableauY),
@@ -232,25 +227,26 @@ const finTableauY = ligneFinTableau
     if (!texteGroupe) continue;
 
     const marqueursIgnorer = [
-  ...(profil.tableau?.marqueursEntete ?? []),
-  ...(profil.tableau?.marqueursFin ?? []),
-  "total ht",
-  "total tva",
-  "total ttc",
-  "arrêtée la présente",
-  "arretee la presente",
-  "magasinier",
-  "nos marchandises",
-  "garantie",
-  "siège social",
-  "siege social",
-  "téléphone",
-  "telephone",
-];
+      ...(profil.tableau?.marqueursEntete ?? []),
+      ...(profil.tableau?.marqueursFin ?? []),
+      "le report",
+      "total ht",
+      "total tva",
+      "total ttc",
+      "arrêtée la présente",
+      "arretee la presente",
+      "magasinier",
+      "nos marchandises",
+      "garantie",
+      "siège social",
+      "siege social",
+      "téléphone",
+      "telephone",
+    ];
 
-if (contientUnMarqueur(texteGroupe, marqueursIgnorer)) {
-  continue;
-}
+    if (contientUnMarqueur(texteGroupe, marqueursIgnorer)) {
+      continue;
+    }
 
     groupesArticleEnCours.push(groupe);
 
@@ -268,6 +264,29 @@ if (contientUnMarqueur(texteGroupe, marqueursIgnorer)) {
   return lignes;
 }
 
+function extraireLignesParProfil(
+  resultatOcr: ResultatOcr | undefined,
+  profil: ProfilOcrFournisseur,
+): LigneFactureExtraite[] {
+  if (!resultatOcr?.pages?.length) {
+    return [];
+  }
+
+  const lignes: LigneFactureExtraite[] = [];
+
+  for (const page of resultatOcr.pages) {
+    const lignesPage = extraireLignesParProfilPage(
+      {
+        pages: [page],
+      },
+      profil,
+    );
+
+    lignes.push(...lignesPage);
+  }
+
+  return lignes;
+}
 function extraireLignesDepuisTexte(texteOcr: string): LigneFactureExtraite[] {
   const lignesTexte = normaliserTexte(texteOcr)
     .split("\n")
@@ -345,9 +364,7 @@ function extraireLignesAvecFallback(
       lignes: lignesProfil,
       strategie: "profil",
       fallbackUtilise: false,
-      qualite: lignesProfil.every((ligne) => ligne.confiance > 95)
-        ? "A"
-        : "B",
+      qualite: lignesProfil.every((ligne) => ligne.confiance > 95) ? "A" : "B",
     };
   }
 
@@ -386,70 +403,101 @@ function extraireLignesAvecFallback(
   };
 }
 
+function corrigerDesignationsMechouarFacture(
+  lignes: LigneFactureExtraite[],
+): LigneFactureExtraite[] {
+  const prefixesAReporter = ["KONACH", "BLEU"];
+
+  for (let index = 0; index < lignes.length; index += 1) {
+    const ligne = lignes[index];
+
+    ligne.designation = ligne.designation
+      .replace(/^le\s+report\.{0,}\s*/i, "")
+      .trim();
+
+    if (index === 0) continue;
+
+    for (const prefixe of prefixesAReporter) {
+      const regex = new RegExp(`^${prefixe}\\s+`, "i");
+
+      if (!regex.test(ligne.designation)) continue;
+
+      const lignePrecedente = lignes[index - 1];
+
+      lignePrecedente.designation = [lignePrecedente.designation, prefixe]
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      ligne.designation = ligne.designation.replace(regex, "").trim();
+
+      break;
+    }
+  }
+
+  return lignes;
+}
+
 export function extraireFactureFournisseurDepuisOcr(
   texteOcr: string,
   resultatOcr?: ResultatOcr,
   fournisseurSelectionneNom?: string,
+  typeDocumentConfirme?: TypeDocumentMechouar,
 ): FactureFournisseurExtraite {
   const texte = normaliserTexte(texteOcr);
 
   const fournisseurNom =
-  fournisseurSelectionneNom ||
-  texte
-    .split("\n")
-    .map((ligne) => ligne.trim())
-    .find(
-      (ligne) =>
-        ligne.length >= 3 &&
-        /^[A-Z0-9\s&.-]+$/.test(ligne),
-    );
+    fournisseurSelectionneNom ||
+    texte
+      .split("\n")
+      .map((ligne) => ligne.trim())
+      .find((ligne) => ligne.length >= 3 && /^[A-Z0-9\s&.-]+$/.test(ligne));
 
-const profil = chargerDriverOcr(fournisseurNom);
+  const profil = chargerDriverOcr(fournisseurNom, texte, typeDocumentConfirme);
 
+  const numeroFacture = chercherAvecMotifs(
+    profil.document?.motifsNumero?.length
+      ? profil.document.motifsNumero
+      : motifsNumeroParDefaut,
+    texte,
+  );
 
-const numeroFacture = chercherAvecMotifs(
-  profil.document?.motifsNumero?.length
-    ? profil.document.motifsNumero
-    : motifsNumeroParDefaut,
-  texte,
-);
-
-const dateFacture = chercherAvecMotifs(
-  profil.document?.motifsDate?.length
-    ? profil.document.motifsDate
-    : motifsDateParDefaut,
-  texte,
-);
+  const dateFacture = chercherAvecMotifs(
+    profil.document?.motifsDate?.length
+      ? profil.document.motifsDate
+      : motifsDateParDefaut,
+    texte,
+  );
 
   const iceMatches = Array.from(texte.matchAll(/ICE\s*:?\s*(\d{10,20})/gi));
-  
-const iceFournisseur = chercherAvecMotifs(
-  profil.document?.motifsIceFournisseur?.length
-    ? profil.document.motifsIceFournisseur
-    : motifsIceFournisseurParDefaut,
-  texte,
-);
+
+  const iceFournisseur = chercherAvecMotifs(
+    profil.document?.motifsIceFournisseur?.length
+      ? profil.document.motifsIceFournisseur
+      : motifsIceFournisseurParDefaut,
+    texte,
+  );
 
   const totalHt = extraireMontantAvecMotifs(
-  profil.document?.motifsTotalHt?.length
-    ? profil.document.motifsTotalHt
-    : motifsTotalHtParDefaut,
-  texte,
-);
+    profil.document?.motifsTotalHt?.length
+      ? profil.document.motifsTotalHt
+      : motifsTotalHtParDefaut,
+    texte,
+  );
 
-const totalTva = extraireMontantAvecMotifs(
-  profil.document?.motifsTotalTva?.length
-    ? profil.document.motifsTotalTva
-    : motifsTotalTvaParDefaut,
-  texte,
-);
+  const totalTva = extraireMontantAvecMotifs(
+    profil.document?.motifsTotalTva?.length
+      ? profil.document.motifsTotalTva
+      : motifsTotalTvaParDefaut,
+    texte,
+  );
 
-const totalTtc = extraireMontantAvecMotifs(
-  profil.document?.motifsTotalTtc?.length
-    ? profil.document.motifsTotalTtc
-    : motifsTotalTtcParDefaut,
-  texte,
-);
+  const totalTtc = extraireMontantAvecMotifs(
+    profil.document?.motifsTotalTtc?.length
+      ? profil.document.motifsTotalTtc
+      : motifsTotalTtcParDefaut,
+    texte,
+  );
 
   const devise = /dirham|mad|dh/i.test(texte) ? "MAD" : undefined;
 
@@ -458,83 +506,84 @@ const totalTtc = extraireMontantAvecMotifs(
     resultatOcr,
     profil,
   );
-  const lignes = extractionLignes.lignes;
+  const lignes =
+    profil.code === "mechouar_facture"
+      ? corrigerDesignationsMechouarFacture(extractionLignes.lignes)
+      : extractionLignes.lignes;
 
   const estBonLivraison = profil.document?.type === "bon_livraison";
-const validation = profil.document?.validation;
+  const validation = profil.document?.validation;
 
-const exigeTotalHt =
-  validation?.exigeTotalHt ?? !estBonLivraison;
+  const typeDocument = profil.document?.type;
+  const traitement = profil.traitement;
 
-const exigeTotalTva =
-  validation?.exigeTotalTva ?? !estBonLivraison;
+  const exigeTotalHt = validation?.exigeTotalHt ?? !estBonLivraison;
 
-const exigeTotalTtc =
-  validation?.exigeTotalTtc ?? true;
+  const exigeTotalTva = validation?.exigeTotalTva ?? !estBonLivraison;
 
-const exigeIceFournisseur =
-  validation?.exigeIceFournisseur ?? !estBonLivraison;
+  const exigeTotalTtc = validation?.exigeTotalTtc ?? true;
+
+  const exigeIceFournisseur =
+    validation?.exigeIceFournisseur ?? !estBonLivraison;
 
   const alertes: string[] = [];
 
   if (!numeroFacture) {
-  alertes.push(
-    estBonLivraison
-      ? "Numéro de bon de livraison non détecté"
-      : "Numéro de facture non détecté",
-  );
-}
+    alertes.push(
+      estBonLivraison
+        ? "Numéro de bon de livraison non détecté"
+        : "Numéro de facture non détecté",
+    );
+  }
 
-if (!dateFacture) {
-  alertes.push(
-    estBonLivraison
-      ? "Date du bon de livraison non détectée"
-      : "Date de facture non détectée",
-  );
-}
+  if (!dateFacture) {
+    alertes.push(
+      estBonLivraison
+        ? "Date du bon de livraison non détectée"
+        : "Date de facture non détectée",
+    );
+  }
 
-if (exigeTotalTtc && !totalTtc) {
-  alertes.push(
-    estBonLivraison
-      ? "Net à payer non détecté"
-      : "Total TTC non détecté",
-  );
-}
+  if (exigeTotalTtc && !totalTtc) {
+    alertes.push(
+      estBonLivraison ? "Net à payer non détecté" : "Total TTC non détecté",
+    );
+  }
 
-if (exigeTotalHt && !totalHt) {
-  alertes.push("Total HT non détecté");
-}
+  if (exigeTotalHt && !totalHt) {
+    alertes.push("Total HT non détecté");
+  }
 
-if (exigeTotalTva && !totalTva) {
-  alertes.push("Total TVA non détecté");
-}
+  if (exigeTotalTva && !totalTva) {
+    alertes.push("Total TVA non détecté");
+  }
 
-if (exigeIceFournisseur && !iceFournisseur) {
-  alertes.push("ICE fournisseur non détecté");
-}
+  if (exigeIceFournisseur && !iceFournisseur) {
+    alertes.push("ICE fournisseur non détecté");
+  }
 
-if (lignes.length === 0) {
-  alertes.push("Aucune ligne article détectée");
-}
+  if (lignes.length === 0) {
+    alertes.push("Aucune ligne article détectée");
+  }
   if (extractionLignes.fallbackUtilise && lignes.length > 0) {
     alertes.push(`Fallback utilisé : ${extractionLignes.strategie}`);
   }
 
   let points = 0;
 
-if (numeroFacture) points += 20;
-if (dateFacture) points += 20;
-if (totalTtc) points += 20;
-if (lignes.length > 0) points += 20;
+  if (numeroFacture) points += 20;
+  if (dateFacture) points += 20;
+  if (totalTtc) points += 20;
+  if (lignes.length > 0) points += 20;
 
-if (estBonLivraison) {
-  if (fournisseurNom) points += 10;
-  if (!extractionLignes.fallbackUtilise) points += 10;
-} else {
-  if (totalHt) points += 10;
-  if (totalTva) points += 10;
-  if (iceFournisseur) points += 10;
-}
+  if (estBonLivraison) {
+    if (fournisseurNom) points += 10;
+    if (!extractionLignes.fallbackUtilise) points += 10;
+  } else {
+    if (totalHt) points += 10;
+    if (totalTva) points += 10;
+    if (iceFournisseur) points += 10;
+  }
 
   return {
     fournisseurNom,
@@ -546,11 +595,16 @@ if (estBonLivraison) {
     totalTtc,
     devise,
     profilOcr: profil.code,
+    typeDocument,
+    integreStock: traitement?.integreStock,
+    comptabiliseTva: traitement?.comptabiliseTva,
+    rapprochementObligatoire: traitement?.rapprochementObligatoire,
+    metAJourPrixAchat: traitement?.metAJourPrixAchat,
     strategieExtractionLignes: extractionLignes.strategie,
     fallbackUtilise: extractionLignes.fallbackUtilise,
     qualiteExtraction: extractionLignes.qualite,
     lignes,
-    confiance: points,
+    confiance: Math.min(100, points),
     alertes,
   };
 }
@@ -559,36 +613,37 @@ function extraireLignesBlDepuisTexte(texteOcr: string): LigneFactureExtraite[] {
   const lignesTexte = normaliserTexte(texteOcr)
     .split("\n")
     .map((ligne) => ligne.trim())
-    .filter(Boolean)
+    .filter(Boolean);
 
-  const lignes: LigneFactureExtraite[] = []
+  const lignes: LigneFactureExtraite[] = [];
 
   for (let i = 0; i < lignesTexte.length - 4; i += 1) {
-    const reference = lignesTexte[i]
-    const designation = lignesTexte[i + 1]
-    const quantiteTexte = lignesTexte[i + 2]
-    const prixTexte = lignesTexte[i + 3]
-    const totalTexte = lignesTexte[i + 4]
+    const reference = lignesTexte[i];
+    const designation = lignesTexte[i + 1];
+    const quantiteTexte = lignesTexte[i + 2];
+    const prixTexte = lignesTexte[i + 3];
+    const totalTexte = lignesTexte[i + 4];
 
-    const estReference =
-      /^[A-Z0-9][A-Z0-9._/-]{4,}$/i.test(reference)
+    const estReference = /^[A-Z0-9][A-Z0-9._/-]{4,}$/i.test(reference);
 
     const estDesignation =
       designation.length >= 5 &&
-      !/^(remarque|net à payer|net a payer|arrêté|arrete)$/i.test(designation)
+      !/^(remarque|net à payer|net a payer|arrêté|arrete)$/i.test(designation);
 
-    const estQuantite = /^\d+$/.test(quantiteTexte)
+    const estQuantite = /^\d+$/.test(quantiteTexte);
 
-    const estPrix = /^\d[\d\s]*[,.]\d{2}$/.test(
-      prixTexte.replace(/\s/g, ""),
-    )
+    const estPrix = /^\d[\d\s]*[,.]\d{2}$/.test(prixTexte.replace(/\s/g, ""));
 
-    const estTotal = /^\d[\d\s]*[,.]\d{2}$/.test(
-      totalTexte.replace(/\s/g, ""),
-    )
+    const estTotal = /^\d[\d\s]*[,.]\d{2}$/.test(totalTexte.replace(/\s/g, ""));
 
-    if (!estReference || !estDesignation || !estQuantite || !estPrix || !estTotal) {
-      continue
+    if (
+      !estReference ||
+      !estDesignation ||
+      !estQuantite ||
+      !estPrix ||
+      !estTotal
+    ) {
+      continue;
     }
 
     const ligneExtraite: LigneFactureExtraite = {
@@ -600,14 +655,17 @@ function extraireLignesBlDepuisTexte(texteOcr: string): LigneFactureExtraite[] {
       totalTtc: parseMontant(totalTexte),
       confiance: 0,
       alertes: ["Extraction fallback BL texte brut", "TVA non détectée"],
-    }
+    };
 
-    ligneExtraite.confiance = Math.min(85, calculerConfianceLigne(ligneExtraite))
+    ligneExtraite.confiance = Math.min(
+      85,
+      calculerConfianceLigne(ligneExtraite),
+    );
 
-    lignes.push(ligneExtraite)
+    lignes.push(ligneExtraite);
 
-    i += 4
+    i += 4;
   }
 
-  return lignes
+  return lignes;
 }

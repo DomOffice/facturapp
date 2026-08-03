@@ -1,104 +1,119 @@
-export type PointOcr = [number, number]
+export type PointOcr = [number, number];
 
 export type LigneOcr = {
-  texte?: string
-  text?: string
-  score?: number
-  confiance?: number
-  position?: PointOcr[]
-}
+  texte?: string;
+  text?: string;
+  score?: number;
+  confiance?: number;
+  position?: PointOcr[];
+};
 
 export type PageOcr = {
-  lignes?: LigneOcr[]
-}
+  lignes?: LigneOcr[];
+};
 
 export type ResultatOcr = {
-  pages?: PageOcr[]
-}
+  pages?: PageOcr[];
+};
 
 export type MotOcrNormalise = {
-  texte: string
-  x: number
-  y: number
-  score?: number
-}
+  texte: string;
+  x: number;
+  y: number;
+  score?: number;
+};
 
 export type LigneFactureExtraite = {
-  reference?: string
-  designation: string
-  quantite?: number
-  prixUnitaireTtc?: number
-  tauxTva?: number
-  remisePourcentage?: number
-  totalTtc?: number
-  confiance: number
-  alertes: string[]
-}
+  reference?: string;
+  designation: string;
+  quantite?: number;
+  prixUnitaireTtc?: number;
+  tauxTva?: number;
+  remisePourcentage?: number;
+  totalTtc?: number;
+  confiance: number;
+  alertes: string[];
+};
 
 export type StrategieExtractionLignes =
-  | 'profil'
-  | 'fallback_generique'
-  | 'fallback_texte'
+  | "profil"
+  | "fallback_generique"
+  | "fallback_texte";
+
+export type TypeDocumentFournisseur = "facture" | "bon_livraison";
+
+export type TraitementDocumentFournisseur = {
+  integreStock: boolean;
+  comptabiliseTva: boolean;
+  rapprochementObligatoire: boolean;
+  metAJourPrixAchat: boolean;
+};
 
 export type FactureFournisseurExtraite = {
-  fournisseurNom?: string
-  numeroFacture?: string
-  dateFacture?: string
-  iceFournisseur?: string
-  totalHt?: number
-  totalTva?: number
-  totalTtc?: number
-  devise?: string
-  profilOcr?: string
-  strategieExtractionLignes?: StrategieExtractionLignes
-  fallbackUtilise?: boolean
-  qualiteExtraction?: 'A' | 'B' | 'C' | 'D'
-  lignes: LigneFactureExtraite[]
-  confiance: number
-  alertes: string[]
-}
+  fournisseurNom?: string;
+  numeroFacture?: string;
+  dateFacture?: string;
+  iceFournisseur?: string;
+  totalHt?: number;
+  totalTva?: number;
+  totalTtc?: number;
+  devise?: string;
+  profilOcr?: string;
+  typeDocument?: TypeDocumentFournisseur;
+  integreStock?: boolean;
+  comptabiliseTva?: boolean;
+  rapprochementObligatoire?: boolean;
+  metAJourPrixAchat?: boolean;
+  strategieExtractionLignes?: StrategieExtractionLignes;
+  fallbackUtilise?: boolean;
+  qualiteExtraction?: "A" | "B" | "C" | "D";
+  lignes: LigneFactureExtraite[];
+  confiance: number;
+  alertes: string[];
+};
 
 export type ZoneColonneOcr = {
-  xMin: number
-  xMax: number
-}
+  xMin: number;
+  xMax: number;
+};
 
 export type ProfilOcrFournisseur = {
-  code: string
-  nom: string
-  aliases: string[]
+  code: string;
+  nom: string;
+  aliases: string[];
+  traitement?: TraitementDocumentFournisseur;
 
-  ligneArticleSurDeuxLignes?: boolean
+  ligneArticleSurDeuxLignes?: boolean;
 
   tableau?: {
-    marqueursEntete?: string[]
-    marqueursDebut?: string[]
-    marqueursFin?: string[]
-  }
+    marqueursEntete?: string[];
+    marqueursDebut?: string[];
+    marqueursFin?: string[];
+  };
 
   document?: {
-  type?: "facture" | "bon_livraison"
-  motifsNumero?: RegExp[]
-  motifsDate?: RegExp[]
-  motifsIceFournisseur?: RegExp[]
-  motifsTotalHt?: RegExp[]
-  motifsTotalTva?: RegExp[]
-  motifsTotalTtc?: RegExp[]
-  validation?: {
-  exigeTotalHt?: boolean
-  exigeTotalTva?: boolean
-  exigeTotalTtc?: boolean
-  exigeIceFournisseur?: boolean
-}
-}
+    type?: TypeDocumentFournisseur;
+    motifsNumero?: RegExp[];
+    motifsDate?: RegExp[];
+    motifsIceFournisseur?: RegExp[];
+    motifsTotalHt?: RegExp[];
+    motifsTotalTva?: RegExp[];
+    motifsTotalTtc?: RegExp[];
+    validation?: {
+      exigeTotalHt?: boolean;
+      exigeTotalTva?: boolean;
+      exigeTotalTtc?: boolean;
+      exigeIceFournisseur?: boolean;
+    };
+  };
 
   colonnes: {
-    reference?: ZoneColonneOcr
-    designation: ZoneColonneOcr
-    tva?: ZoneColonneOcr
-    remise?: ZoneColonneOcr
-    puTtc: ZoneColonneOcr
-    quantite: ZoneColonneOcr
-    totalTtc: ZoneColonneOcr
-  }
-}
+    reference?: ZoneColonneOcr;
+    designation: ZoneColonneOcr;
+    tva?: ZoneColonneOcr;
+    remise?: ZoneColonneOcr;
+    puTtc: ZoneColonneOcr;
+    quantite: ZoneColonneOcr;
+    totalTtc: ZoneColonneOcr;
+  };
+};

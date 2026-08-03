@@ -28,6 +28,13 @@ type ExtractionFacture = {
   alertes?: string[];
   lignes?: LigneFactureExtraite[];
   profilOcr?: string;
+
+  typeDocument?: "facture" | "bon_livraison";
+  integreStock?: boolean;
+  comptabiliseTva?: boolean;
+  rapprochementObligatoire?: boolean;
+  metAJourPrixAchat?: boolean;
+
   strategieExtractionLignes?: string;
   fallbackUtilise?: boolean;
   qualiteExtraction?: "A" | "B" | "C" | "D";
@@ -552,7 +559,9 @@ export default function UploadFacture({ fournisseurs }: Props) {
       if (!ocrRes.ok) {
         setEtat({
           type: "erreur",
-          message: ocrData.error || "Erreur lors de l'OCR.",
+          message: [ocrData.error || "Erreur lors de l'OCR.", ocrData.detail]
+            .filter(Boolean)
+            .join(" — "),
         });
         return;
       }
@@ -788,15 +797,19 @@ export default function UploadFacture({ fournisseurs }: Props) {
   const validerLignes = async () => {
     if (etat.type !== "succes") return;
 
-    const ecartsPrix = regrouperEcartsPrixProduits(lignesEditables);
+    const metAJourPrixAchat = etat.extraction?.metAJourPrixAchat !== false;
 
-    const decisionsManquantes = ecartsPrix.some(
-      (ecart) => typeof ecart.mettreAJourPrixProduit !== "boolean",
-    );
+    if (metAJourPrixAchat) {
+      const ecartsPrix = regrouperEcartsPrixProduits(lignesEditables);
 
-    if (decisionsManquantes) {
-      setValidationPrixOuverte(true);
-      return;
+      const decisionsManquantes = ecartsPrix.some(
+        (ecart) => typeof ecart.mettreAJourPrixProduit !== "boolean",
+      );
+
+      if (decisionsManquantes) {
+        setValidationPrixOuverte(true);
+        return;
+      }
     }
 
     await envoyerValidationLignes();

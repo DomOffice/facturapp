@@ -22,6 +22,13 @@ type LignePayload = {
   mettreAJourPrixProduit?: boolean;
 };
 
+type TraitementDocument = {
+  integreStock: boolean;
+  comptabiliseTva: boolean;
+  rapprochementObligatoire: boolean;
+  metAJourPrixAchat: boolean;
+};
+
 function toNumber(value: unknown, fallback = 0): number {
   const normalized =
     typeof value === "string" ? value.replace(",", ".") : value;
@@ -33,6 +40,25 @@ function toNumber(value: unknown, fallback = 0): number {
 
 function arrondirMontant(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function calculerMontantTvaDepuisTtc(
+  montantTtc: number,
+  tauxTva: number,
+): number {
+  if (
+    !Number.isFinite(montantTtc) ||
+    montantTtc <= 0 ||
+    !Number.isFinite(tauxTva) ||
+    tauxTva <= 0
+  ) {
+    return 0;
+  }
+
+  const coefficientTva = 1 + tauxTva / 100;
+  const montantHt = montantTtc / coefficientTva;
+
+  return arrondirMontant(montantTtc - montantHt);
 }
 
 function lireNumeroFacture(donneesExtraites: unknown): string | null {
@@ -59,6 +85,57 @@ function lireNumeroFacture(donneesExtraites: unknown): string | null {
   return typeof numeroFacture === "string" && numeroFacture.trim().length > 0
     ? numeroFacture.trim()
     : null;
+}
+
+function lireTraitementDocument(donneesExtraites: unknown): TraitementDocument {
+  const traitementParDefaut: TraitementDocument = {
+    integreStock: true,
+    comptabiliseTva: false,
+    rapprochementObligatoire: true,
+    metAJourPrixAchat: true,
+  };
+
+  if (
+    !donneesExtraites ||
+    typeof donneesExtraites !== "object" ||
+    Array.isArray(donneesExtraites)
+  ) {
+    return traitementParDefaut;
+  }
+
+  const extraction = (donneesExtraites as Record<string, unknown>).extraction;
+
+  if (
+    !extraction ||
+    typeof extraction !== "object" ||
+    Array.isArray(extraction)
+  ) {
+    return traitementParDefaut;
+  }
+
+  const donnees = extraction as Record<string, unknown>;
+
+  return {
+    integreStock:
+      typeof donnees.integreStock === "boolean"
+        ? donnees.integreStock
+        : traitementParDefaut.integreStock,
+
+    comptabiliseTva:
+      typeof donnees.comptabiliseTva === "boolean"
+        ? donnees.comptabiliseTva
+        : traitementParDefaut.comptabiliseTva,
+
+    rapprochementObligatoire:
+      typeof donnees.rapprochementObligatoire === "boolean"
+        ? donnees.rapprochementObligatoire
+        : traitementParDefaut.rapprochementObligatoire,
+
+    metAJourPrixAchat:
+      typeof donnees.metAJourPrixAchat === "boolean"
+        ? donnees.metAJourPrixAchat
+        : traitementParDefaut.metAJourPrixAchat,
+  };
 }
 
 function normaliserNumeroFacture(numeroFacture: string): string {
@@ -102,6 +179,34 @@ export async function POST(
       ? (body.lignes as LignePayload[])
       : [];
 
+    const documentContexte = await prisma.documentImporte.findUnique({
+      where: {
+        id: documentId,
+      },
+      select: {
+        id: true,
+        statut: true,
+        donneesExtraites: true,
+
+        integrationStock: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!documentContexte) {
+      return NextResponse.json(
+        { error: "Document importé introuvable" },
+        { status: 404 },
+      );
+    }
+
+    const traitement = lireTraitementDocument(
+      documentContexte.donneesExtraites,
+    );
+
     if (lignes.length === 0) {
       return NextResponse.json(
         { error: "Aucune ligne à valider" },
@@ -111,34 +216,40 @@ export async function POST(
 
     const lignesValides = lignes
       .filter((ligne): ligne is LignePayload => Boolean(ligne))
-      .map((ligne) => ({
-        referenceDetectee: ligne.reference?.trim() || null,
-        designation: ligne.designation?.trim() || "",
-        quantite: toNumber(ligne.quantite),
-        prixUnitaire: toNumber(ligne.prixUnitaireTtc),
-        tauxTva: toNumber(ligne.tauxTva),
-        montantTotal: toNumber(ligne.totalTtc),
+      .map((ligne) => {
+        const tauxTva = toNumber(ligne.tauxTva);
+        const montantTotal = toNumber(ligne.totalTtc);
 
-        produitId:
-          Number.isInteger(Number(ligne.produitId)) &&
-          Number(ligne.produitId) > 0
-            ? Number(ligne.produitId)
-            : null,
+        return {
+          referenceDetectee: ligne.reference?.trim() || null,
+          designation: ligne.designation?.trim() || "",
+          quantite: toNumber(ligne.quantite),
+          prixUnitaire: toNumber(ligne.prixUnitaireTtc),
+          tauxTva,
+          montantTva: calculerMontantTvaDepuisTtc(montantTotal, tauxTva),
+          montantTotal,
 
-        prixAchatHtFacture:
-          ligne.prixAchatHtFacture === undefined ||
-          ligne.prixAchatHtFacture === null
-            ? null
-            : toNumber(ligne.prixAchatHtFacture),
+          produitId:
+            Number.isInteger(Number(ligne.produitId)) &&
+            Number(ligne.produitId) > 0
+              ? Number(ligne.produitId)
+              : null,
 
-        prixAchatTtcFacture:
-          ligne.prixAchatTtcFacture === undefined ||
-          ligne.prixAchatTtcFacture === null
-            ? null
-            : toNumber(ligne.prixAchatTtcFacture),
+          prixAchatHtFacture:
+            ligne.prixAchatHtFacture === undefined ||
+            ligne.prixAchatHtFacture === null
+              ? null
+              : toNumber(ligne.prixAchatHtFacture),
 
-        mettreAJourPrixProduit: ligne.mettreAJourPrixProduit === true,
-      }))
+          prixAchatTtcFacture:
+            ligne.prixAchatTtcFacture === undefined ||
+            ligne.prixAchatTtcFacture === null
+              ? null
+              : toNumber(ligne.prixAchatTtcFacture),
+
+          mettreAJourPrixProduit: ligne.mettreAJourPrixProduit === true,
+        };
+      })
       .filter((ligne) => ligne.designation.length > 0);
 
     if (lignesValides.length === 0) {
@@ -154,7 +265,7 @@ export async function POST(
      */
     const lignesSansProduit = lignesValides.filter((ligne) => !ligne.produitId);
 
-    if (lignesSansProduit.length > 0) {
+    if (traitement.rapprochementObligatoire && lignesSansProduit.length > 0) {
       return NextResponse.json(
         {
           error:
@@ -193,7 +304,16 @@ export async function POST(
      * Vérification préalable de l'existence des produits.
      */
     const produitIds = Array.from(
-      new Set(lignesValides.map((ligne) => ligne.produitId as number)),
+      new Set(
+        lignesValides
+          .map((ligne) => ligne.produitId)
+          .filter(
+            (produitId): produitId is number =>
+              typeof produitId === "number" &&
+              Number.isInteger(produitId) &&
+              produitId > 0,
+          ),
+      ),
     );
 
     const produitsExistants = await prisma.produit.findMany({
@@ -257,7 +377,11 @@ export async function POST(
     >();
 
     for (const ligne of lignesValides) {
-      if (!ligne.produitId || ligne.mettreAJourPrixProduit !== true) {
+      if (
+        !traitement.metAJourPrixAchat ||
+        !ligne.produitId ||
+        ligne.mettreAJourPrixProduit !== true
+      ) {
         continue;
       }
 
@@ -334,6 +458,7 @@ export async function POST(
         select: {
           id: true,
           fournisseurId: true,
+          statut: true,
           donneesExtraites: true,
 
           integrationStock: {
@@ -348,8 +473,16 @@ export async function POST(
         throw new Error("DOCUMENT_INTROUVABLE");
       }
 
-      if (document.integrationStock) {
+      const traitementTransaction = lireTraitementDocument(
+        document.donneesExtraites,
+      );
+
+      if (traitementTransaction.integreStock && document.integrationStock) {
         throw new Error("DOCUMENT_DEJA_INTEGRE");
+      }
+
+      if (!traitementTransaction.integreStock && document.statut === "valide") {
+        throw new Error("DOCUMENT_DEJA_VALIDE");
       }
 
       const numeroFacture = lireNumeroFacture(document.donneesExtraites);
@@ -392,6 +525,54 @@ export async function POST(
         if (factureDejaIntegree) {
           throw new Error("FACTURE_DEJA_INTEGREE");
         }
+      }
+
+      if (!traitementTransaction.integreStock) {
+        await tx.ligneImportee.deleteMany({
+          where: {
+            documentImporteId: documentId,
+          },
+        });
+
+        for (const ligne of lignesValides) {
+          await tx.ligneImportee.create({
+            data: {
+              documentImporteId: documentId,
+              referenceDetectee: ligne.referenceDetectee,
+              designation: ligne.designation,
+              quantite: new Prisma.Decimal(ligne.quantite),
+              prixUnitaire: new Prisma.Decimal(ligne.prixUnitaire),
+              tauxTva: new Prisma.Decimal(ligne.tauxTva),
+              montantTva: new Prisma.Decimal(ligne.montantTva),
+              montantTotal: new Prisma.Decimal(ligne.montantTotal),
+
+              // Le rapprochement reste facultatif.
+              produitId: ligne.produitId,
+
+              // Cette ligne est validée mais n’a pas été intégrée au stock.
+              statut: "validee_sans_stock",
+            },
+          });
+        }
+
+        await tx.documentImporte.update({
+          where: {
+            id: documentId,
+          },
+          data: {
+            statut: "valide",
+          },
+        });
+
+        return {
+          integrationStockId: null,
+          lignesEnregistrees: lignesValides.length,
+          mouvementsCrees: 0,
+          associationsMemorisees: 0,
+          quantiteTotaleIntegree: "0",
+          integreStock: false,
+          comptabiliseTva: traitementTransaction.comptabiliseTva,
+        };
       }
 
       /*
@@ -441,6 +622,7 @@ export async function POST(
             quantite,
             prixUnitaire: new Prisma.Decimal(ligne.prixUnitaire),
             tauxTva: new Prisma.Decimal(ligne.tauxTva),
+            montantTva: new Prisma.Decimal(ligne.montantTva),
             montantTotal: new Prisma.Decimal(ligne.montantTotal),
             produitId,
             statut: "integree_stock",
@@ -576,8 +758,8 @@ export async function POST(
         lignesEnregistrees: lignesValides.length,
         mouvementsCrees,
         associationsMemorisees,
-
         quantiteTotaleIntegree: quantiteTotaleIntegree.toString(),
+        integreStock: true,
       };
     });
 
@@ -587,7 +769,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       documentId,
-      statut: "stock_integre",
+      statut: resultat.integreStock === false ? "valide" : "stock_integre",
       ...resultat,
     });
   } catch (error) {
@@ -619,6 +801,14 @@ export async function POST(
       );
     }
 
+    if (error instanceof Error && error.message === "DOCUMENT_DEJA_VALIDE") {
+      return NextResponse.json(
+        {
+          error: "Ce document a déjà été validé.",
+        },
+        { status: 409 },
+      );
+    }
     /*
      * P2002 correspond notamment à une violation de contrainte
      * unique. Cela protège aussi contre deux clics simultanés.
@@ -635,12 +825,11 @@ export async function POST(
       );
     }
 
-    console.error("[VALIDER_LIGNES_ET_STOCK_FOURNISSEUR]", error);
+    console.error("[VALIDER_DOCUMENT_FOURNISSEUR]", error);
 
     return NextResponse.json(
       {
-        error:
-          "Erreur serveur lors de la validation et de l’intégration au stock.",
+        error: "Erreur serveur lors de la validation du document fournisseur.",
       },
       { status: 500 },
     );

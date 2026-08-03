@@ -123,8 +123,12 @@ export async function POST(
       PYTHON_OCR_PATH,
       [OCR_SCRIPT_PATH, cheminComplet],
       {
-        timeout: 120000,
-        maxBuffer: 20 * 1024 * 1024,
+        /*
+         * Un PDF multipage peut demander plusieurs minutes avec PaddleOCR,
+         * particulièrement lors du premier chargement des modèles.
+         */
+        timeout: 5 * 60 * 1000,
+        maxBuffer: 50 * 1024 * 1024,
         windowsHide: true,
       },
     );
@@ -283,12 +287,48 @@ export async function POST(
       doublonFacture,
       diagnosticCoordonnees,
     });
-  } catch (error) {
-    console.error("[OCR_FACTURE_FOURNISSEUR]", error);
+  } catch (error: unknown) {
+  const erreurExecution = error as {
+    message?: string;
+    code?: string | number;
+    killed?: boolean;
+    signal?: string;
+    stdout?: string;
+    stderr?: string;
+  };
 
-    return NextResponse.json(
-      { error: "Erreur serveur lors de l'OCR" },
-      { status: 500 },
-    );
-  }
+  console.error("[OCR_FACTURE_FOURNISSEUR]", {
+    message: erreurExecution.message,
+    code: erreurExecution.code,
+    killed: erreurExecution.killed,
+    signal: erreurExecution.signal,
+    stderr: erreurExecution.stderr,
+    stdoutFin: erreurExecution.stdout?.slice(-2000),
+  });
+
+  const delaiDepasse =
+    erreurExecution.killed === true ||
+    erreurExecution.signal === "SIGTERM" ||
+    erreurExecution.code === "ETIMEDOUT";
+
+  return NextResponse.json(
+    {
+      error: delaiDepasse
+        ? "Le traitement OCR a dépassé le délai autorisé. Le document contient peut-être plusieurs pages."
+        : "Erreur serveur lors de l'OCR.",
+
+      /*
+       * Utile pendant le développement local.
+       * Ne pas afficher de chemins système en production.
+       */
+      detail:
+        process.env.NODE_ENV === "development"
+          ? erreurExecution.stderr ||
+            erreurExecution.message ||
+            "Erreur OCR inconnue"
+          : undefined,
+    },
+    { status: 500 },
+  );
+}
 }

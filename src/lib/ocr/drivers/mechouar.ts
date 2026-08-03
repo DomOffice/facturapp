@@ -4,34 +4,35 @@ export const mechouarDriver: ProfilOcrFournisseur = {
   code: "mechouar",
   nom: "Mechouar",
 
-  aliases: [
-    "mechouar",
-  ],
+  aliases: ["mechouar"],
+
+  traitement: {
+    integreStock: true,
+    comptabiliseTva: false,
+    rapprochementObligatoire: true,
+    metAJourPrixAchat: true,
+  },
 
   ligneArticleSurDeuxLignes: true,
 
   document: {
     type: "bon_livraison",
 
-    motifsNumero: [
-      /\b\d{2}\/BL\d+\b/i,
-    ],
+    motifsNumero: [/\b\d{2}\/BL\d+\b/i],
 
-    motifsDate: [
-      /\b\d{2}\/\d{2}\/\d{4}\b/,
-    ],
+    motifsDate: [/\b\d{2}\/\d{2}\/\d{4}\b/],
 
     motifsTotalTtc: [
-  /net\s+[àa]\s+payer[ \t]*:?[ \t]*(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})/i,
-  /(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})(?:[ \t]*\r?\n[^\r\n]*){0,2}[ \t]*\r?\n[ \t]*net\s+[àa]\s+payer/i,
-],
+      /net\s+[àa]\s+payer[ \t]*:?[ \t]*(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})/i,
+      /(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})(?:[ \t]*\r?\n[^\r\n]*){0,2}[ \t]*\r?\n[ \t]*net\s+[àa]\s+payer/i,
+    ],
 
-  validation: {
-  exigeTotalHt: false,
-  exigeTotalTva: false,
-  exigeTotalTtc: true,
-  exigeIceFournisseur: false,
-},
+    validation: {
+      exigeTotalHt: false,
+      exigeTotalTva: false,
+      exigeTotalTtc: true,
+      exigeIceFournisseur: false,
+    },
   },
 
   tableau: {
@@ -47,11 +48,7 @@ export const mechouarDriver: ProfilOcrFournisseur = {
       "total par ligne",
     ],
 
-    marqueursDebut: [
-      "référence",
-      "designation",
-      "désignation",
-    ],
+    marqueursDebut: ["référence", "designation", "désignation"],
 
     marqueursFin: [
       "remarque",
@@ -97,4 +94,87 @@ export const mechouarDriver: ProfilOcrFournisseur = {
       xMax: 1125,
     },
   },
-}
+};
+
+export const mechouarFactureDriver: ProfilOcrFournisseur = {
+  ...mechouarDriver,
+
+  code: "mechouar_facture",
+  nom: "Mechouar — Facture",
+
+  traitement: {
+    integreStock: false,
+    comptabiliseTva: true,
+    rapprochementObligatoire: false,
+    metAJourPrixAchat: false,
+  },
+
+  document: {
+    type: "facture",
+
+    motifsNumero: [/\b\d{2}\/FA\d+\b/i],
+
+    motifsDate: [/\b\d{2}\/\d{2}\/\d{4}\b/],
+
+    motifsIceFournisseur: [/\bICE\s*:?\s*(000198247000082)\b/i],
+
+    motifsTotalHt: [
+      /t\s*otal\s*ht[ \t]*:?[ \t]*(?:\r?\n[ \t]*)?(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})/i,
+    ],
+
+    motifsTotalTva: [
+      /t\s*otal\s*tva[ \t]*:?[ \t]*(?:\r?\n[ \t]*)?(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})/i,
+    ],
+
+    motifsTotalTtc: [
+      /total\s*ttc[ \t]*:?[ \t]*(?:\r?\n[ \t]*)?(\d(?:[ \u00a0\u202f]?\d)*[,.]\d{2})/i,
+    ],
+
+    validation: {
+      exigeTotalHt: true,
+      exigeTotalTva: true,
+      exigeTotalTtc: true,
+      exigeIceFournisseur: true,
+    },
+  },
+
+  colonnes: {
+    reference: {
+      xMin: 20,
+      xMax: 270,
+    },
+
+    designation: {
+      xMin: 270,
+      xMax: 1010,
+    },
+
+    // La facture comporte deux quantités :
+    // commandée vers x=1110 et livrée vers x=1270.
+    // Pour la comptabilisation, on retient la quantité livrée.
+    quantite: {
+      xMin: 1180,
+      xMax: 1335,
+    },
+
+    puTtc: {
+      xMin: 1340,
+      xMax: 1510,
+    },
+
+    remise: {
+      xMin: 1510,
+      xMax: 1615,
+    },
+
+    tva: {
+      xMin: 1615,
+      xMax: 1720,
+    },
+
+    totalTtc: {
+      xMin: 1720,
+      xMax: 1925,
+    },
+  },
+};
