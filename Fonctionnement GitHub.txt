@@ -17,6 +17,18 @@ git add .
 git commit -m "Description courte de la modification"
 git push
 
+// Nouvelle méthode :
+
+git status
+git add .
+git commit 
+    Ajouter le titre du commit
+    appuyer sur i : pour activer l'insertion
+    Ajouter les détails du commit
+    Echap
+    :wq pour valider
+git push
+
 Exemple :
 
 git commit -m "Ajoute filtre sur les factures"
