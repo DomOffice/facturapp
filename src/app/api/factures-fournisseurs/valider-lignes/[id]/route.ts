@@ -87,20 +87,15 @@ function lireNumeroFacture(donneesExtraites: unknown): string | null {
     : null;
 }
 
-function lireTraitementDocument(donneesExtraites: unknown): TraitementDocument {
-  const traitementParDefaut: TraitementDocument = {
-    integreStock: true,
-    comptabiliseTva: false,
-    rapprochementObligatoire: true,
-    metAJourPrixAchat: true,
-  };
-
+function lireExtraction(
+  donneesExtraites: unknown,
+): Record<string, unknown> | null {
   if (
     !donneesExtraites ||
     typeof donneesExtraites !== "object" ||
     Array.isArray(donneesExtraites)
   ) {
-    return traitementParDefaut;
+    return null;
   }
 
   const extraction = (donneesExtraites as Record<string, unknown>).extraction;
@@ -110,34 +105,57 @@ function lireTraitementDocument(donneesExtraites: unknown): TraitementDocument {
     typeof extraction !== "object" ||
     Array.isArray(extraction)
   ) {
-    return traitementParDefaut;
+    return null;
   }
 
-  const donnees = extraction as Record<string, unknown>;
-
-  return {
-    integreStock:
-      typeof donnees.integreStock === "boolean"
-        ? donnees.integreStock
-        : traitementParDefaut.integreStock,
-
-    comptabiliseTva:
-      typeof donnees.comptabiliseTva === "boolean"
-        ? donnees.comptabiliseTva
-        : traitementParDefaut.comptabiliseTva,
-
-    rapprochementObligatoire:
-      typeof donnees.rapprochementObligatoire === "boolean"
-        ? donnees.rapprochementObligatoire
-        : traitementParDefaut.rapprochementObligatoire,
-
-    metAJourPrixAchat:
-      typeof donnees.metAJourPrixAchat === "boolean"
-        ? donnees.metAJourPrixAchat
-        : traitementParDefaut.metAJourPrixAchat,
-  };
+  return extraction as Record<string, unknown>;
 }
 
+function lireTraitementDocument(donneesExtraites: unknown): TraitementDocument {
+  const extraction = lireExtraction(donneesExtraites);
+
+  const profilOcr =
+    typeof extraction?.profilOcr === "string"
+      ? extraction.profilOcr.toLowerCase()
+      : "";
+
+  const typeDocument =
+    typeof extraction?.typeDocument === "string"
+      ? extraction.typeDocument.toLowerCase()
+      : "";
+
+  const estMechouar =
+    profilOcr === "mechouar" || profilOcr === "mechouar_facture";
+
+  const estFactureMechouar =
+    profilOcr === "mechouar_facture" ||
+    (estMechouar && typeDocument === "facture");
+
+  if (estFactureMechouar) {
+    return {
+      integreStock: false,
+      comptabiliseTva: true,
+      rapprochementObligatoire: false,
+      metAJourPrixAchat: false,
+    };
+  }
+
+  if (estMechouar) {
+    return {
+      integreStock: true,
+      comptabiliseTva: false,
+      rapprochementObligatoire: true,
+      metAJourPrixAchat: true,
+    };
+  }
+
+  return {
+    integreStock: true,
+    comptabiliseTva: true,
+    rapprochementObligatoire: true,
+    metAJourPrixAchat: true,
+  };
+}
 function normaliserNumeroFacture(numeroFacture: string): string {
   return numeroFacture
     .normalize("NFD")
@@ -760,6 +778,7 @@ export async function POST(
         associationsMemorisees,
         quantiteTotaleIntegree: quantiteTotaleIntegree.toString(),
         integreStock: true,
+        comptabiliseTva: traitementTransaction.comptabiliseTva,
       };
     });
 

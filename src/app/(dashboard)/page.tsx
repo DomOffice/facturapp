@@ -7,7 +7,9 @@ import { formatMontant } from "@/lib/utils/currency";
 type DonneesFactureFournisseur = {
   extraction?: {
     dateFacture?: string;
-    totalTva?: number;
+    totalTva?: number | string;
+    profilOcr?: string;
+    typeDocument?: string;
   };
 };
 
@@ -52,6 +54,37 @@ function lireDateFactureFournisseur(
   }
 
   return dateImport;
+}
+
+function doitComptabiliserTvaFournisseur(
+  extraction: DonneesFactureFournisseur["extraction"],
+): boolean {
+  const profilOcr =
+    typeof extraction?.profilOcr === "string"
+      ? extraction.profilOcr.trim().toLowerCase()
+      : "";
+
+  const typeDocument =
+    typeof extraction?.typeDocument === "string"
+      ? extraction.typeDocument.trim().toLowerCase()
+      : "";
+
+  const estMechouar =
+    profilOcr === "mechouar" || profilOcr === "mechouar_facture";
+
+  const estFactureMechouar =
+    profilOcr === "mechouar_facture" ||
+    (estMechouar && typeDocument === "facture");
+
+  if (estFactureMechouar) {
+    return true;
+  }
+
+  if (estMechouar) {
+    return false;
+  }
+
+  return true;
 }
 
 // Removed duplicate export default function UtilisateursPage() { ... }
@@ -114,8 +147,8 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
 
     prisma.documentImporte.findMany({
       where: {
-        integrationStock: {
-          isNot: null,
+        statut: {
+          in: ["valide", "stock_integre"],
         },
       },
       select: {
@@ -123,8 +156,7 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
         donneesExtraites: true,
         lignes: {
           select: {
-            montantTotal: true,
-            tauxTva: true,
+            montantTva: true,
           },
         },
       },
@@ -158,6 +190,15 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
 
       const extraction = donnees?.extraction;
 
+      /*
+       * BL Mechouar : aucune TVA.
+       * Facture Mechouar : TVA.
+       * Autres fournisseurs : TVA.
+       */
+      if (!doitComptabiliserTvaFournisseur(extraction)) {
+        return total;
+      }
+
       const dateFacture = lireDateFactureFournisseur(
         extraction?.dateFacture,
         document.dateImport,
@@ -170,38 +211,38 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
         return total;
       }
 
-      const tvaExtraite = Number(extraction?.totalTva);
+      const totalTvaExtraite =
+        typeof extraction?.totalTva === "number"
+          ? extraction.totalTva
+          : typeof extraction?.totalTva === "string"
+            ? Number(
+                extraction.totalTva.trim().replace(/\s/g, "").replace(",", "."),
+              )
+            : Number.NaN;
 
       /*
-       * Le total TVA détecté par l'OCR est prioritaire.
+       * Le montant OCR est utilisé uniquement lorsqu'il est
+       * réellement exploitable et positif.
        */
-      if (Number.isFinite(tvaExtraite) && tvaExtraite >= 0) {
-        return total + tvaExtraite;
+      if (Number.isFinite(totalTvaExtraite) && totalTvaExtraite > 0) {
+        return total + totalTvaExtraite;
       }
 
       /*
-       * Solution de secours :
-       * les lignes OCR stockent actuellement des montants TTC.
+       * Sinon, on additionne les montants TVA enregistrés
+       * lors de la validation des lignes.
+       *
+       * Aucun recalcul approximatif depuis le TTC n'est effectué.
        */
-      const tvaCalculee = document.lignes.reduce((totalLignes, ligne) => {
-        const montantTtc = Number(ligne.montantTotal);
-        const tauxTva = Number(ligne.tauxTva);
+      const totalTvaLignes = document.lignes.reduce((totalLignes, ligne) => {
+        const montantTva = Number(ligne.montantTva);
 
-        if (
-          !Number.isFinite(montantTtc) ||
-          !Number.isFinite(tauxTva) ||
-          montantTtc <= 0 ||
-          tauxTva <= 0
-        ) {
-          return totalLignes;
-        }
-
-        const montantHt = montantTtc / (1 + tauxTva / 100);
-
-        return totalLignes + (montantTtc - montantHt);
+        return Number.isFinite(montantTva)
+          ? totalLignes + montantTva
+          : totalLignes;
       }, 0);
 
-      return total + tvaCalculee;
+      return total + totalTvaLignes;
     },
     0,
   );

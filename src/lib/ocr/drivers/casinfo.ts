@@ -1,13 +1,16 @@
-import type { ProfilOcrFournisseur } from '../types'
+import type { ProfilOcrFournisseur } from "../types";
 
 export const casinfoDriver: ProfilOcrFournisseur = {
   code: "casinfo",
   nom: "CASINFO",
-  aliases: [
-    "casinfo",
-    "cas info",
-    "cas-info",
-  ],
+  aliases: ["casinfo", "cas info", "cas-info"],
+
+  traitement: {
+    integreStock: true,
+    comptabiliseTva: true,
+    rapprochementObligatoire: true,
+    metAJourPrixAchat: true,
+  },
 
   ligneArticleSurDeuxLignes: true,
 
@@ -20,10 +23,10 @@ export const casinfoDriver: ProfilOcrFournisseur = {
   },
 
   document: {
-  type: "facture",
+    type: "facture",
 
-  motifsIceFournisseur: [
-    /(?:ice|identifiant\s+commun\s+de\s+l['’]?entreprise)\s*:?\s*(\d{15})/i,
-  ],
-},
-}
+    motifsIceFournisseur: [
+      /(?:ice|identifiant\s+commun\s+de\s+l['’]?entreprise)\s*:?\s*(\d{15})/i,
+    ],
+  },
+};

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import Link from "next/link";
+import { formatMontant } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,59 @@ function lireNombre(
 
   return null;
 }
+
+function doitComptabiliserTva(
+  extraction: Record<string, unknown> | null,
+): boolean {
+  const profilOcr =
+    typeof extraction?.profilOcr === "string"
+      ? extraction.profilOcr.trim().toLowerCase()
+      : "";
+
+  const typeDocument =
+    typeof extraction?.typeDocument === "string"
+      ? extraction.typeDocument.trim().toLowerCase()
+      : "";
+
+  const estMechouar =
+    profilOcr === "mechouar" || profilOcr === "mechouar_facture";
+
+  const estFactureMechouar =
+    profilOcr === "mechouar_facture" ||
+    (estMechouar && typeDocument === "facture");
+
+  /*
+   * Facture Mechouar :
+   * TVA oui, stock non.
+   */
+  if (estFactureMechouar) {
+    return true;
+  }
+
+  /*
+   * BL Mechouar :
+   * TVA non, stock oui.
+   */
+  if (estMechouar) {
+    return false;
+  }
+
+  /*
+   * Tous les autres fournisseurs :
+   * TVA oui, stock oui.
+   */
+  return true;
+}
+
+function lireBooleen(
+  objet: Record<string, unknown> | null,
+  cle: string,
+): boolean | null {
+  const valeur = objet?.[cle];
+
+  return typeof valeur === "boolean" ? valeur : null;
+}
+
 export default async function FacturesFournisseursPage() {
   const session = await auth();
 
@@ -80,6 +134,11 @@ export default async function FacturesFournisseursPage() {
           dateIntegration: true,
         },
       },
+      lignes: {
+        select: {
+          montantTva: true,
+        },
+      },
       _count: {
         select: {
           lignes: true,
@@ -104,6 +163,20 @@ export default async function FacturesFournisseursPage() {
         ? extraction.dateFacture
         : null;
 
+    const comptabiliseTva = doitComptabiliserTva(extraction);
+
+    const totalTvaExtraite = lireNombre(extraction, "totalTva");
+
+    const totalTvaLignes = document.lignes.reduce(
+      (total, ligne) => total + Number(ligne.montantTva),
+      0,
+    );
+
+    const totalTva =
+      totalTvaExtraite !== null && totalTvaExtraite > 0
+        ? totalTvaExtraite
+        : totalTvaLignes;
+
     return {
       id: document.id,
       numeroFacture,
@@ -112,7 +185,9 @@ export default async function FacturesFournisseursPage() {
       dateFacture,
       dateImport: document.dateImport,
       totalHt: lireNombre(extraction, "totalHt"),
+      totalTva,
       totalTtc: lireNombre(extraction, "totalTtc"),
+      comptabiliseTva,
       statut: document.statut,
       estIntegree: document.integrationStock !== null,
       nombreLignes: document._count.lignes,
@@ -190,6 +265,7 @@ export default async function FacturesFournisseursPage() {
                 <th>Fournisseur</th>
                 <th>Date</th>
                 <th>Montant HT</th>
+                <th>TVA</th>
                 <th>Montant TTC</th>
                 <th>Lignes</th>
                 <th>Statut</th>
@@ -221,13 +297,19 @@ export default async function FacturesFournisseursPage() {
 
                   <td className="text-right">
                     {facture.totalHt !== null
-                      ? `${facture.totalHt.toFixed(2)} MAD`
+                      ? `${formatMontant(facture.totalHt)} MAD`
+                      : "—"}
+                  </td>
+
+                  <td className="text-right">
+                    {facture.comptabiliseTva
+                      ? `${formatMontant(facture.totalTva)} MAD`
                       : "—"}
                   </td>
 
                   <td className="text-right font-medium">
                     {facture.totalTtc !== null
-                      ? `${facture.totalTtc.toFixed(2)} MAD`
+                      ? `${formatMontant(facture.totalTtc)} MAD`
                       : "—"}
                   </td>
 
