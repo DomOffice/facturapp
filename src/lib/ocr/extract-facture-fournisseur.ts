@@ -485,7 +485,7 @@ export function extraireFactureFournisseurDepuisOcr(
     texte,
   );
 
-  const totalTva = extraireMontantAvecMotifs(
+  let totalTva = extraireMontantAvecMotifs(
     profil.document?.motifsTotalTva?.length
       ? profil.document.motifsTotalTva
       : motifsTotalTvaParDefaut,
@@ -499,6 +499,36 @@ export function extraireFactureFournisseurDepuisOcr(
     texte,
   );
 
+  /*
+   * Les tableaux de synthèse des factures Mechouar sont parfois
+   * lus dans un ordre différent de leur disposition visuelle.
+   *
+   * Exemple :
+   * TOTAL TVA
+   * 0,00
+   * 2047,17
+   *
+   * Lorsque HT et TTC sont fiables, la différence TTC - HT est
+   * plus sûre que le premier nombre placé après le libellé TVA.
+   */
+  if (
+    profil.code === "mechouar_facture" &&
+    totalHt !== undefined &&
+    totalTtc !== undefined
+  ) {
+    const tvaCalculee =
+      Math.round((totalTtc - totalHt + Number.EPSILON) * 100) / 100;
+
+    const tvaExtraiteIncoherente =
+      totalTva === undefined ||
+      totalTva <= 0 ||
+      Math.abs(totalTva - tvaCalculee) > 0.05;
+
+    if (tvaCalculee >= 0 && tvaExtraiteIncoherente) {
+      totalTva = tvaCalculee;
+    }
+  }
+
   const devise = /dirham|mad|dh/i.test(texte) ? "MAD" : undefined;
 
   const extractionLignes = extraireLignesAvecFallback(
@@ -510,6 +540,21 @@ export function extraireFactureFournisseurDepuisOcr(
     profil.code === "mechouar_facture"
       ? corrigerDesignationsMechouarFacture(extractionLignes.lignes)
       : extractionLignes.lignes;
+
+  const totauxComptablesComplets =
+    totalHt !== undefined &&
+    totalTva !== undefined &&
+    totalTtc !== undefined &&
+    totalHt > 0 &&
+    totalTva >= 0 &&
+    totalTtc > 0;
+
+  const qualiteExtraction =
+    profil.code === "mechouar_facture" &&
+    totauxComptablesComplets &&
+    extractionLignes.fallbackUtilise
+      ? "B"
+      : extractionLignes.qualite;
 
   const estBonLivraison = profil.document?.type === "bon_livraison";
   const validation = profil.document?.validation;
@@ -566,7 +611,13 @@ export function extraireFactureFournisseurDepuisOcr(
     alertes.push("Aucune ligne article détectée");
   }
   if (extractionLignes.fallbackUtilise && lignes.length > 0) {
-    alertes.push(`Fallback utilisé : ${extractionLignes.strategie}`);
+    if (profil.code === "mechouar_facture" && totauxComptablesComplets) {
+      alertes.push(
+        `Fallback lignes utilisé : ${extractionLignes.strategie} — totaux comptables validés`,
+      );
+    } else {
+      alertes.push(`Fallback utilisé : ${extractionLignes.strategie}`);
+    }
   }
 
   let points = 0;
@@ -602,7 +653,7 @@ export function extraireFactureFournisseurDepuisOcr(
     metAJourPrixAchat: traitement?.metAJourPrixAchat,
     strategieExtractionLignes: extractionLignes.strategie,
     fallbackUtilise: extractionLignes.fallbackUtilise,
-    qualiteExtraction: extractionLignes.qualite,
+    qualiteExtraction,
     lignes,
     confiance: Math.min(100, points),
     alertes,

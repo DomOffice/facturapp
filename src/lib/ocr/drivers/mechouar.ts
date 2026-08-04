@@ -140,41 +140,45 @@ export const mechouarFactureDriver: ProfilOcrFournisseur = {
 
   colonnes: {
     reference: {
-      xMin: 20,
+      xMin: 70,
       xMax: 270,
     },
 
     designation: {
       xMin: 270,
-      xMax: 1010,
+      xMax: 900,
     },
 
-    // La facture comporte deux quantités :
-    // commandée vers x=1110 et livrée vers x=1270.
-    // Pour la comptabilisation, on retient la quantité livrée.
+    /*
+     * La facture comporte deux colonnes de quantité :
+     * - commandée : environ x=975
+     * - livrée : environ x=1110
+     *
+     * La quantité livrée est la valeur comptabilisée.
+     */
     quantite: {
-      xMin: 1180,
-      xMax: 1335,
+      xMin: 1030,
+      xMax: 1165,
     },
 
     puTtc: {
-      xMin: 1340,
-      xMax: 1510,
+      xMin: 1165,
+      xMax: 1305,
     },
 
     remise: {
-      xMin: 1510,
-      xMax: 1615,
+      xMin: 1305,
+      xMax: 1385,
     },
 
     tva: {
-      xMin: 1615,
-      xMax: 1720,
+      xMin: 1385,
+      xMax: 1475,
     },
 
     totalTtc: {
-      xMin: 1720,
-      xMax: 1925,
+      xMin: 1475,
+      xMax: 1645,
     },
   },
 };
