@@ -215,7 +215,8 @@ export async function POST(
     let doublonFacture: {
       documentId: number;
       numeroFacture: string;
-      dateIntegration: string;
+      dateTraitement: string;
+      avaitIntegreStock: boolean;
     } | null = null;
 
     const numeroFacture =
@@ -228,7 +229,7 @@ export async function POST(
       : "";
 
     if (numeroFactureNormalise) {
-      const documentsDejaIntegres = await prisma.documentImporte.findMany({
+      const documentsDejaValides = await prisma.documentImporte.findMany({
         where: {
           id: {
             not: documentId,
@@ -236,13 +237,22 @@ export async function POST(
 
           fournisseurId: document.fournisseurId,
 
-          integrationStock: {
-            isNot: null,
+          /*
+           * On recherche tous les documents déjà validés :
+           *
+           * - "stock_integre" pour les BL Mechouar et les factures
+           *   fournisseurs qui alimentent le stock ;
+           * - "valide" pour les factures Mechouar sans stock.
+           */
+          statut: {
+            in: ["valide", "stock_integre"],
           },
         },
 
         select: {
           id: true,
+          dateImport: true,
+          dateMiseAJour: true,
           donneesExtraites: true,
 
           integrationStock: {
@@ -257,7 +267,7 @@ export async function POST(
         },
       });
 
-      const documentDoublon = documentsDejaIntegres.find((documentExistant) => {
+      const documentDoublon = documentsDejaValides.find((documentExistant) => {
         const numeroExistant = lireNumeroFacture(
           documentExistant.donneesExtraites,
         );
@@ -268,12 +278,17 @@ export async function POST(
         );
       });
 
-      if (documentDoublon && documentDoublon.integrationStock) {
+      if (documentDoublon) {
+        const dateTraitement =
+          documentDoublon.integrationStock?.dateIntegration ??
+          documentDoublon.dateMiseAJour ??
+          documentDoublon.dateImport;
+
         doublonFacture = {
           documentId: documentDoublon.id,
           numeroFacture,
-          dateIntegration:
-            documentDoublon.integrationStock.dateIntegration.toISOString(),
+          dateTraitement: dateTraitement.toISOString(),
+          avaitIntegreStock: documentDoublon.integrationStock !== null,
         };
       }
     }
@@ -288,47 +303,47 @@ export async function POST(
       diagnosticCoordonnees,
     });
   } catch (error: unknown) {
-  const erreurExecution = error as {
-    message?: string;
-    code?: string | number;
-    killed?: boolean;
-    signal?: string;
-    stdout?: string;
-    stderr?: string;
-  };
+    const erreurExecution = error as {
+      message?: string;
+      code?: string | number;
+      killed?: boolean;
+      signal?: string;
+      stdout?: string;
+      stderr?: string;
+    };
 
-  console.error("[OCR_FACTURE_FOURNISSEUR]", {
-    message: erreurExecution.message,
-    code: erreurExecution.code,
-    killed: erreurExecution.killed,
-    signal: erreurExecution.signal,
-    stderr: erreurExecution.stderr,
-    stdoutFin: erreurExecution.stdout?.slice(-2000),
-  });
+    console.error("[OCR_FACTURE_FOURNISSEUR]", {
+      message: erreurExecution.message,
+      code: erreurExecution.code,
+      killed: erreurExecution.killed,
+      signal: erreurExecution.signal,
+      stderr: erreurExecution.stderr,
+      stdoutFin: erreurExecution.stdout?.slice(-2000),
+    });
 
-  const delaiDepasse =
-    erreurExecution.killed === true ||
-    erreurExecution.signal === "SIGTERM" ||
-    erreurExecution.code === "ETIMEDOUT";
+    const delaiDepasse =
+      erreurExecution.killed === true ||
+      erreurExecution.signal === "SIGTERM" ||
+      erreurExecution.code === "ETIMEDOUT";
 
-  return NextResponse.json(
-    {
-      error: delaiDepasse
-        ? "Le traitement OCR a dépassé le délai autorisé. Le document contient peut-être plusieurs pages."
-        : "Erreur serveur lors de l'OCR.",
+    return NextResponse.json(
+      {
+        error: delaiDepasse
+          ? "Le traitement OCR a dépassé le délai autorisé. Le document contient peut-être plusieurs pages."
+          : "Erreur serveur lors de l'OCR.",
 
-      /*
-       * Utile pendant le développement local.
-       * Ne pas afficher de chemins système en production.
-       */
-      detail:
-        process.env.NODE_ENV === "development"
-          ? erreurExecution.stderr ||
-            erreurExecution.message ||
-            "Erreur OCR inconnue"
-          : undefined,
-    },
-    { status: 500 },
-  );
-}
+        /*
+         * Utile pendant le développement local.
+         * Ne pas afficher de chemins système en production.
+         */
+        detail:
+          process.env.NODE_ENV === "development"
+            ? erreurExecution.stderr ||
+              erreurExecution.message ||
+              "Erreur OCR inconnue"
+            : undefined,
+      },
+      { status: 500 },
+    );
+  }
 }

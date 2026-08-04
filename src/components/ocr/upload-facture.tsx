@@ -43,7 +43,8 @@ type ExtractionFacture = {
 type DoublonFacture = {
   documentId: number;
   numeroFacture: string;
-  dateIntegration: string;
+  dateTraitement: string;
+  avaitIntegreStock: boolean;
 };
 
 type UploadEtat =
@@ -1000,13 +1001,13 @@ export default function UploadFacture({ fournisseurs }: Props) {
             {etat.doublonFacture && (
               <div className="rounded-lg border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
                 <h3 className="font-semibold">
-                  Facture potentiellement déjà intégrée
+                  Document potentiellement déjà intégré
                 </h3>
 
                 <p className="mt-2">
-                  Une facture du même fournisseur portant le numéro{" "}
+                  Un document du même fournisseur portant le numéro{" "}
                   <strong>{etat.doublonFacture.numeroFacture}</strong> a déjà
-                  été intégrée au stock.
+                  été validé.
                 </p>
 
                 <p className="mt-1">
@@ -1014,15 +1015,16 @@ export default function UploadFacture({ fournisseurs }: Props) {
                 </p>
 
                 <p className="mt-1">
-                  Date d’intégration :{" "}
-                  {new Date(etat.doublonFacture.dateIntegration).toLocaleString(
+                  Date du traitement précédent :{" "}
+                  {new Date(etat.doublonFacture.dateTraitement).toLocaleString(
                     "fr-FR",
                   )}
                 </p>
 
                 <p className="mt-3 font-medium">
-                  Une nouvelle validation ajoutera une seconde fois les
-                  quantités au stock.
+                  {etat.doublonFacture.avaitIntegreStock
+                    ? "Une nouvelle validation peut ajouter une seconde fois les quantités au stock et dupliquer les données comptables."
+                    : "Une nouvelle validation créera une seconde écriture comptable et comptabilisera à nouveau la TVA."}
                 </p>
 
                 <div className="mt-4 rounded-md border border-orange-200 bg-white p-3">
@@ -1039,8 +1041,8 @@ export default function UploadFacture({ fournisseurs }: Props) {
                     />
 
                     <span>
-                      Autoriser exceptionnellement cette réintégration pendant
-                      les tests
+                      Autoriser exceptionnellement cette nouvelle validation
+                      pendant les tests
                     </span>
                   </label>
                 </div>
@@ -1405,7 +1407,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
             className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {etat.doublonFacture
-              ? "Intégrer à nouveau malgré l’avertissement"
+              ? "Valider à nouveau malgré l’avertissement"
               : "Valider les lignes"}
           </button>
         )}
