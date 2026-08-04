@@ -193,6 +193,9 @@ export async function POST(
 
     const autoriserReintegration = body?.autoriserReintegration === true;
 
+    const autoriserValidationSansRapprochement =
+      body?.autoriserValidationSansRapprochement === true;
+
     const lignes = Array.isArray(body?.lignes)
       ? (body.lignes as LignePayload[])
       : [];
@@ -278,12 +281,19 @@ export async function POST(
     }
 
     /*
-     * Toutes les lignes doivent être rapprochées avant
+     * Toutes les lignes doivent normalement être rapprochées avant
      * l'intégration au stock.
+     *
+     * Le forçage permet de conserver les lignes non rapprochées,
+     * mais elles ne doivent produire aucun mouvement de stock.
      */
     const lignesSansProduit = lignesValides.filter((ligne) => !ligne.produitId);
 
-    if (traitement.rapprochementObligatoire && lignesSansProduit.length > 0) {
+    if (
+      traitement.rapprochementObligatoire &&
+      lignesSansProduit.length > 0 &&
+      !autoriserValidationSansRapprochement
+    ) {
       return NextResponse.json(
         {
           error:
@@ -298,6 +308,13 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    const lignesAvecProduit = lignesValides.filter(
+      (ligne): ligne is typeof ligne & { produitId: number } =>
+        typeof ligne.produitId === "number" &&
+        Number.isInteger(ligne.produitId) &&
+        ligne.produitId > 0,
+    );
 
     /*
      * Une entrée de stock doit obligatoirement avoir une
@@ -625,7 +642,7 @@ export async function POST(
        */
       const prixProduitsDejaMisAJour = new Set<number>();
 
-      for (const ligne of lignesValides) {
+      for (const ligne of lignesAvecProduit) {
         const produitId = ligne.produitId as number;
         const quantite = new Prisma.Decimal(ligne.quantite);
 
@@ -760,6 +777,28 @@ export async function POST(
       }
 
       /*
+       * Lorsque la validation sans rapprochement a été forcée,
+       * les lignes concernées sont conservées à titre documentaire,
+       * sans mouvement ni modification du stock.
+       */
+      for (const ligne of lignesSansProduit) {
+        await tx.ligneImportee.create({
+          data: {
+            documentImporteId: documentId,
+            referenceDetectee: ligne.referenceDetectee,
+            designation: ligne.designation,
+            quantite: new Prisma.Decimal(ligne.quantite),
+            prixUnitaire: new Prisma.Decimal(ligne.prixUnitaire),
+            tauxTva: new Prisma.Decimal(ligne.tauxTva),
+            montantTva: new Prisma.Decimal(ligne.montantTva),
+            montantTotal: new Prisma.Decimal(ligne.montantTotal),
+            produitId: null,
+            statut: "validee_sans_stock",
+          },
+        });
+      }
+
+      /*
        * Le document est désormais définitivement intégré.
        */
       await tx.documentImporte.update({
@@ -774,11 +813,12 @@ export async function POST(
       return {
         integrationStockId: integration.id,
         lignesEnregistrees: lignesValides.length,
+        lignesIntegreesStock: lignesAvecProduit.length,
+        lignesSansRapprochement: lignesSansProduit.length,
         mouvementsCrees,
         associationsMemorisees,
         quantiteTotaleIntegree: quantiteTotaleIntegree.toString(),
         integreStock: true,
-        comptabiliseTva: traitementTransaction.comptabiliseTva,
       };
     });
 

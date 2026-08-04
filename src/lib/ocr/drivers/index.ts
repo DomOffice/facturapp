@@ -1,10 +1,12 @@
 import type { ProfilOcrFournisseur } from "../types";
 import { casinfoDriver } from "./casinfo";
+import { mztechDriver } from "./mztech";
 import { mechouarDriver, mechouarFactureDriver } from "./mechouar";
 import { genericDriver, genericLargeDriver } from "./generic";
 
 export const driversOcr: ProfilOcrFournisseur[] = [
   casinfoDriver,
+  mztechDriver,
   mechouarDriver,
   mechouarFactureDriver,
   genericDriver,

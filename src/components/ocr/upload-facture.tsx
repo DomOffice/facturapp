@@ -362,6 +362,11 @@ export default function UploadFacture({ fournisseurs }: Props) {
 
   const [autoriserReintegration, setAutoriserReintegration] = useState(false);
 
+  const [
+    autoriserValidationSansRapprochement,
+    setAutoriserValidationSansRapprochement,
+  ] = useState(false);
+
   const validerFichier = (fichier: File): string | null => {
     if (!FORMATS_ACCEPTES.includes(fichier.type)) {
       return "Format non autorisé.\nFormats acceptés : PDF, JPEG, PNG.";
@@ -385,6 +390,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
     setFichierSelectionne(fichier);
     setLignesEditables([]);
     setAutoriserReintegration(false);
+    setAutoriserValidationSansRapprochement(false);
     setEtat({ type: "idle" });
   }, []);
 
@@ -764,6 +770,7 @@ export default function UploadFacture({ fournisseurs }: Props) {
           body: JSON.stringify({
             lignes: lignesEditables,
             autoriserReintegration,
+            autoriserValidationSansRapprochement,
           }),
         },
       );
@@ -820,9 +827,21 @@ export default function UploadFacture({ fournisseurs }: Props) {
     setFichierSelectionne(null);
     setLignesEditables([]);
     setAutoriserReintegration(false);
+    setAutoriserValidationSansRapprochement(false);
     setEtat({ type: "idle" });
     if (inputRef.current) inputRef.current.value = "";
   };
+
+  const lignesSansRapprochement = lignesEditables.filter((ligne) => {
+    const produitId = Number(ligne.produitId);
+
+    return !Number.isInteger(produitId) || produitId <= 0;
+  });
+
+  const rapprochementManquant =
+    etat.type === "succes" &&
+    etat.extraction?.rapprochementObligatoire === true &&
+    lignesSansRapprochement.length > 0;
 
   const ligneCreationProduit =
     indexLigneCreationProduit !== null
@@ -1367,6 +1386,40 @@ export default function UploadFacture({ fournisseurs }: Props) {
         }
       />
 
+      {rapprochementManquant && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <h3 className="font-semibold">Produits non rapprochés</h3>
+
+          <p className="mt-2">
+            {lignesSansRapprochement.length} ligne(s) ne sont pas encore
+            associée(s) à un produit.
+          </p>
+
+          <p className="mt-1">
+            Veuillez rapprocher les lignes avec des produits existants ou créer
+            les nouveaux produits avant de valider.
+          </p>
+
+          <div className="mt-4 rounded-md border border-amber-200 bg-white p-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={autoriserValidationSansRapprochement}
+                onChange={(event) =>
+                  setAutoriserValidationSansRapprochement(event.target.checked)
+                }
+                className="mt-1"
+              />
+
+              <span>
+                Autoriser exceptionnellement la validation sans intégrer les
+                lignes non rapprochées au stock
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end gap-3">
         <button
           type="button"
@@ -1403,12 +1456,17 @@ export default function UploadFacture({ fournisseurs }: Props) {
           <button
             type="button"
             onClick={validerLignes}
-            disabled={Boolean(etat.doublonFacture) && !autoriserReintegration}
+            disabled={
+              (Boolean(etat.doublonFacture) && !autoriserReintegration) ||
+              (rapprochementManquant && !autoriserValidationSansRapprochement)
+            }
             className="px-5 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {etat.doublonFacture
-              ? "Valider à nouveau malgré l’avertissement"
-              : "Valider les lignes"}
+            {rapprochementManquant && autoriserValidationSansRapprochement
+              ? "Valider uniquement les lignes rapprochées"
+              : etat.doublonFacture
+                ? "Valider à nouveau malgré l’avertissement"
+                : "Valider les lignes"}
           </button>
         )}
       </div>
