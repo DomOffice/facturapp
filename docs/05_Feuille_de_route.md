@@ -1,247 +1,57 @@
 # 05 — Feuille de route FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-## 1. Vision
+## Phase actuelle — Stabilisation + extension fournisseurs
 
-FacturApp doit devenir progressivement l'application principale de gestion commerciale, en remplacement ou complément de l'application VB6 existante.
+### P0 — Exploitation serveur
 
-Le développement doit rester incrémental : chaque étape doit être testée, documentée et validée avant la suivante.
+- [ ] Valider la tâche Windows `DomOffice API (PM2)`.
+- [ ] Tester `pm2 kill` puis déclenchement manuel de la tâche.
+- [ ] Tester un vrai redémarrage Windows.
+- [ ] Corriger / recréer la tâche si son ancien répertoire de travail pose problème.
+- [ ] Versionner `ecosystem.config.cjs` après nettoyage.
+- [ ] Documenter une procédure de déploiement unique.
 
-## 2. État actuel
+### P1 — Nouveaux fournisseurs
 
-### Réalisé
+- [ ] Ajouter les prochains drivers sur le modèle CasInfo / MZ Tech.
+- [ ] Tester pour chaque driver : totaux, lignes, TVA, stock, doublons.
+- [ ] Conserver un jeu de documents de référence.
 
-- Architecture Next.js / TypeScript / Prisma.
-- PostgreSQL local FacturApp.
-- Synchronisation VB6 → PostgreSQL disponible.
-- Module factures fournisseurs accessible.
-- Upload PDF/image validé.
-- Stockage hors projet validé.
-- Table `documents_importes` créée.
-- OCR PaddleOCR local validé.
-- OCR lancé depuis interface web.
-- Texte OCR stocké en base.
-- Documentation technique structurée dans `docs/`.
+### P1 — Validation partielle
 
-## 3. Roadmap module factures fournisseurs
+- [ ] Introduire un statut explicite « en attente de rapprochement ».
+- [ ] Permettre la reprise ultérieure des lignes non rapprochées.
+- [ ] Intégrer plus tard ces lignes au stock.
+- [ ] Ventiler correctement la TVA en cas de validation partielle.
 
-### Phase 1 — Upload documentaire
+### P2 — Qualité / non-régression
 
-Statut : terminé.
+- [ ] Tests automatisés règles TVA / stock par profil.
+- [ ] Tests doublons.
+- [ ] Tests de migration VB6.
+- [ ] Tests sur `/tva`.
 
-- Sélection fournisseur.
-- Upload PDF / image.
-- Stockage dans `UPLOAD_DIR`.
-- Création `DocumentImporte`.
+### P2 — Dépendances
 
-### Phase 2 — OCR
+- [ ] Planifier la mise à niveau Next.js.
+- [ ] Traiter les vulnérabilités npm sans `--force` aveugle.
 
-Statut : terminé.
+### P3 — OCR avancé
 
-- Service Python local.
-- PaddleOCR.
-- Route API OCR.
-- Lancement depuis l'interface.
-- Stockage du texte OCR.
+- [ ] File de traitement.
+- [ ] Provider cloud optionnel.
+- [ ] Journalisation détaillée des durées OCR.
+- [ ] Recherche documentaire.
 
-### Phase 3 — Extraction intelligente
+## Critère de passage en production réelle
 
-Statut : en cours avancé.
+Avant que FacturApp remplace définitivement VB6 :
 
-Réalisé :
-- extraction des champs principaux ;
-- extraction des lignes articles depuis les coordonnées PaddleOCR ;
-- confiance par ligne ;
-- affichage éditable des lignes dans l'interface.
-
-Reste à faire :
-- ArticleBuilder pour gérer les désignations sur une ou plusieurs lignes ;
-- détection automatique des colonnes à partir des en-têtes ;
-- drivers fournisseurs légers ;
-- sauvegarde des corrections utilisateur ;
-- rapprochement avec les articles existants.
-### Phase 4 — Validation utilisateur
-
-Statut : démarrée.
-
-Un premier tableau éditable existe côté interface.  
-Il reste à persister les corrections, gérer les validations et préparer la création réelle de la facture fournisseur.
-
-### Phase 5 — Création facture fournisseur
-
-Statut : à faire.
-
-Créer la facture fournisseur finale après validation.
-
-### Phase 6 — Archivage et consultation
-
-Statut : à faire.
-
-Permettre de rechercher et consulter les documents importés.
-
-## 4. Roadmap technique
-
-### Court terme
-
-- Ajouter extraction structurée par règles.
-- Créer une page validation OCR.
-- Centraliser les statuts documents.
-- Mettre à jour les documents de référence.
-
-### Moyen terme
-
-- Ajouter checksum anti-doublon.
-- Ajouter une file d'attente OCR.
-- Ajouter logs d'exécution OCR.
-- Ajouter prévisualisation PDF.
-
-### Long terme
-
-- Ajouter provider OCR cloud optionnel.
-- Ajouter IA d'interprétation documentaire.
-- Généraliser le moteur documentaire à d'autres pièces : BL, BC, devis, justificatifs.
-- Préparer migration progressive hors VB6.
-
-## 5. Jalons proposés
-
-| Jalons | Statut |
-|---|---|
-| Import PDF/image | Terminé |
-| OCR local PaddleOCR | Terminé |
-| Extraction champs facture | Terminé |
-| Validation utilisateur | À faire |
-| Création facture fournisseur | À faire |
-| Détection doublons | À faire |
-| File OCR | À faire |
-| OCR cloud hybride | Optionnel futur |
-| Extraction lignes articles OCR | En cours avancé |
-| ArticleBuilder OCR | À faire |
-| Drivers fournisseurs OCR | En cours |
-
-## MAJ du 11/07/2026
-Sprint 3 — Extraction intelligente
-Statut : terminé
-
-Réalisé :
-
-extraction des champs ;
-lignes depuis coordonnées OCR ;
-ArticleBuilder ;
-articles sur 1, 2, 3 ou N groupes OCR ;
-confiance par ligne ;
-drivers légers ;
-fallbacks ;
-diagnostic OCR ;
-fallback BL séquentiel ;
-prise en charge des lignes sans TVA.
-Sprint 4.1 — Validation
-Statut : terminé
-
-Réalisé :
-
-correction utilisateur ;
-endpoint de validation ;
-enregistrement dans lignes_importees ;
-statut lignes_validees ;
-association produit facultative.
-Sprint 4.2.1 — Recherche manuelle
-Statut : terminé
-Sprint 4.2.2 — Recherche automatique initiale
-Statut : V1 terminée, précision à améliorer
-Sprint 4.2.3 — Mémorisation
-Statut : prochaine étape
-
-Contenu :
-
-table d’associations ;
-sauvegarde lors de la validation ;
-priorité aux associations connues ;
-correction possible d’une association existante.
-Sprint 4.2.4 — Création d’un article
-Statut : à faire après 4.2.3
-Sprint 4.3 — Création facture fournisseur
-Statut : à faire
-Sprint 4.4 — Impact stock
-Statut : à faire séparément
-
-## MAJ du 24/07/2026
-## Phase actuelle — Stabilisation OCR
-
-1. Nettoyage limité du moteur OCR.
-2. Centralisation des motifs par défaut.
-3. Découpage léger de la fonction principale.
-4. Vérification TypeScript et tests CasInfo/Mechouar.
-
-## Phase suivante — Catalogue produits
-
-1. Audit du modèle Produit et des lignes fournisseurs.
-2. Recherche de candidats.
-3. Score de rapprochement.
-4. Validation manuelle des propositions.
-5. Création d’un produit depuis une ligne OCR.
-
-## Phase suivante — Apprentissage
-
-1. Persistance des correspondances fournisseur/produit.
-2. Réutilisation automatique.
-3. Gestion des corrections.
-4. Mesure du niveau de confiance.
-
-## Phase suivante — Nouveaux drivers
-
-1. Saham.
-2. Disway.
-3. HP.
-4. Dell.
-5. Autres fournisseurs selon les documents disponibles.
-
-## Phase suivante — Stock
-
-1. Audit du module stock existant.
-2. Définition de l’événement déclencheur.
-3. Création transactionnelle des mouvements.
-4. Protection contre les doublons.
-5. Tests de validation, annulation et revalidation.
-
-## MAJ du 26/07/2026
-### Phase 3 — Extraction intelligente
-
-Statut : fonctionnelle, à consolider.
-
-Réalisé :
-
-- extraction d’entête et de totaux ;
-- extraction des lignes ;
-- stratégies par coordonnées et fallback séquentiel ;
-- drivers fournisseurs ;
-- édition des lignes ;
-- rapprochement produit ;
-- mémorisation des associations ;
-- gestion des écarts de prix ;
-- règle TVA des produits existants.
-### Phase 4 — Validation et stock
-
-Statut : implémentée, tests de non-régression à compléter.
-
-Réalisé :
-
-- validation atomique ;
-- lignes importées ;
-- intégration de stock ;
-- mouvements de stock ;
-- idempotence par document ;
-- mise à jour contrôlée des prix d’achat.
-### Phase 5 — Stabilisation générale
-
-Statut : prochaine étape.
-
-Objectifs :
-
-- recenser les bugs de tous les modules ;
-- les classer par criticité ;
-- corriger par petits patches ;
-- ajouter un test de non-régression à chaque correction ;
-- vérifier `npx tsc --noEmit` après chaque patch ;
-- tester également factures, devis, avoirs, paiements, produits,
-  fournisseurs, charges, authentification et navigation.
+- migrations PostgreSQL versionnées ;
+- sauvegardes automatisées ;
+- restauration testée ;
+- déploiement reproductible ;
+- redémarrage automatique validé ;
+- tests de non-régression sur les fonctions financières et stock.

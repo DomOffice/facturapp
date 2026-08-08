@@ -1,265 +1,60 @@
 # 04 — Bugs connus FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-## 1. Bugs corrigés
+## 1. Limites connues actives
 
-### Mauvais lien Nouvelle facture fournisseur
+### TVA lors d’une validation partielle forcée
 
-Symptôme : clic sur `Nouvelle facture` depuis `factures-fournisseurs` menait à une page 404.
+Lorsque certaines lignes ne sont pas rapprochées mais que l’utilisateur force la validation, seules les lignes rapprochées alimentent le stock. En revanche, la TVA globale de la facture reste comptabilisée en totalité.
 
-Cause : lien vers `/charges/nouveau` au lieu de `/factures-fournisseurs/nouveau`.
+Statut : accepté temporairement.
 
-Statut : corrigé.
+### Facture Mechouar multipage
 
-### Redirections incorrectes
+Les totaux HT / TVA / TTC peuvent être correctement reconnus alors que le détail des lignes retombe sur `fallback_generique`.
 
-Symptôme : redirections vers `/login` ou `/dashboard` alors que l'application utilise `/connexion` et `/`.
+Statut : acceptable actuellement, car les factures Mechouar servent à la comptabilité et les BL servent au stock / prix.
 
-Statut : corrigé ou à surveiller dans les nouveaux modules.
+### Dépendances npm anciennes
 
-### Test OCR via curl redirigé vers `/connexion`
+`npm ci` signale plusieurs vulnérabilités et Next.js 14.2.5 n’est plus à jour.
 
-Symptôme : appel direct `curl.exe -X POST` retourne `/connexion`.
+Statut : ne pas corriger avec `npm audit fix --force` sans campagne de test dédiée.
 
-Cause : curl ne transmet pas la session navigateur. La route API est protégée par authentification.
+### Redémarrage automatique Windows
 
-Statut : comportement normal.
+`pm2 startup` retourne `Init system not found` sous Windows.
 
-### PaddleOCR `cls=True`
+Le mécanisme retenu est une tâche planifiée Windows :
 
-Symptôme : erreur `unexpected keyword argument 'cls'`.
+```text
+DomOffice API (PM2)
+→ cmd.exe /c "pm2 resurrect"
+```
 
-Cause : changement d'API dans les versions récentes de PaddleOCR.
+La tâche possède encore un ancien `WorkingDirectory` (`C:\domoffice-api`). La modification PowerShell a échoué car Windows demande les informations d’identification enregistrées pour la tâche.
 
-Correction : utiliser `ocr.predict(...)` et `use_textline_orientation`.
+Statut : à valider / corriger proprement avant de considérer l’auto-start comme garanti.
 
-Statut : corrigé.
+## 2. Bugs corrigés récemment
 
-### Erreur PaddlePaddle oneDNN / PIR
+- TVA CasInfo absente du tableau fournisseurs après premier affichage ;
+- TVA facture Mechouar non détectée ;
+- incohérences TVA dashboard / page TVA ;
+- filtres date TVA fournisseurs ;
+- réinitialisation client / fournisseur sur `/tva` ;
+- doublons facture Mechouar ;
+- validation de lignes non rapprochées ;
+- absence des tables OCR/stock en production après déploiement ;
+- multiples daemons PM2 concurrents ;
+- lancement Next.js en mode développement via PM2 ;
+- démarrage `next start` sans build `.next`.
 
-Symptôme : `ConvertPirAttribute2RuntimeAttribute not support`.
+## 3. Points à surveiller
 
-Cause : incompatibilité rencontrée avec une version récente de PaddlePaddle en inférence CPU Windows.
-
-Correction : utiliser `paddlepaddle==3.2.2`.
-
-Statut : corrigé.
-
-### Environnement virtuel Python cassé après renommage
-
-Symptôme : `Fatal error in launcher` après renommage `ocr-service` → `ocr`.
-
-Cause : le `.venv` conserve l'ancien chemin interne.
-
-Correction : supprimer et recréer `.venv` dans `ocr/`.
-
-Statut : corrigé.
-
-## 2. Points à surveiller
-
-### Timeout OCR
-
-Les gros documents peuvent dépasser le délai de traitement HTTP.
-
-Recommandation : file d'attente OCR si le volume augmente.
-
-### Doublons documentaires
-
-Actuellement, le même PDF peut être importé plusieurs fois.
-
-Recommandation : ajouter un checksum.
-
-### Sécurité fichier
-
-Le contrôle MIME ne suffit pas toujours.
-
-Recommandation : validation plus stricte du contenu fichier.
-
-### Chemins Windows
-
-Les chemins absolus doivent rester dans `.env`, jamais en dur dans le code.
-
-### Synchronisation
-
-La synchronisation MariaDB → PostgreSQL ne doit pas supprimer ni écraser les tables propres à FacturApp, notamment `documents_importes`.
-
-## 3. Bugs ouverts
-
-Aucun bug bloquant connu à ce stade pour :
-
-- upload document ;
-- stockage fichier ;
-- OCR local ;
-- affichage OCR ;
-- mise à jour `ocr_termine`.
-
-### Extraction ligne article CASINFO décalée
-
-Symptôme :
-Les lignes articles étaient mal détectées : la deuxième ligne de désignation était interprétée comme référence, ce qui inversait quantité et prix.
-
-Cause :
-Les factures CASINFO affichent une ligne article sur deux lignes OCR.
-
-Correction :
-Extraction basée sur les coordonnées PaddleOCR et regroupement logique des lignes article.
-
-Statut :
-Corrigé pour CASINFO, à généraliser via profils fournisseurs.
-
-### Variantes de lignes articles CASINFO
-
-Symptôme :
-Certaines factures CASINFO ont une ligne article sur une seule ligne OCR, d’autres sur plusieurs lignes.
-
-Cause :
-La structure OCR varie selon le scan ou le modèle de facture.
-
-Correction en cours :
-Remplacer la logique `ligneArticleSurDeuxLignes` par un ArticleBuilder générique qui accumule les lignes jusqu’à obtenir un article complet.
-
-Statut :
-En cours — Sprint 3.4.
-
-## Qualité des scans OCR
-
-Pour Sprint 3, l’extraction des lignes articles est validée uniquement sur des documents correctement scannés :
-- page droite ;
-- texte lisible ;
-- tableau non incliné ;
-- résolution suffisante ;
-- facture complète.
-
-Les documents inclinés ou de mauvaise qualité peuvent échouer à l’extraction des lignes.  
-La correction automatique d’inclinaison ou le redressement d’image n’est pas prioritaire à ce stade.
-
-## MAJ du 11/07/2026
-### Bugs corrigés
-# 1- Association identique affectée à plusieurs lignes
-- Symptôme :
-CANPG445 et CANCL446
-→ même produitId
-- Cause :
-conservation d’un ancien produitId lors d’une nouvelle recherche.
-- Correction :
-remise à null du produit sélectionné lors du changement de recherche.
-
-# 2- Option « À rapprocher » absente
-- Cause :
-le <select> n’était affiché que si une proposition existait.
-- Correction :
-affichage permanent du sélecteur et de l’option À rapprocher.
-
-# 3- Filtre fournisseur trop restrictif
-- Cause :
-la recherche imposait le même fournisseurId.
-- Correction :
-le fournisseur devient un bonus de score et non une condition d’exclusion.
-
-# 4- Fallback BL jamais appelé
-- Cause :
-extraireLignesBlDepuisTexte() existait mais n’était pas appelée.
-- Correction :
-ajout après l’échec du fallback texte historique.
-
-### Points à surveiller
-faux positifs dans le rapprochement lexical ;
-codes-barres fournisseurs absents de la fiche produit ;
-différences lexicales : agrafe / agrafeuse, CL446 / CL 446 ;
-multiplication des requêtes lors de la frappe ;
-risque de doublons lors de la future création de produits.
-
-## MAJ du 24/07/2026
-## Lignes fournisseurs non rapprochées
-
-### Symptôme
-
-La validation affiche :
-
-> X ligne(s) ne sont pas rapprochée(s). Associez chaque ligne à un
-> produit existant ou créez un nouveau produit avant la validation.
-
-### État
-
-Le contrôle est volontaire et protège la cohérence métier.
-
-### Limite actuelle
-
-Le rapprochement est manuel. Le système ne propose pas encore
-automatiquement les produits les plus probables.
-
-### Correction prévue
-
-Mettre en place :
-
-- une recherche par référence fournisseur ;
-- une comparaison de désignation ;
-- un score de similarité ;
-- un historique des correspondances validées.
-
-## MAJ du 26/07/2026
-Bugs ou risques à ajouter
-### Prisma Migrate non initialisé
-
-Symptôme :
-`npx prisma migrate status` affiche :
-`No migration found in prisma/migrations`.
-
-Cause :
-le projet ne possède pas encore d’historique Prisma Migrate.
-
-Impact :
-impossibilité d’utiliser normalement le cycle `migrate dev` sans préparer
-un baseline.
-
-Statut :
-à traiter après stabilisation immédiate des bugs applicatifs.
-Ne pas utiliser `prisma migrate reset`.
-### Réécriture de `schema.prisma` par `prisma db pull`
-
-Symptôme :
-`prisma db pull` réorganise et réécrit le schéma Prisma.
-
-Risque :
-perte de commentaires ou de précisions Prisma telles que certaines options
-de relations, annotations de types natifs ou choix de modélisation.
-
-Contournement :
-sauvegarder le schéma avant introspection, comparer les fichiers et ne jamais
-remplacer automatiquement le schéma de référence.
-
-Statut :
-correctif à intégrer dans `facturapp-db-tools`.
-### Verrouillage du moteur Prisma sous Windows
-
-Symptôme :
-erreur `EPERM` sur `query_engine-windows.dll.node` pendant
-`prisma generate`.
-
-Cause probable :
-un processus Node.js conserve le moteur Prisma ouvert.
-
-Contournement :
-arrêter le serveur de développement, terminer les processus Node.js,
-puis régénérer Prisma.
-
-Statut :
-à surveiller.
-
-
-## Format des nouveaux bugs
-
-Chaque bug doit contenir :
-
-- identifiant ;
-- module ;
-- priorité ;
-- symptôme ;
-- procédure de reproduction ;
-- résultat attendu ;
-- résultat obtenu ;
-- cause, si connue ;
-- correction ;
-- test de non-régression ;
-- statut.
+- gros PDF OCR et temps de traitement ;
+- sécurité réelle du contenu des fichiers importés ;
+- dérive entre `schema.prisma` et la base PostgreSQL ;
+- anciennes valeurs d’environnement ou anciens chemins Windows après déplacement du projet ;
+- `tsconfig.tsbuildinfo` actuellement versionné alors qu’il s’agit d’un cache généré.

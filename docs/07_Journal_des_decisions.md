@@ -1,421 +1,89 @@
 # 07 — Journal des décisions FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-Ce document trace les décisions d'architecture importantes du projet FacturApp.
+## 2026-06 / 2026-07 — Principes OCR conservés
 
-## 2026-06-28 — MariaDB reste la base de vérité
+- PaddleOCR local comme moteur actuel.
+- Architecture compatible avec un provider cloud futur.
+- ArticleBuilder générique.
+- Drivers fournisseurs simples.
+- Fallbacks conservés.
+- Validation humaine avant création métier.
+- Aucune création automatique de produit.
+- La TVA OCR ne remplace pas automatiquement la TVA d’un produit existant.
 
-### Décision
+## 2026-07 — Validation et stock atomiques
 
-MariaDB reste la base opérationnelle principale tant que l'application VB6 tourne à 100 %.
+La persistance des lignes, les associations, la mise à jour du stock et les mouvements sont regroupés dans une transaction Prisma.
 
-### Motif
+Objectif : tout réussir ou ne rien conserver.
 
-L'application VB6 est actuellement stable et utilisée en production. FacturApp TS est encore en développement.
+## 2026-08 — Règles TVA / stock par type de document
 
-### Conséquence
+### Facture Mechouar
 
-La synchronisation se fait dans le sens :
+- TVA : oui ;
+- stock : non ;
+- rapprochement facultatif ;
+- statut final : `valide`.
 
-```text
-VB6 / MariaDB → FacturApp / PostgreSQL
-```
+### BL Mechouar
 
-## 2026-06-28 — PostgreSQL est la base FacturApp TS
+- TVA : non ;
+- stock : oui ;
+- rapprochement normalement obligatoire ;
+- statut final : `stock_integre`.
 
-### Décision
+### CasInfo / MZ Tech / autres factures fournisseurs
 
-FacturApp utilise PostgreSQL comme base applicative.
+- TVA : oui ;
+- stock : oui ;
+- rapprochement normalement obligatoire ;
+- statut final : `stock_integre`.
 
-### Motif
+## 2026-08 — Forçage de validation partielle
 
-Cela permet de développer les nouveaux modules web sans modifier directement la base MariaDB de production.
+Décision : autoriser exceptionnellement la validation malgré des lignes non rapprochées.
 
-### Conséquence
+Conséquence : seules les lignes rapprochées alimentent le stock. Les autres restent conservées sans mouvement stock.
 
-Certaines tables peuvent exister uniquement dans PostgreSQL, par exemple `documents_importes`.
+Dette acceptée : la TVA globale reste actuellement comptabilisée en totalité.
 
-## 2026-06-28 — `documents_importes` est propre à FacturApp TS
+## 2026-08 — Doublons documentaires
 
-### Décision
+La détection ne dépend plus seulement de `IntegrationStock`.
 
-La table `documents_importes` n'est pas développée côté VB6.
+Un document déjà `valide` ou `stock_integre` portant le même numéro normalisé chez le même fournisseur est considéré comme doublon potentiel.
 
-### Motif
+Le forçage reste disponible pendant les tests.
 
-Elle sert au module web d'import PDF/OCR et n'est pas nécessaire à l'application historique.
+## 2026-08 — Factures Mechouar
 
-### Conséquence
+Pour les factures Mechouar, HT / TVA / TTC sont prioritaires. Le détail des lignes n’est pas déterminant pour le stock, car celui-ci provient des BL.
 
-Elle doit être protégée des processus de synchronisation qui pourraient écraser PostgreSQL.
-
-## 2026-06-28 — Stockage documentaire hors projet
-
-### Décision
-
-Les PDF et images importés sont stockés hors du dossier Next.js.
-
-Chemin production Windows :
-
-```text
-C:/serveur/Factures_achats
-```
-
-### Motif
-
-Éviter de mélanger code applicatif et documents métier.
-
-### Conséquence
-
-Le projet peut être mis à jour ou redéployé sans toucher aux fichiers importés.
-
-## 2026-06-28 — Arborescence année/mois
-
-### Décision
-
-Les documents sont rangés par année et par mois.
+Si HT et TTC sont fiables mais la TVA globale est mal lue, le profil `mechouar_facture` peut recalculer :
 
 ```text
-UPLOAD_DIR/YYYY/MM/fichier.pdf
+TVA = TTC - HT
 ```
 
-### Motif
+## 2026-08 — Migration VB6
 
-Éviter un dossier unique contenant des milliers de fichiers.
+MariaDB reste la source de réimport historique.
 
-## 2026-06-28 — Nommage automatique des fichiers
+Le script de synchronisation ne doit pas remplir les tables propres à FacturApp.
 
-### Décision
+Les taux TVA historiques sont normalisés pour accepter `0.20` ou `20` comme représentation de 20 %.
 
-Le nom stocké suit une logique :
+## 2026-08 — Base PostgreSQL de test reconstructible
 
-```text
-date_numeroFacture_fournisseur_hash.pdf
-```
+Pendant la phase actuelle, les données PostgreSQL peuvent être supprimées si nécessaire, car elles peuvent être réimportées depuis VB6 et le seed recrée l’administrateur / paramètres.
 
-Lorsque le numéro n'est pas encore connu :
+Cette liberté ne s’appliquera plus lorsque FacturApp deviendra la base métier principale.
 
-```text
-date_sans-numero_fournisseur_hash.pdf
-```
+## 2026-08 — Exploitation Windows
 
-### Motif
+PM2 est utilisé sous Windows mais `pm2 startup` n’est pas disponible dans cet environnement.
 
-Le numéro réel peut n'être connu qu'après OCR.
-
-## 2026-06-28 — OCR hybride
-
-### Décision
-
-L'architecture OCR est hybride.
-
-Implémentation actuelle : PaddleOCR local.
-
-Évolution future possible : provider cloud.
-
-### Motif
-
-Conserver la confidentialité et limiter les coûts, tout en gardant la possibilité d'améliorer la qualité plus tard via une API spécialisée.
-
-## 2026-06-28 — OCR en Python séparé de Next.js
-
-### Décision
-
-Le moteur OCR est placé dans un dossier `ocr/` séparé.
-
-### Motif
-
-L'écosystème OCR est plus mature en Python qu'en Node.js.
-
-### Conséquence
-
-Next.js lance le script Python depuis une route API serveur.
-
-## 2026-06-28 — PaddlePaddle figé en 3.2.2
-
-### Décision
-
-Utiliser `paddlepaddle==3.2.2`.
-
-### Motif
-
-Une version plus récente a provoqué une erreur oneDNN/PIR sous Windows CPU.
-
-### Conséquence
-
-La version doit rester figée dans `ocr/requirements.txt`.
-
-## 2026-06-28 — Documentation intégrée au dépôt
-
-### Décision
-
-Les documents techniques sont placés dans `docs/`.
-
-### Motif
-
-Garder l'historique et le contexte technique avec le code source.
-
-### Conséquence
-
-Les fichiers `.md` doivent être mis à jour à chaque évolution significative.
-
-# 07 — Journal des décisions FacturApp
-
-Dernière mise à jour : 2026-06-29
-
-## 2026-06-29 — Sprint 3 OCR lignes articles
-
-Décision :
-Le module factures fournisseurs extrait désormais les lignes articles à partir des coordonnées PaddleOCR, et non uniquement depuis le texte OCR brut.
-
-Motif :
-Le texte brut ne conserve pas suffisamment la structure des tableaux. Les coordonnées X/Y permettent de reconstruire les colonnes : désignation, TVA, PU TTC, quantité et total TTC.
-
-Implémentation actuelle :
-- extraction des lignes dans `src/lib/ocr/extract-facture-fournisseur.ts` ;
-- stockage dans `donnees_extraites.extraction.lignes` ;
-- affichage dans `src/components/ocr/EditableInvoiceLines.tsx` ;
-- badge de confiance dans `src/components/ocr/ConfidenceBadge.tsx`.
-
-Limite connue :
-La logique actuelle fonctionne sur CASINFO et doit être généralisée avec des profils OCR fournisseurs.
-
-Décision suivante :
-Créer un système simple de profils fournisseurs :
-- profil générique par défaut ;
-- profil CASINFO ;
-- fallback si aucun profil spécifique n'existe.
-
-## 2026-06-29 — Sprint 3.4 ArticleBuilder OCR
-
-Décision :
-La logique `ligneArticleSurDeuxLignes` ne doit pas être conservée comme principe central.
-
-Motif :
-Une ligne article peut occuper une, deux ou plusieurs lignes OCR selon le fournisseur, le scan ou le modèle de facture.
-
-Nouvelle orientation :
-Créer une logique ArticleBuilder simple :
-- accumuler les lignes OCR ;
-- vérifier si l’article est complet ;
-- construire la ligne article lorsque TVA, PU, quantité et total sont identifiés.
-
-Principe d’architecture :
-- le moteur OCR ne connaît aucun fournisseur ;
-- les drivers fournisseurs restent déclaratifs ;
-- les fallbacks sont conservés ;
-- l’interface éditable existante n’est pas modifiée.
-
-## MAJ du 11/07/2026
-Décision — TVA facultative sur les lignes importées
-
-Motif :
-
-certains documents fournisseurs, notamment des BL, ne présentent pas la TVA par article.
-
-Conséquence :
-
-une ligne peut être complète avec désignation, quantité, prix et total ;
-l’absence de TVA génère une alerte, mais ne bloque plus l’extraction.
-Décision — Conservation des fallbacks
-
-Motif :
-
-les coordonnées OCR ne suffisent pas pour tous les formats ;
-le fallback séquentiel permet d’obtenir une V1 exploitable.
-
-Conséquence :
-
-profil
-→ fallback générique
-→ fallback texte
-→ fallback tableau séquentiel
-Décision — Validation avant création métier
-
-Motif :
-
-l’OCR ne doit jamais créer automatiquement une facture ou modifier le stock.
-
-Conséquence :
-
-les corrections sont d’abord enregistrées dans lignes_importees.
-Décision — Produit facultatif
-
-Motif :
-
-une ligne OCR doit pouvoir être validée même lorsqu’aucun produit n’est trouvé.
-
-Conséquence :
-
-produitId renseigné → associee
-produitId absent    → a_rapprocher
-Décision — Le fournisseur influence mais ne bloque pas la recherche
-
-Motif :
-
-un produit peut être acheté auprès de plusieurs fournisseurs ;
-les données synchronisées peuvent contenir un fournisseur principal différent.
-Décision — Présélection automatique prudente
-
-Motif :
-
-les correspondances lexicales peuvent confondre des produits proches.
-
-Conséquence :
-
-les résultats faibles restent des propositions ;
-la présélection exige un score élevé et une avance nette.
-Décision — Mémoriser les choix humains
-
-Motif :
-
-le choix validé par l’utilisateur est plus fiable qu’une nouvelle recherche approximative.
-
-Conséquence :
-
-Sprint 4.2.3 introduit une association stable entre fournisseur, référence détectée et produit.
-Décision — Création produit volontaire uniquement
-
-Motif :
-
-éviter les doublons provoqués par une mauvaise lecture OCR ou une désignation légèrement différente.
-
-Conséquence :
-
-aucun article ne sera créé automatiquement ;
-l’utilisateur disposera d’une action explicite « Créer un article »
-
-## MAJ du 24/07/2026
-## 2026-07-24 — Drivers OCR documentaires déclaratifs
-
-### Décision
-
-Les drivers OCR fournisseurs peuvent désormais déclarer :
-
-- les coordonnées des colonnes ;
-- les marqueurs du tableau ;
-- le type de document ;
-- les motifs du numéro et de la date ;
-- les motifs ICE et totaux ;
-- les champs obligatoires pour la validation.
-
-### Motif
-
-Les factures et bons de livraison ne présentent pas les mêmes champs
-et ne doivent pas être validés selon les mêmes règles.
-
-### Conséquence
-
-Le moteur générique ne contient plus de logique spécifique à Mechouar
-ou CasInfo pour ces éléments.
-
-## 2026-07-24 — Validation selon le type de document
-
-### Décision
-
-Les champs obligatoires sont configurables par driver.
-
-### Motif
-
-Un bon de livraison Mechouar peut présenter un net à payer sans afficher
-séparément le total HT, la TVA ou l’ICE.
-
-### Conséquence
-
-L’absence de ces champs ne produit plus d’alertes injustifiées et ne
-dégrade plus artificiellement la confiance OCR.
-
-## 2026-07-24 — Rapprochement obligatoire avant validation
-
-### Décision
-
-Une ligne fournisseur doit être associée à un produit existant ou à un
-nouveau produit avant la validation définitive.
-
-### Motif
-
-Éviter la création de lignes d’achat et de mouvements de stock sans
-référence au catalogue interne.
-
-### Suite prévue
-
-Automatiser les propositions de rapprochement et mémoriser les choix
-validés.
-
-## MAJ du 26/07/2026
-TVA des produits existants
-## 2026-07 — La TVA produit reste la référence
-
-### Décision
-
-Lorsqu’une ligne OCR est rapprochée avec un produit existant, le taux de TVA
-du produit enregistré en base est conservé.
-
-### Motif
-
-La TVA OCR peut être mal reconnue et ne doit pas écraser une donnée métier
-déjà validée.
-
-### Conséquence
-
-La TVA OCR reste une information documentaire mais n’est pas utilisée pour
-modifier automatiquement la TVA du produit existant.
-Confirmation des écarts de prix
-## 2026-07 — Les écarts de prix exigent une confirmation
-
-### Décision
-
-Un écart entre le prix OCR et le dernier prix d’achat enregistré est présenté
-à l’utilisateur avant validation.
-
-### Conséquence
-
-La mise à jour du prix n’est pas silencieuse et reste contrôlée.
-Transaction stock
-## 2026-07 — Validation OCR et stock atomiques
-
-### Décision
-
-La persistance des lignes, la mémorisation des associations, la mise à jour du
-stock et la création des mouvements sont exécutées dans une transaction Prisma.
-
-### Conséquence
-
-Soit toute l’intégration réussit, soit aucune modification n’est conservée.
-Restauration DEV
-## 2026-07 — Le schéma DEV est conservé pendant les restaurations
-
-### Décision
-
-Les restaurations de production vers DEV sont réalisées en `data-only`.
-Les tables DEV sont vidées puis les données sont restaurées sans remplacer le
-schéma PostgreSQL de DEV.
-
-### Motif
-
-DEV contient des tables OCR/stock qui ne sont pas encore présentes en production.
-
-### Conséquence
-
-`facturapp-db-tools` doit exclure les données de `_prisma_migrations`,
-désactiver temporairement les triggers pendant la restauration, recalculer les
-séquences et exécuter les vérifications.
-db pull
-## 2026-07 — `prisma db pull` n’est pas une étape de restauration
-
-### Décision
-
-Le processus de réinitialisation DEV ne lance pas automatiquement
-`prisma db pull`.
-
-### Motif
-
-L’introspection réécrit `schema.prisma` et peut perdre des informations
-déclaratives du schéma de référence.
-
-### Conséquence
-
-Toute introspection doit être volontaire, précédée d’une sauvegarde et suivie
-d’une comparaison.
-
+Le redémarrage automatique doit donc passer par le Planificateur de tâches Windows avec `pm2 resurrect` et un `pm2 save` à jour.

@@ -1,237 +1,63 @@
 # 01 — Audit technique FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-## 1. Synthèse
+## 1. État général
 
-FacturApp repose sur une architecture moderne Next.js / TypeScript / Prisma / PostgreSQL. Le projet est maintenant organisé autour d'un socle web en développement, connecté indirectement à l'écosystème VB6 via synchronisation MariaDB → PostgreSQL.
+FacturApp dispose désormais d’un socle fonctionnel cohérent couvrant la gestion commerciale, la TVA, les imports fournisseurs, l’OCR, le rapprochement produit et l’intégration du stock.
 
-Le module prioritaire actuellement validé est le chargement des factures fournisseurs avec stockage documentaire et OCR local PaddleOCR.
+Le principal risque n’est plus l’absence de fonctionnalités, mais la maîtrise de l’exploitation : cohérence schéma PostgreSQL / Prisma, déploiement Windows, maintien des règles métier par type de document et non-régression des drivers OCR.
 
-## 2. Architecture globale
+## 2. Points solides
 
-### Points positifs
+- Next.js / TypeScript / Prisma bien séparés du moteur OCR Python.
+- Drivers fournisseurs indépendants.
+- Fallbacks OCR conservés.
+- Validation humaine avant impact métier.
+- Contrôle serveur des règles TVA / stock.
+- Intégration stock transactionnelle.
+- Détection de doublons sur les documents fournisseurs.
+- Page `/tva` dédiée.
+- Synchronisation VB6 → PostgreSQL conservée comme canal historique.
+- Déploiement serveur reconstruit proprement depuis GitHub.
 
-- Séparation claire entre l'application historique VB6 et FacturApp TS.
-- PostgreSQL dédié à FacturApp.
-- Prisma utilisé comme couche d'accès aux données.
-- Dossier `docs/` désormais présent dans le dépôt.
-- Dossier `ocr/` séparé du code Next.js.
-- Stockage documentaire hors du projet.
+## 3. Points de vigilance
 
-### Points de vigilance
+### Prisma / PostgreSQL
 
-- La synchronisation MariaDB → PostgreSQL doit rester maîtrisée.
-- Les tables propres à FacturApp ne doivent pas être écrasées par la synchronisation.
-- Les traitements OCR peuvent être longs ; il faudra évoluer vers une file de traitement si le volume augmente.
+`prisma generate` ne met pas à jour PostgreSQL. Lors d’un déploiement comportant une évolution du schéma, vérifier explicitement la structure de la base avant redémarrage de l’application.
 
-## 3. Qualité du code
+### PM2 Windows
 
-### Points positifs
+`pm2 startup` ne fonctionne pas sous Windows dans cette installation (`Init system not found`). Le redémarrage automatique repose sur une tâche planifiée Windows exécutant `pm2 resurrect`.
 
-- Le module upload/OCR a été découpé en deux routes distinctes.
-- Le frontend déclenche l'OCR après upload sans tout mélanger dans une seule logique serveur.
-- Les chemins système passent par `.env`.
+Cette tâche doit être testée après arrêt complet de PM2 puis par un vrai redémarrage Windows.
 
-### À améliorer
+### Dépendances
 
-- Factoriser les contrôles de rôle `admin` / `saisie`.
-- Centraliser les constantes de statuts documentaires.
-- Créer un service applicatif pour les documents importés.
-- Éviter que les routes API deviennent trop volumineuses.
+Le build serveur signale des dépendances anciennes et des vulnérabilités npm, notamment Next.js 14.2.5. Ne pas lancer `npm audit fix --force` sur la branche stable. Prévoir une mise à niveau contrôlée et testée.
 
-## 4. Performances
+### OCR
 
-### État actuel
+Les factures Mechouar multipages peuvent encore retomber sur un fallback pour le détail des lignes. Ce comportement est accepté lorsque HT / TVA / TTC sont fiables, car le stock Mechouar provient des BL.
 
-- Upload validé avec limite de taille.
-- OCR PaddleOCR fonctionnel mais consommateur CPU.
-- PDF converti en image avant reconnaissance.
+## 4. Dette technique prioritaire
 
-### Risques futurs
+1. Validation complète du redémarrage automatique Windows.
+2. Mettre `ecosystem.config.cjs` sous contrôle Git après nettoyage du chemin serveur.
+3. Exclure `tsconfig.tsbuildinfo` du versionnement.
+4. Ajouter une vraie procédure de déploiement documentée.
+5. Mettre à niveau Next.js et les dépendances après campagne de non-régression.
+6. Ajouter des tests automatisés sur les règles TVA / stock / doublons.
+7. Revoir la TVA lors des validations partielles forcées.
 
-- Timeout HTTP sur gros PDF.
-- Blocage CPU si plusieurs OCR sont lancés en même temps.
-- Répétition inutile de l'OCR si le même document est traité plusieurs fois.
+## 5. Sécurité / exploitation
 
-### Recommandations
+- `.env` ne doit jamais être commité.
+- Les chemins de stockage et secrets restent dans l’environnement serveur.
+- Les documents fournisseurs ne doivent pas être placés dans `public/`.
+- Les commandes Prisma destructives ne doivent être utilisées que lorsque la base ciblée et la perte de données sont explicitement acceptées.
 
-- Ajouter un mécanisme de file d'attente.
-- Ajouter un checksum SHA-256 pour détecter les doublons.
-- Limiter le nombre de traitements OCR concurrents.
-- Journaliser les durées d'exécution OCR.
+## 6. Conclusion
 
-## 5. Sécurité
-
-### Points validés
-
-- Les routes upload et OCR nécessitent une session.
-- Les rôles autorisés sont limités à `admin` et `saisie`.
-- Les fichiers sont stockés hors du dossier public.
-- `.env` et `.venv` sont ignorés par Git.
-
-### À renforcer
-
-- Vérifier réellement le contenu du fichier et pas seulement le MIME.
-- Refuser les extensions dangereuses.
-- Ajouter un scan antivirus si le module devient exposé à plusieurs utilisateurs.
-- Ne jamais exposer directement les chemins physiques au frontend.
-
-## 6. Base de données
-
-### Points positifs
-
-- `DocumentImporte` sert de point d'entrée pour tous les documents OCR.
-- Le texte OCR et les données JSON sont stockés en base.
-- Le statut permet de suivre le cycle du document.
-
-### À améliorer
-
-- Normaliser les statuts : `brouillon`, `en_traitement`, `ocr_termine`, `extraction_terminee`, `valide`, `rejete`.
-- Ajouter éventuellement un champ `checksum`.
-- Ajouter éventuellement un champ `providerOcr`.
-- Prévoir la liaison finale avec la facture fournisseur créée.
-
-## 7. Maintenabilité
-
-### Bonnes pratiques déjà en place
-
-- Documentation Markdown dans `docs/`.
-- OCR isolé dans `ocr/`.
-- Dépendances Python figées dans `requirements.txt`.
-
-### Recommandations
-
-- Maintenir les fichiers `docs/` à chaque sprint.
-- Ajouter `07_Journal_des_decisions.md` pour tracer les décisions structurantes.
-- Centraliser les règles métier dans des services plutôt que dans les composants React.
-
-## 8. Évolutivité
-
-Le choix d'une architecture OCR hybride est pertinent.
-
-Aujourd'hui : PaddleOCR local.
-Demain : possibilité d'ajouter un provider cloud via `OCR_PROVIDER`.
-
-Il faudra prévoir une interface technique du type :
-
-```ts
-interface OcrProvider {
-  extract(documentPath: string): Promise<OcrResult>
-}
-```
-
-Puis implémenter :
-
-```text
-LocalPaddleOcrProvider
-AzureOcrProvider
-GoogleDocumentAiProvider
-MistralOcrProvider
-```
-
-## 9. Préparation production
-
-### Points validés
-
-- Pas de stockage dans `public/`.
-- `UPLOAD_DIR` configurable.
-- `.env.example` doit documenter les variables nécessaires.
-- `.gitignore` protège les fichiers sensibles et volumineux.
-
-### Points à vérifier avant production
-
-- Droits Windows sur `C:/serveur/Factures_achats`.
-- Existence du dossier au démarrage.
-- Accès en lecture/écriture pour l'utilisateur Node/PM2.
-- Chemins `PYTHON_OCR_PATH` et `OCR_SCRIPT_PATH` corrects sur serveur.
-- Installation Python et dépendances OCR sur serveur.
-
-## 10. Priorités techniques actuelles
-
-1. Finaliser l'extraction structurée des données depuis le texte OCR.
-2. Préremplir un formulaire de validation utilisateur.
-3. Créer la facture fournisseur finale après validation.
-4. Gérer les doublons.
-5. Ajouter une file de traitement OCR.
-6. Renforcer la sécurité fichier.
-
-## MAJ du 11/07/2026
-### Points validés
-extraction des champs principaux ;
-extraction intelligente des lignes ;
-ArticleBuilder supportant des articles sur plusieurs groupes OCR ;
-fallback texte brut ;
-validation et correction des lignes ;
-enregistrement dans lignes_importees ;
-association facultative avec Produit ;
-recherche produit manuelle ;
-recherche produit automatique initiale ;
-statuts associee et a_rapprocher.
-
-#### Points de vigilance
-Recherche produit approximative
-
-La recherche automatique peut produire des faux positifs.
-
-Exemple rencontré :
-
-AGRAFE EXPRESS XO-3343 24/6
-→ Agrafeuse 24/6 Express XO-3343
-
-La proposition est utile, mais ne doit pas être présélectionnée en dessous d’un seuil élevé.
-
-Concurrence des recherches frontend
-
-La saisie manuelle déclenche des requêtes réseau successives. Il faudra plus tard ajouter :
-
-un debounce ;
-éventuellement un AbortController ;
-une protection contre les réponses arrivant dans le désordre.
-Logique métier dans le frontend
-
-Le scoring et l’enrichissement automatique sont encore partiellement orchestrés dans upload-facture.tsx. À terme, le rapprochement devra être déplacé vers un service serveur.
-
-## MAJ du 24/07/2026
-## État du moteur OCR fournisseurs
-
-Points désormais stabilisés :
-
-- architecture par drivers fournisseurs ;
-- fallback générique ;
-- extraction par coordonnées OCR ;
-- motifs documentaires configurables ;
-- validation configurable selon le type de document ;
-- fonctionnement validé avec CasInfo et Mechouar ;
-- compilation TypeScript propre avec `npx tsc --noEmit`.
-
-Points techniques encore à traiter :
-
-- découpage de la fonction principale d’extraction ;
-- tests automatisés des drivers ;
-- centralisation des motifs génériques ;
-- rapprochement produit ;
-- apprentissage des associations ;
-- transactions de validation et de stock.
-
-## MAJ du 26/07/2026
-### les points positifs
-- Validation atomique des lignes OCR et de l’intégration en stock.
-- Protection contre la double intégration d’un document.
-- Traçabilité par `IntegrationStock` et `MouvementStock`.
-- Mémorisation déterministe des associations fournisseur → produit.
-- Conservation de la TVA de référence des produits existants.
-- Confirmation explicite des écarts de prix d’achat.
-
-### les points de vigilance
-- Le projet ne possède pas encore de dossier `prisma/migrations`.
-- La base actuelle n’est pas encore baselinée avec Prisma Migrate.
-- `prisma db pull` peut réécrire le schéma Prisma et perdre des informations
-  déclaratives non restituées à l’identique.
-- Le schéma Prisma doit être sauvegardé et comparé avant toute introspection.
-- Les scripts de restauration DEV doivent restaurer uniquement les données,
-  sans remplacer le schéma DEV ni le fichier `schema.prisma`.
-
-### recommandation prioritaire
-Mettre en place un baseline Prisma contrôlé lorsque le schéma OCR/stock sera
-stabilisé, sans réinitialiser la base existante.
+Le projet est suffisamment stable pour poursuivre l’ajout de nouveaux drivers fournisseurs. La priorité parallèle doit être de figer l’exploitation serveur et la procédure de déploiement afin qu’une mise à jour GitHub reste prévisible et répétable.

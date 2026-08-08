@@ -1,269 +1,96 @@
 # 03 — Améliorations FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-## 1. Améliorations terminées
+## 1. Fonctionnalités désormais terminées
 
-### Module factures fournisseurs — import documentaire
+### OCR fournisseurs
 
-- Upload PDF / JPEG / PNG.
-- Contrôle taille maximale.
-- Contrôle type MIME.
-- Stockage hors projet dans `UPLOAD_DIR`.
-- Arborescence par année et mois.
-- Nommage automatique du fichier.
-- Création d'une ligne `DocumentImporte`.
-- Affichage côté interface après upload.
-
-### Module OCR
-
-- Installation de PaddleOCR local.
-- Création du dossier `ocr/`.
-- Script `ocr_document.py` fonctionnel.
-- Dépendances Python dans `requirements.txt`.
-- Route API OCR Next.js.
-- Lancement OCR depuis l'interface web.
-- Mise à jour du statut `ocr_termine`.
-- Remplissage du texte OCR en base.
-
-### Module OCR — extraction structurée
-
-- Extraction des champs principaux depuis OCR :
-  - fournisseur ;
-  - numéro de facture ;
-  - date facture ;
-  - ICE fournisseur ;
-  - total HT ;
-  - TVA ;
-  - total TTC ;
-  - devise ;
-  - confiance globale ;
-  - alertes.
-- Extraction des lignes articles depuis les coordonnées PaddleOCR.
-- Stockage des lignes dans `donnees_extraites.extraction.lignes`.
-- Ajout d'une confiance par ligne.
-- Affichage des lignes articles dans l'interface.
-- Cellules du tableau rendues éditables côté interface, sans insertion BDD à ce stade.
-
-### Configuration projet
-
-- `.gitignore` adapté au Python, OCR, uploads et environnements.
-- `.env.example` enrichi pour l'OCR et le stockage.
-- Documentation technique déplacée dans `docs/`.
-
-## 2. Priorité haute
-
-### Extraction structurée des données OCR
-
-Objectif : transformer le texte OCR en champs exploitables.
-
-Champs cibles :
-
-- fournisseur reconnu ;
-- numéro facture ;
-- date facture ;
-- ICE fournisseur ;
-- total HT ;
-- TVA ;
-- total TTC ;
-- lignes article ;
-- devise ;
-- conditions éventuelles.
-
-### Profils OCR fournisseurs
-
-### Moteur OCR lignes articles — ArticleBuilder
-
-Objectif : remplacer la logique fixe “article sur une ou deux lignes” par une logique générique.
-
-Principe :
-- lire les blocs OCR ligne par ligne ;
-- accumuler les lignes d’un article en cours ;
-- considérer l’article comme complet uniquement quand référence/désignation, TVA, PU, quantité et total sont détectés ;
-- permettre les désignations sur une, deux ou plusieurs lignes.
-
-Les drivers fournisseurs restent simples et ne doivent pas contenir de logique métier.
-
-### Formulaire de validation
-
-Créer une page de validation permettant à l'utilisateur de vérifier et corriger les données extraites avant création de la facture fournisseur.
-
-### Création de la facture fournisseur
-
-Après validation, créer la facture fournisseur définitive en base.
-
-## 3. Priorité moyenne
-
-### Détection des doublons
-
-Ajouter un checksum SHA-256 pour éviter l'import multiple du même PDF.
-
-### Amélioration des statuts
-
-Centraliser les statuts dans une constante TypeScript.
-
-### File de traitement OCR
-
-Prévoir une file si plusieurs documents sont traités simultanément.
-
-### Journalisation OCR
-
-Stocker :
-
-- date de lancement ;
-- durée ;
-- moteur utilisé ;
-- message d'erreur éventuel.
-
-## 4. Priorité basse
-
-### OCR cloud optionnel
-
-Ajouter un connecteur cloud compatible avec `OCR_PROVIDER`.
-
-### Prévisualisation PDF
-
-Afficher le PDF à gauche et les champs extraits à droite.
-
-### Recherche documentaire
-
-Permettre de rechercher dans les textes OCR.
-
-### Archivage documentaire
-
-Mettre en place un cycle : brouillon → validé → archivé.
-
-## 5. Améliorations transversales
-
-- Centraliser les contrôles d'autorisation.
-- Créer des services applicatifs métier.
-- Mettre en place des tests sur les routes critiques.
-- Ajouter une documentation d'installation serveur.
-- Documenter la synchronisation MariaDB → PostgreSQL.
-
-## MAJ du 11/07/2026
-### Améliorations terminées 
-- Extraction OCR
-- extraction fournisseur, numéro, date, ICE et totaux ;
-- extraction des lignes article ;
-- coordonnées et confiance OCR ;
-- ArticleBuilder générique ;
-- drivers fournisseurs déclaratifs ;
-- fallback générique ;
-- fallback texte ;
-- extraction de BL sans TVA par ligne ;
+- upload PDF / JPG / PNG ;
+- PaddleOCR local ;
+- extraction fournisseur, numéro, date, ICE, HT, TVA, TTC ;
+- extraction des lignes articles ;
+- ArticleBuilder ;
+- confiance par ligne ;
 - diagnostic OCR ;
 - qualité A/B/C/D ;
-- édition des cellules.
+- fallback générique / texte / séquentiel ;
+- édition manuelle des lignes.
 
-### Validation
-- endpoint valider-lignes/[id] ;
-- remplacement transactionnel des anciennes lignes ;
-- création de LigneImportee ;
-- conservation des corrections ;
-- association facultative à un produit ;
-- statuts associee et a_rapprocher.
+### Drivers
 
-### Rapprochement
-- endpoint de recherche produit ;
-- recherche par référence et désignation ;
+- Mechouar BL ;
+- Mechouar facture ;
+- CasInfo ;
+- MZ Tech ;
+- profils génériques.
+
+### Rapprochement produits
+
+- recherche automatique ;
+- recherche manuelle ;
 - score de pertinence ;
-- bonus fournisseur non bloquant ;
-- sélection manuelle ;
-- option permanente « À rapprocher » ;
-- propositions automatiques initiales.
+- association fournisseur-produit ;
+- mémorisation des choix ;
+- création volontaire des produits absents ;
+- blocage de validation si des lignes restent non rapprochées ;
+- forçage exceptionnel de validation partielle.
 
-### Nouvelle priorité haute
-- mémorisation des associations fournisseur–référence–produit ;
-- réutilisation automatique des associations ;
-- création d’un produit depuis une ligne OCR ;
-- création réelle de la facture fournisseur ;
-- impact stock dans une étape séparée.
+### Stock
 
-## MAJ du 24/07/2026
+- intégration transactionnelle ;
+- mouvements de stock ;
+- protection contre la double intégration ;
+- mise à jour contrôlée du prix d’achat ;
+- exclusion des factures Mechouar du stock.
 
-### Profils OCR fournisseurs
-### les améliorations terminées
-- architecture par drivers déclaratifs ;
-- driver générique ;
-- driver CasInfo ;
-- driver Mechouar ;
-- sélection par alias fournisseur ;
-- fallback générique ;
-- colonnes OCR configurables ;
-- marqueurs de tableau configurables ;
-- motifs numéro, date, ICE et totaux configurables ;
-- règles de validation configurables ;
-- distinction facture / bon de livraison.
+### TVA
 
-### les éléments terminés
-### Validation des documents fournisseurs
+- colonne TVA dans `/factures-fournisseurs` ;
+- dashboard TVA corrigé ;
+- page `/tva` finalisée ;
+- filtres dates / client / fournisseur ;
+- distinction TVA perçue / TVA payée ;
+- intégration TVA des charges ;
+- exclusion des BL Mechouar ;
+- inclusion des factures Mechouar.
 
-- édition des lignes extraites ;
-- persistance du document validé ;
-- contrôle empêchant la validation des lignes non rapprochées ;
-- fonctionnement validé sur plusieurs documents Mechouar et CasInfo.
+### Doublons
 
-## Priorité haute
+- détection sur CasInfo ;
+- Mechouar BL ;
+- Mechouar facture ;
+- MZ Tech ;
+- forçage possible avec avertissement.
 
-### Rapprochement automatique des produits
+### Migration VB6
 
-- exploiter la référence fournisseur lorsqu’elle existe ;
-- comparer les désignations normalisées ;
-- proposer des produits candidats ;
-- calculer un score de rapprochement ;
-- exiger une confirmation en cas d’ambiguïté.
+- script MariaDB → PostgreSQL vérifié et fiabilisé ;
+- prise en charge `DATABASE_URL` ;
+- normalisation TVA ;
+- conservation des tables spécifiques FacturApp.
 
-### Création des produits absents
+## 2. Priorités actuelles
 
-- préremplir le formulaire produit depuis la ligne OCR ;
-- conserver le lien avec la ligne importée ;
-- éviter les doublons ;
-- rattacher immédiatement le produit créé.
+### Priorité haute
 
-### Apprentissage des correspondances
+- valider définitivement le redémarrage automatique Windows ;
+- ajouter les prochains drivers fournisseurs ;
+- fiabiliser le déploiement GitHub → serveur ;
+- corriger la TVA lors d’une validation partielle forcée ;
+- mettre sous tests les règles TVA / stock / doublons.
 
-- mémoriser les choix validés ;
-- réutiliser les correspondances fournisseur/produit ;
-- distinguer correspondance automatique et validation manuelle ;
-- permettre la correction d’une correspondance erronée.
+### Priorité moyenne
 
-### Branchement du stock
+- améliorer encore les factures Mechouar multipages si nécessaire ;
+- mettre `ecosystem.config.cjs` sous Git ;
+- créer un script de déploiement serveur reproductible ;
+- rotation des logs PM2 ;
+- sauvegarde PostgreSQL automatisée.
 
-- créer les mouvements de stock uniquement après validation complète ;
-- garantir l’idempotence ;
-- utiliser une transaction ;
-- empêcher le double mouvement lors d’une nouvelle validation.
+### Priorité basse
 
-## MAJ du 26/07/2026
-### Améliorations terminées 
-#### Rapprochement et validation des lignes OCR
-- recherche des produits existants ;
-- association manuelle des lignes non rapprochées ;
-- mémorisation fournisseur → produit ;
-- validation impossible tant qu’une ligne reste non rapprochée ;
-- conservation de la TVA du produit existant ;
-- comparaison entre prix OCR et dernier prix d’achat ;
-- dialogue de confirmation en cas d’écart de prix.
-
-#### Intégration du stock
-
-- validation transactionnelle ;
-- création des lignes importées ;
-- création d’une intégration de stock ;
-- mise à jour atomique du stock actuel ;
-- création d’un mouvement par ligne ;
-- protection contre une seconde intégration ;
-- mise à jour contrôlée du dernier prix d’achat.
-
-### Priorités suivantes
-la priorité exclusivement OCR :
-
-1. campagne de correction des bugs fonctionnels de l’ensemble de FacturApp ;
-2. sécurisation de la gestion du schéma et des restaurations DEV ;
-3. finalisation des tests de non-régression OCR/stock ;
-4. création guidée des nouveaux produits depuis une ligne OCR ;
-5. création de la facture fournisseur comptable ;
-6. baseline Prisma Migrate ;
-7. poursuite des drivers fournisseurs ;
-8. amélioration de la file de traitement OCR.
+- provider OCR cloud optionnel ;
+- file de traitement OCR ;
+- recherche plein texte documentaire ;
+- prévisualisation PDF plus avancée.

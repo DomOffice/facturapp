@@ -1,309 +1,235 @@
 # 00 — Architecture FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-## 1. Objectif du projet
+## 1. Objectif
 
-FacturApp est l'application web TypeScript / Next.js destinée à reprendre progressivement les fonctions métier actuellement assurées par l'application historique VB6. L'application couvre la gestion commerciale, la facturation, les devis, les avoirs, les fournisseurs, les charges, les paiements et le nouveau module d'import des factures fournisseurs avec OCR.
+FacturApp est l’application web Next.js / TypeScript destinée à remplacer progressivement l’application historique VB6.
 
-Le principe directeur reste : faire évoluer FacturApp progressivement sans casser l'existant VB6.
-
-## 2. Architecture générale
+Architecture métier actuelle :
 
 ```text
-Application VB6 existante
-        │
-        │ Base opérationnelle historique
-        ▼
+VB6
+ ↓
 MariaDB
-        │
-        │ Synchronisation VB6 → FacturApp
-        ▼
-PostgreSQL FacturApp
-        │
-        ├── Next.js / TypeScript
-        ├── Prisma ORM
-        ├── NextAuth
-        ├── Module facturation
-        ├── Module fournisseurs / charges
-        └── Module documents importés / OCR
+ ↓  synchronisation contrôlée
+PostgreSQL
+ ↓
+FacturApp
 ```
 
-## 3. Rôle des bases de données
+MariaDB reste la source historique. PostgreSQL est la base applicative de FacturApp et contient aussi les tables propres au nouveau fonctionnement web : OCR, documents importés, rapprochements fournisseurs, intégrations et mouvements de stock.
 
-### MariaDB
+## 2. Stack actuelle
 
-MariaDB reste la base de vérité tant que l'application VB6 tourne à 100 % en production.
+- Next.js 14.2.5 — App Router
+- TypeScript
+- Prisma 5.22
+- PostgreSQL
+- NextAuth
+- Python + PaddleOCR local
+- PM2 sous Windows pour l’exploitation serveur
 
-Elle conserve les données métier historiques et opérationnelles.
+## 3. Modules fonctionnels
 
-### PostgreSQL
+FacturApp couvre aujourd’hui :
 
-PostgreSQL est la base utilisée par FacturApp TS. Elle est alimentée par synchronisation depuis MariaDB et contient aussi des tables spécifiques au développement web, notamment `documents_importes` pour l'import documentaire et l'OCR.
+- clients ;
+- fournisseurs ;
+- produits ;
+- devis ;
+- factures ;
+- avoirs ;
+- paiements ;
+- charges ;
+- TVA ;
+- factures fournisseurs ;
+- import documentaire fournisseur ;
+- OCR et extraction structurée ;
+- rapprochement fournisseur → produit ;
+- intégration stock et mouvements de stock.
 
-Cette séparation permet de développer FacturApp sans perturber l'application VB6.
+## 4. Architecture des documents fournisseurs
 
-## 4. Frontend
-
-FacturApp utilise Next.js avec l'App Router.
-
-Organisation fonctionnelle :
+Pipeline actuel :
 
 ```text
-src/app
-├── (auth)
-├── (dashboard)
-│   ├── factures
-│   ├── devis
-│   ├── avoirs
-│   ├── fournisseurs
-│   ├── charges
-│   └── factures-fournisseurs
-└── api
-    ├── auth
-    ├── admin
-    └── factures-fournisseurs
-```
-
-Les pages métier sont protégées par session et par rôle.
-
-## 5. Backend applicatif
-
-Le backend est assuré par les routes API Next.js.
-
-Pour le module factures fournisseurs :
-
-```text
-/api/factures-fournisseurs/upload
-/api/factures-fournisseurs/ocr/[id]
-/api/factures-fournisseurs/valider-lignes/[id]
-/api/produits/recherche
-/api/produits/associations
-```
-
-La route `upload` gère l'import physique du document et la création de la ligne `DocumentImporte`.
-La route `ocr/[id]` déclenche le traitement OCR local via Python / PaddleOCR puis met à jour PostgreSQL.
-
-## 6. Stockage documentaire
-
-Les fichiers PDF et images importés ne sont pas stockés dans le projet Next.js.
-
-Chemin retenu en production Windows :
-
-```text
-C:/serveur/Factures_achats
-```
-
-Arborescence retenue :
-
-```text
-C:/serveur/Factures_achats
-└── YYYY
-    └── MM
-        └── date_numeroFacture_fournisseur_hash.pdf
-```
-
-Exemple :
-
-```text
-C:/serveur/Factures_achats/2026/06/20260628_sans-numero_casinfo_cde99d5b.pdf
-```
-
-Le chemin complet n'est pas codé en dur dans le code applicatif. Il passe par la variable d'environnement `UPLOAD_DIR`.
-
-## 7. Architecture OCR
-
-Décision retenue : architecture hybride.
-
-Implémentation actuelle :
-
-```text
-Next.js
-  │
-  ├── Upload PDF/image
-  │
-  ▼
-DocumentImporte créé en PostgreSQL
-  │
-  ▼
-API OCR Next.js
-  │
-  ▼
-Service Python local
-  │
-  ▼
-PaddleOCR
-  │
-  ▼
-Texte OCR + JSON stockés dans PostgreSQL
-```
-Architecture fonctionnelle du module
-
-Import du document
-        ↓
+Upload document
+ ↓
+DocumentImporte
+ ↓
 OCR PaddleOCR
-        ↓
+ ↓
 Extraction structurée
-        ↓
+ ↓
+Driver fournisseur
+ ↓
 Lignes OCR éditables
-        ↓
-Recherche / rapprochement produits
-        ↓
-Validation humaine
-        ↓
-lignes_importees
-        ↓
-Mémorisation des associations
-        ↓
-Création future de la facture fournisseur
+ ↓
+Rapprochement produits
+ ↓
+Validation métier
+ ↓
+LigneImportee
+ ↓
+Association fournisseur-produit
+ ↓
+Intégration éventuelle au stock
+ ↓
+MouvementStock
+```
 
+L’OCR ne doit jamais être considéré comme la source de vérité métier. Il prépare des données qui restent contrôlables et éditables avant validation.
 
-Le moteur actuel est local : Python + PaddleOCR.
+## 5. Drivers OCR actifs
 
-L'architecture doit rester compatible avec un futur provider cloud : Azure Document Intelligence, Google Document AI, Mistral OCR ou autre.
+Drivers actuellement validés :
 
-Le traitement OCR ne stocke plus uniquement le texte brut.  
-Il conserve aussi les coordonnées PaddleOCR et exploite ces coordonnées pour extraire les lignes articles des factures fournisseurs.
+- `mechouar` : bons de livraison Mechouar ;
+- `mechouar_facture` : factures Mechouar ;
+- `casinfo` : factures CasInfo ;
+- `mztech` : factures MZ Tech ;
+- profils génériques de fallback.
 
-Les lignes extraites restent à l'état de pré-validation :
-- elles sont affichées dans l'interface ;
-- elles sont éditables côté frontend ;
-- elles ne créent pas encore de facture fournisseur réelle ;
-- elles n'impactent pas encore le stock.
-
-## 8. Dossier OCR
-
-Organisation retenue :
+Le moteur conserve plusieurs stratégies :
 
 ```text
-ocr/
-├── .venv/              # non versionné
-├── ocr_document.py     # script OCR local
-├── requirements.txt    # dépendances Python
-└── README.md           # documentation d'installation OCR
+profil
+ ↓
+fallback générique
+ ↓
+fallback texte
+ ↓
+fallback tableau séquentiel
 ```
 
-Le dossier `.venv` est ignoré par Git.
+Les drivers doivent rester simples : alias, paramètres de colonnes, motifs, corrections et règles documentaires. La logique métier ne doit pas être dispersée dans les drivers.
 
-## 9. Variables d'environnement importantes
+## 6. Règles TVA / stock des documents fournisseurs
 
-```env
-DATABASE_URL=
-NEXTAUTH_SECRET=
-NEXTAUTH_URL=
-UPLOAD_DIR=
-OCR_PROVIDER=local
-PYTHON_OCR_PATH=
-OCR_SCRIPT_PATH=
-OCR_API_URL=
-OCR_API_KEY=
+| Document | TVA | Stock | Rapprochement | Mise à jour prix | Statut final attendu |
+|---|---:|---:|---:|---:|---|
+| Facture Mechouar | Oui | Non | Facultatif | Non | `valide` |
+| BL Mechouar | Non | Oui | Obligatoire sauf forçage | Oui | `stock_integre` |
+| Facture CasInfo | Oui | Oui | Obligatoire sauf forçage | Oui | `stock_integre` |
+| Facture MZ Tech | Oui | Oui | Obligatoire sauf forçage | Oui | `stock_integre` |
+| Autres factures fournisseurs | Oui | Oui par défaut | Obligatoire sauf règle spécifique | Oui | `stock_integre` |
+
+Ces règles doivent être sécurisées côté serveur. L’API ne doit pas faire confiance uniquement aux drapeaux envoyés par l’interface.
+
+## 7. TVA applicative
+
+La TVA est désormais disponible dans :
+
+- `/factures-fournisseurs` : TVA par document fournisseur ;
+- `/` : encart Situation TVA ;
+- `/tva` : page de synthèse et filtres.
+
+La TVA payée agrège :
+
+- les factures fournisseurs assujetties ;
+- les charges.
+
+Les BL Mechouar ne génèrent pas de TVA.
+
+## 8. Détection des doublons fournisseurs
+
+Un doublon est recherché par fournisseur et numéro de document normalisé sur les documents déjà validés ou intégrés au stock.
+
+Le contrôle couvre les documents avec ou sans intégration stock.
+
+Le forçage reste disponible pendant la phase de développement, avec avertissement explicite :
+
+- risque de double stock pour un document stock ;
+- risque de double TVA pour une facture sans stock.
+
+## 9. Validation partielle
+
+Par défaut, un document devant alimenter le stock ne peut pas être validé tant que toutes ses lignes ne sont pas rapprochées.
+
+Un forçage exceptionnel permet néanmoins de valider partiellement :
+
+- seules les lignes avec `produitId` alimentent le stock ;
+- les lignes sans produit sont conservées avec `produitId = null` ;
+- elles portent un statut de type `validee_sans_stock` ;
+- elles ne modifient ni stock ni prix.
+
+Limitation connue : la TVA globale du document reste actuellement comptabilisée en totalité lors d’une validation partielle forcée.
+
+## 10. Base de données et Prisma
+
+Le schéma PostgreSQL réel et `prisma/schema.prisma` doivent rester alignés.
+
+La base historique n’a pas été initialement créée avec Prisma Migrate. Pendant la phase actuelle de test, la base PostgreSQL peut être reconstruite depuis `schema.prisma` si les données sont jetables et réimportables depuis VB6.
+
+Commandes à distinguer :
+
+- `npx prisma generate` : régénère le client, ne modifie pas la base ;
+- `npx prisma validate` : valide le schéma ;
+- `npx prisma db push` : modifie réellement la base ;
+- `npx prisma db pull` : réécrit potentiellement `schema.prisma` depuis la base.
+
+Toute opération destructive doit être volontaire et assumée.
+
+## 11. Synchronisation VB6 / MariaDB → PostgreSQL
+
+Script principal :
+
+```text
+prisma/sync-mariadb-to-pg.ts
 ```
 
-## 10. Principe d'évolution
+Le script synchronise les données historiques utiles :
 
-FacturApp doit évoluer par étapes :
+```text
+clients
+fournisseurs
+produits
+factures
+facture_lignes
+paiements
+devis
+devis_lignes
+avoirs
+avoir_lignes
+```
 
-1. stabiliser une fonctionnalité ;
-2. tester localement ;
-3. valider le build ;
-4. pousser Git ;
-5. mettre à jour la documentation ;
-6. déployer ensuite en production.
+Il ne doit pas remplir ni supprimer les tables propres au nouveau fonctionnement FacturApp :
 
-Le moteur OCR évolue vers une logique en deux niveaux :
+```text
+documents_importes
+lignes_importees
+integrations_stock
+mouvements_stock
+associations fournisseur-produit
+```
 
-- un moteur générique qui lit les blocs OCR ;
-- des drivers fournisseurs légers qui décrivent les particularités éventuelles.
+La conversion TVA est normalisée pour accepter les deux représentations historiques possibles : `0.20` ou `20` pour 20 %.
 
-Le moteur ne doit pas dépendre directement d’un fournisseur précis.  
-Les drivers ne doivent pas contenir de logique complexe : uniquement des paramètres, alias, corrections ou particularités.
+## 12. Déploiement Windows actuel
 
-## MAJ du 11/07/2026
-FacturApp n’est pas seulement un OCR. Il constitue un moteur de lecture intelligente de documents fournisseurs.
+Installation active :
 
-Le moteur dispose maintenant de deux voies :
+```text
+C:\serveur\facturapp-clean
+```
 
-Extraction par coordonnées OCR
-Extraction séquentielle depuis le texte brut en fallback
+Application de production :
 
-Le fallback séquentiel permet notamment de lire un tableau organisé sous la forme :
+```text
+http://10.8.0.1:3001
+```
 
-Référence
-Désignation
-Quantité
-Prix
-Total
+PM2 lance Next.js en production depuis :
 
-Il a été validé sur un BL comportant 14 articles.
+```text
+node_modules\next\dist\bin\next start -p 3001
+```
 
+La liste PM2 est sauvegardée dans :
 
-## MAJ du 24/07/2026
-### Drivers OCR fournisseurs
+```text
+C:\Users\SRV-BDD\.pm2\dump.pm2
+```
 
-Les particularités des documents fournisseurs sont décrites dans :
-src/lib/ocr/drivers/
-├── generic.ts
-├── casinfo.ts
-└── mechouar.ts
-
-Le driver peut configurer :
-
-les alias du fournisseur ;
-les coordonnées des colonnes ;
-les marqueurs de début, d’en-tête et de fin du tableau ;
-le type de document : facture ou bon de livraison ;
-les motifs du numéro et de la date ;
-les motifs ICE et totaux ;
-les champs obligatoires pour la validation.
-
-Le moteur d’extraction ne doit contenir aucune condition métier liée
-directement à un fournisseur.
-
-
-### Modifier la partie pré-validation
-
-Le document affirme actuellement que les lignes ne créent pas encore de facture fournisseur réelle. :contentReference[oaicite:6]{index=6}
-
-À remplacer selon l’état réel par :
-
-```md
-Les données OCR sont d’abord placées dans un état de pré-validation.
-
-Après correction et validation :
-
-- les données du document sont persistées ;
-- chaque ligne doit être rapprochée d’un produit existant ou donner lieu
-  à la création d’un produit ;
-- le branchement des mouvements de stock reste à réaliser.
-
-## MAJ du 26/07/2026
-Les lignes extraites suivent désormais le cycle suivant :
-
-1. affichage des lignes OCR dans l’interface ;
-2. correction manuelle éventuelle ;
-3. rapprochement avec un produit existant ;
-4. comparaison du prix OCR avec le dernier prix d’achat enregistré ;
-5. confirmation utilisateur en cas d’écart ;
-6. validation atomique en base ;
-7. création des lignes importées ;
-8. mémorisation des associations fournisseur → produit ;
-9. mise à jour du stock ;
-10. création des mouvements de stock ;
-11. mise à jour éventuelle du dernier prix d’achat.
-
-Les produits existants conservent toujours leur TVA enregistrée en base.
-La TVA détectée par OCR n’écrase pas la TVA d’un produit existant.
-
-La création d’une véritable facture fournisseur comptable reste une étape
-distincte à finaliser.
-
-la route : facturapp\src\app\api\factures-fournisseurs\valider-lignes\[id] :
-assure une transaction atomique regroupant :
-validation ;
-persistance des lignes corrigées ;
-associations ;
-stock ;
-mouvements ;
-prix d’achat ;
-changement du statut du document.
-
+Une tâche planifiée Windows nommée `DomOffice API (PM2)` doit exécuter `pm2 resurrect` au démarrage du serveur. Sa configuration reste à valider complètement par un test de redémarrage réel.

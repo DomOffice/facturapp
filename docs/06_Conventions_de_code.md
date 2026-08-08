@@ -1,193 +1,83 @@
 # 06 — Conventions de code FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-## 1. Principes généraux
+## 1. Principe général
 
-- Ne pas casser l'existant.
-- Privilégier les évolutions incrémentales.
-- Garder MariaDB comme base de vérité tant que VB6 reste opérationnel.
-- Ne pas mélanger logique UI, logique métier et accès disque.
-- Documenter chaque décision importante.
+Faire des modifications petites, ciblées et testables. Éviter les réécritures massives sans nécessité.
 
-## 2. TypeScript / Next.js
+## 2. TypeScript
 
-### Pages
+- conserver le typage strict ;
+- éviter `any` sauf justification ;
+- préférer les fonctions utilitaires partagées aux duplications ;
+- lancer `npx tsc --noEmit` après une évolution significative.
 
-Les pages doivent rester lisibles et déléguer la logique complexe à des composants ou services.
+## 3. Prisma
 
-### Routes API
+- ne jamais supposer que `prisma generate` modifie la base ;
+- valider avec `npx prisma validate` ;
+- analyser toute évolution de `schema.prisma` avant déploiement ;
+- ne pas lancer de commande destructive sur une base non identifiée.
 
-Les routes API doivent :
+## 4. OCR
 
-- vérifier la session ;
-- vérifier les rôles ;
-- valider les entrées ;
-- retourner des erreurs explicites ;
-- ne jamais exposer de chemin physique complet inutilement.
+- moteur générique d’abord ;
+- drivers simples et déclaratifs ;
+- conserver les fallbacks ;
+- aucune création automatique de produit ;
+- aucune modification silencieuse de TVA produit existante ;
+- la validation humaine garde la priorité.
 
-### Redirections
+## 5. Règles métier fournisseurs
 
-Utiliser des chemins relatifs :
+Les règles TVA / stock doivent être centralisées côté serveur et déterminées par le type de document / profil OCR.
 
-```ts
-redirect('/connexion')
-redirect('/')
-```
+Ne pas réimplémenter ces règles uniquement dans le frontend.
 
-Ne jamais utiliser `http://localhost:3000` dans le code applicatif.
+## 6. Montants
 
-## 3. Rôles
-
-Les rôles sont à traiter en minuscules :
-
-```ts
-admin
-saisie
-consultation
-```
-
-Recommandation : centraliser les contrôles d'autorisation dans un helper.
-
-## 4. Prisma
-
-- Utiliser Prisma pour PostgreSQL FacturApp.
-- Ne jamais utiliser Prisma pour modifier MariaDB VB6.
-- Les tables propres à FacturApp peuvent exister uniquement dans PostgreSQL.
-- Valider le schéma avant commit :
-
-```bash
-npx prisma validate
-```
-
-## 5. Fichiers et uploads
-
-Les documents métier ne doivent pas être stockés dans :
+Pour l’affichage comptable français :
 
 ```text
-public/
-src/
+1 250,00
+25 000,50
+1 000 000,00
 ```
 
-Ils doivent être stockés hors projet via :
+Réutiliser l’utilitaire existant de formatage ; ne pas créer plusieurs fonctions concurrentes.
 
-```env
-UPLOAD_DIR=C:/serveur/Factures_achats
-```
+## 7. Git
 
-Le code doit stocker de préférence un chemin relatif en base.
+Avant commit :
 
-## 6. OCR
-
-### Organisation
-
-```text
-ocr/
-├── .venv/              # ignoré Git
-├── ocr_document.py
-├── requirements.txt
-└── README.md
-```
-
-### Règles
-
-- Aucun environnement virtuel ne doit être versionné.
-- Les modèles PaddleOCR téléchargés localement ne doivent pas être versionnés.
-- Le frontend ne doit pas appeler Python directement.
-- Next.js appelle Python via une route API serveur.
-- Les chemins Python doivent venir de `.env`.
-
-## 7. Variables d'environnement
-
-Toujours documenter dans `.env.example` les variables nécessaires.
-
-Ne jamais versionner :
-
-```text
-.env
-.env.local
-.env.production.local
-```
-
-## 8. Git
-
-Avant chaque push important :
-
-```bash
-npm run build
-npx prisma validate
+```powershell
 git status
+npx tsc --noEmit
 ```
 
-Vérifier que les éléments suivants ne sont pas inclus :
+Lors d’un déploiement serveur :
+
+```powershell
+git fetch origin
+git log --oneline HEAD..origin/main
+git pull --ff-only origin main
+```
+
+Ne pas versionner :
 
 - `.env` ;
-- `.venv` ;
-- fichiers uploadés ;
-- caches PaddleOCR ;
+- `node_modules` ;
 - `.next` ;
-- `node_modules`.
+- environnements Python ;
+- caches générés comme `tsconfig.tsbuildinfo`.
 
-## 9. Documentation
+## 8. Documentation
 
-Le dossier `docs/` doit être mis à jour à chaque étape importante.
+Toute évolution importante doit mettre à jour au minimum :
 
-Documents de référence :
-
-- `00_Architecture.md`
-- `01_Audit_Technique.md`
-- `02_Base_de_donnees.md`
-- `03_Ameliorations.md`
-- `04_Bugs_connus.md`
-- `05_Feuille_de_route.md`
-- `06_Conventions_de_code.md`
-- `07_Journal_des_decisions.md`
-
-## MAJ du 11/07/2026
-- Une recherche approximative ne doit jamais produire silencieusement une écriture métier définitive.
-- Une association automatique doit rester corrigeable par l’utilisateur.
-- Toute migration Prisma doit être accompagnée de :
-  npx prisma format
-  npx prisma validate
-  npx prisma migrate dev
-  npm run build
-
-  ## MAJ du 24/07/2026
-  ## Conventions du moteur OCR
-
-- Aucun `if` fondé sur le nom d’un fournisseur dans le moteur générique.
-- Les particularités fournisseurs sont placées dans les drivers.
-- Les drivers restent déclaratifs et sans logique métier complexe.
-- Toute option de driver doit posséder un comportement générique par défaut.
-- Les regex globales doivent être réinstanciées avant utilisation afin
-  d’éviter les effets de bord liés à `lastIndex`.
-- Les patches doivent rester petits et testables.
-- Après chaque modification :
-  - lancer `npx tsc --noEmit` ;
-  - tester au moins un document Mechouar ;
-  - tester au moins un document CasInfo.
-
-## MAJ du 26/07/2026
-### Méthode de modification
-
-Le propriétaire fonctionnel du projet est novice en TypeScript.
-
-Toute proposition de correction doit donc indiquer :
-
-1. le chemin exact du fichier ;
-2. la zone exacte à rechercher ;
-3. le bloc exact à ajouter, supprimer ou remplacer ;
-4. une explication métier simple ;
-5. les commandes de contrôle ;
-6. le test fonctionnel à exécuter.
-
-Éviter les réécritures complètes lorsqu’un petit patch suffit.
-Ne pas regrouper plusieurs corrections sans rapport dans un même patch.
-Ajouter dans Prisma
-Avant toute commande susceptible de modifier la base ou le schéma :
-
-- expliquer le sens de la commande ;
-- préciser si elle agit sur la base ou seulement sur les fichiers ;
-- sauvegarder le schéma si nécessaire ;
-- ne jamais proposer `migrate reset` sur la base restaurée ;
-- ne jamais intégrer `db pull` automatiquement au processus de restauration.
+- architecture si la structure change ;
+- base de données si un modèle change ;
+- journal des décisions si une règle métier est décidée ;
+- bugs connus si une limite est acceptée ;
+- feuille de route si une priorité change.

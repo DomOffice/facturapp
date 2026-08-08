@@ -1,294 +1,167 @@
 # 02 — Base de données FacturApp
 
-Dernière mise à jour : 2026-06-28
+Dernière mise à jour : 2026-08-08
 
-## 1. Principe général
+## 1. Principe
 
-FacturApp utilise PostgreSQL comme base applicative TS. La base historique MariaDB reste la source de vérité tant que l'application VB6 est pleinement opérationnelle.
+FacturApp utilise PostgreSQL. MariaDB reste la base historique de l’application VB6 et la source de réimport des données métier existantes.
 
-```text
-MariaDB VB6
-    │
-    │ Synchronisation
-    ▼
-PostgreSQL FacturApp
-```
+Les données PostgreSQL peuvent être distinguées en deux familles :
 
-Les données synchronisées depuis MariaDB ne doivent pas être mélangées sans contrôle avec les tables propres à FacturApp.
+### Données historiques synchronisées depuis VB6
 
-## 2. Rôle de PostgreSQL
+- clients ;
+- fournisseurs ;
+- produits ;
+- factures et lignes ;
+- paiements ;
+- devis et lignes ;
+- avoirs et lignes.
 
-PostgreSQL contient :
+### Données propres à FacturApp
 
-- les données synchronisées utiles à FacturApp ;
-- les utilisateurs et rôles web ;
-- les tables métier Next.js ;
-- les tables spécifiques au module OCR, notamment `documents_importes`.
+- documents importés ;
+- lignes OCR validées ;
+- associations fournisseur-produit ;
+- intégrations de stock ;
+- mouvements de stock ;
+- données OCR structurées et diagnostics.
 
-## 3. Table `documents_importes`
+La synchronisation VB6 ne doit pas supprimer ces tables spécifiques.
 
-### Rôle
+## 2. Modèles OCR / stock
 
-La table `documents_importes` sert de registre documentaire pour les fichiers importés dans FacturApp.
+### DocumentImporte
 
-Elle permet de suivre :
+Point d’entrée d’un document fournisseur.
 
-- le fournisseur lié ;
-- le fichier d'origine ;
-- le fichier stocké ;
-- le chemin relatif ;
-- le statut de traitement ;
-- le texte OCR ;
-- les données extraites JSON ;
-- l'utilisateur ayant importé le document.
+Contient notamment :
 
-## 4. Cycle d'un document importé
+- fournisseur ;
+- fichier original / stocké ;
+- statut ;
+- texte OCR ;
+- JSON d’extraction ;
+- dates techniques.
 
-```text
-Upload fichier
-    │
-    ▼
-DocumentImporte créé
-    statut = brouillon
-    │
-    ▼
-OCR lancé
-    statut = en_traitement
-    │
-    ▼
-OCR terminé
-    statut = ocr_termine
-    │
-    ▼
-Extraction des champs
-    statut = extraction_terminee
-    │
-    ▼
-Validation utilisateur
-    statut = valide
-    │
-    ▼
-Création facture fournisseur
-```
+### LigneImportee
 
-## 5. Statuts recommandés
+Version persistée d’une ligne OCR validée ou partiellement validée.
 
-| Statut | Signification |
-|---|---|
-| `brouillon` | Document importé, aucun OCR encore terminé |
-| `en_traitement` | OCR ou traitement en cours |
-| `ocr_termine` | Texte OCR récupéré |
-| `extraction_terminee` | Champs structurés extraits |
-| `valide` | Document validé par l'utilisateur |
-| `rejete` | Document rejeté ou traitement impossible |
+Contient notamment :
 
-## 6. Données OCR
-
-Deux niveaux sont distingués :
-
-### Texte OCR brut
-
-Stocké dans un champ texte.
-
-Exemple :
-
-```text
-BL/ FACTURE N°: FV2026-01642
-Date facturation: 25/03/2026
-Total HT 70,83
-Total TVA 20% 14,17
-Total TTC 85,00
-```
-
-### Données OCR structurées JSON
-
-Stockées dans un champ JSON.
-
-Exemple :
-
-```json
-{
-  "success": true,
-  "texte": "...",
-  "pages": [
-    {
-      "page": 1,
-      "texte": "...",
-      "lignes": []
-    }
-  ]
-}
-```
-
-## 7. Relation fournisseur
-
-Chaque document importé est rattaché à un fournisseur sélectionné par l'utilisateur lors de l'upload.
-
-```text
-Fournisseur 1 ─── n DocumentImporte
-```
-
-Ce lien est nécessaire même si l'OCR peut retrouver un fournisseur dans le texte. La sélection utilisateur reste la première source de rattachement à cette étape.
-
-## 8. Chemin fichier
-
-La table ne doit pas stocker un BLOB PDF.
-
-Elle stocke uniquement le chemin relatif ou logique du document.
-
-Exemple :
-
-```text
-2026/06/20260628_sans-numero_casinfo_cde99d5b.pdf
-```
-
-Le chemin complet est reconstruit avec `UPLOAD_DIR`.
-
-## 9. Champs recommandés à ajouter plus tard
-
-À envisager quand le module sera stabilisé :
-
-- `checksum` : détection des doublons ;
-- `ocrProvider` : `local`, `azure`, `google`, etc. ;
-- `ocrDurationMs` : mesure performance ;
-- `factureFournisseurId` : lien final vers la facture créée ;
-- `erreurTraitement` : détail exploitable en cas d'échec.
-
-## 10. Synchronisation MariaDB → PostgreSQL
-
-Les tables propres à FacturApp comme `documents_importes` ne doivent pas être écrasées par la synchronisation.
-
-Règle :
-
-```text
-MariaDB alimente PostgreSQL pour les données historiques.
-PostgreSQL reste maître pour les modules propres à FacturApp TS.
-```
-
-## MAJ du 11/07/2026
-### lignes_importees
-
-Rôle :
-
-stocker les lignes OCR corrigées et validées ;
-conserver la référence détectée ;
-conserver la désignation ;
-stocker quantité, prix unitaire, TVA et total ;
-porter un produitId facultatif ;
-distinguer les lignes associées et celles restant à rapprocher.
-
-Cycle :
-
-Ligne OCR détectée
-        ↓
-Correction utilisateur
-        ↓
-Validation
-        ↓
-LigneImportee
-        ├── produitId défini → associee
-        └── produitId null   → a_rapprocher
-
-### table d’association
-
-associations_articles_fournisseurs
-Clé fonctionnelle proposée :
-fournisseurId + referenceNormalisee
-Rôle :
-référence fournisseur détectée
-        ↓
-produit FacturApp correspondant
-Mettre à jour le cycle documentaire
-Le cycle réel comprend maintenant :
-upload
-→ OCR
-→ extraction
-→ correction
-→ lignes_validees
-→ rapprochement
-→ facture fournisseur future
-
-## MAJ du 24/07/2026
-## Correspondances articles fournisseurs
-
-Le modèle devra permettre de mémoriser une relation entre :
-
-- un fournisseur ;
-- une référence ou désignation fournisseur ;
-- un produit interne ;
-- éventuellement un score de confiance ;
-- la date de dernière utilisation ;
-- le nombre de validations confirmées.
-
-Le nom exact de la table et ses contraintes seront définis après audit
-du schéma Prisma existant.
-
-## MAJ du 26/07/2026
-### lignes_importees
-Contient la version corrigée et validée des lignes extraites par OCR.
-
-Chaque ligne peut être reliée à un produit existant et conserve notamment :
-
-- référence détectée ;
+- référence fournisseur ;
 - désignation ;
 - quantité ;
-- prix unitaire ;
-- TVA détectée à titre documentaire ;
+- prix ;
+- taux TVA ;
+- montant TVA ;
 - montant total ;
-- produit associé ;
-- statut de traitement.
-
-### AssociationArticleFournisseur
-Mémorise les correspondances validées entre une référence fournisseur et un
-produit FacturApp.
-
-L’apprentissage est déterministe : aucune association n’est créée sans
-validation métier.
+- produit associé éventuel ;
+- statut.
 
 ### IntegrationStock
-Représente une intégration globale d’un document fournisseur dans le stock.
 
-Une contrainte unique sur le document protège contre la double intégration.
+Trace l’intégration globale d’un document fournisseur au stock.
+
+Une facture Mechouar ne doit pas créer d’intégration stock.
 
 ### MouvementStock
-Trace chaque entrée de stock générée depuis une ligne importée :
+
+Trace chaque entrée stock issue d’une ligne rapprochée :
 
 - produit ;
-- ligne importée ;
 - quantité ;
 - stock avant ;
 - stock après ;
-- type de mouvement ;
-- date du mouvement.
+- document source.
 
-### Nouveau cycle réel
-Upload
-→ OCR
-→ extraction structurée
-→ correction
-→ rapprochement produit
-→ comparaison des prix
-→ confirmation utilisateur
-→ transaction de validation
-→ lignes importées
-→ associations mémorisées
-→ stock mis à jour
-→ mouvements tracés
-→ document marqué comme intégré
+## 3. États métier principaux
 
-#### Ajouter une section Prisma
-## Gestion actuelle du schéma Prisma
+Les documents fournisseurs utilisent notamment :
 
-Le projet ne dispose pas encore d’un historique `prisma/migrations`.
+- `valide` ;
+- `stock_integre`.
 
-Conséquences :
+Les lignes peuvent aussi rester dans un état sans stock lorsqu’une validation partielle est forcée.
 
-- `prisma migrate status` signale que la base n’est pas gérée par Prisma Migrate ;
-- ne pas lancer `prisma migrate reset` ;
-- ne pas utiliser `prisma db pull` comme étape automatique de restauration ;
-- sauvegarder `prisma/schema.prisma` avant toute introspection ;
-- comparer et valider les différences après introspection ;
-- utiliser `prisma validate`, `prisma generate` et `npx tsc --noEmit`
-  comme contrôles non destructifs.
+## 4. Règles TVA / stock
 
-Un baseline Prisma devra être créé ultérieurement.
+| Profil | TVA | Stock |
+|---|---:|---:|
+| `mechouar_facture` | Oui | Non |
+| `mechouar` | Non | Oui |
+| `casinfo` | Oui | Oui |
+| `mztech` | Oui | Oui |
+
+Les autres fournisseurs suivent par défaut le comportement facture fournisseur : TVA + stock, sauf règle documentaire spécifique.
+
+## 5. TVA
+
+La TVA payée provient des factures fournisseurs assujetties et des charges.
+
+La TVA perçue provient des factures clients.
+
+La page `/tva` offre des filtres par date, client et fournisseur.
+
+## 6. Synchronisation MariaDB → PostgreSQL
+
+Script :
+
+```text
+prisma/sync-mariadb-to-pg.ts
+```
+
+Le script utilise `DATABASE_URL` si disponible et conserve la possibilité d’utiliser des variables PostgreSQL historiques séparées.
+
+La conversion TVA est normalisée :
+
+```text
+0.20 → 20 %
+20   → 20 %
+```
+
+Le type fournisseur est synchronisé quand une correspondance de paramètre existe.
+
+Pour les clients, le portable peut être repris comme téléphone de secours si le téléphone principal est vide.
+
+## 7. Réinitialisation pendant la phase de test
+
+Tant que PostgreSQL ne contient pas de données irremplaçables, une reconstruction depuis `prisma/schema.prisma` est acceptable après décision explicite :
+
+```powershell
+npx prisma db push --force-reset --accept-data-loss
+npx prisma generate
+```
+
+Puis exécuter le seed ou la synchronisation VB6 selon le besoin.
+
+Cette stratégie n’est pas une règle de production définitive. Lorsque FacturApp deviendra la source principale, une stratégie de migrations versionnées devra être mise en place.
+
+## 8. Seed
+
+Le fichier :
+
+```text
+prisma/seed.ts
+```
+
+crée notamment :
+
+- rôles ;
+- administrateur ;
+- entreprise par défaut ;
+- types de paramètres ;
+- paramètres de TVA, unités, types fournisseurs, etc.
+
+Si `prisma db seed` n’est pas configuré dans `package.json`, le seed peut être exécuté directement avec `tsx` pendant la phase de développement.
+
+## 9. Prisma — règles de prudence
+
+- `prisma generate` : sans impact base.
+- `prisma validate` : sans impact base.
+- `prisma db pull` : peut réécrire le fichier Prisma.
+- `prisma db push` : modifie la base.
+- `prisma migrate reset` : destructif.
+
+Avant toute opération structurelle, vérifier la base réellement ciblée par `DATABASE_URL`.
