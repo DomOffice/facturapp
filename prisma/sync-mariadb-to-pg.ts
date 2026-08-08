@@ -2,9 +2,6 @@
 // Synchronisation MariaDB (VB6) → PostgreSQL (FacturApp)
 // VERSION COMPLÈTE CORRIGÉE — updated_at ajouté partout
 
-console.log("PGDATABASE =", process.env.PGDATABASE);
-console.log("MYSQL_HOST =", process.env.MYSQL_HOST);
-
 import { Pool } from "pg";
 import mysql from "mysql2/promise";
 
@@ -35,14 +32,48 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/*
+ * MariaDB peut contenir un taux TVA sous deux formes :
+ * - 0.20 pour 20 %
+ * - 20 pour 20 %
+ *
+ * Cette fonction retourne toujours un pourcentage :
+ * 20 dans les deux cas.
+ */
+function tauxTvaPourcentage(v: unknown): number {
+  const n = toNum(v);
+
+  if (n <= 1) {
+    return round2(n * 100);
+  }
+
+  return round2(n);
+}
+
+/*
+ * Cette fonction retourne toujours le taux sous forme décimale :
+ * 0.20 pour 20 %.
+ *
+ * Elle sert aux calculs de montants TVA et TTC.
+ */
+function tauxTvaDecimal(v: unknown): number {
+  return tauxTvaPourcentage(v) / 100;
+}
+
 async function main() {
-  const pg = new Pool({
-    host: env("PGHOST", "127.0.0.1"),
-    port: Number(env("PGPORT", "5432")),
-    database: env("PGDATABASE"),
-    user: env("PGUSER"),
-    password: env("PGPASSWORD"),
-  });
+  const databaseUrl = process.env.DATABASE_URL;
+
+  const pg = databaseUrl
+    ? new Pool({
+        connectionString: databaseUrl,
+      })
+    : new Pool({
+        host: env("PGHOST", "127.0.0.1"),
+        port: Number(env("PGPORT", "5432")),
+        database: env("PGDATABASE"),
+        user: env("PGUSER"),
+        password: env("PGPASSWORD"),
+      });
 
   const db = await mysql.createConnection({
     host: env("MYSQL_HOST", "127.0.0.1"),
@@ -114,12 +145,28 @@ async function main() {
     const [fournisseurs] = await db.query<mysql.RowDataPacket[]>(
       "SELECT id, type, nom, adresse, code_postal, ville, telephone, ice, email FROM fournisseurs ORDER BY id",
     );
+    const { rows: typeFournisseurParams } = await pgClient.query(
+      `SELECT p.id, p.libelle
+   FROM parametres p
+   JOIN parametre_types pt ON pt.id = p.type_id
+   WHERE pt.code = 'type_fournisseur'`,
+    );
+
+    const typeFournisseurMap: Record<string, number> = {};
+
+    for (const r of typeFournisseurParams) {
+      typeFournisseurMap[String(r.libelle).trim().toLowerCase()] = r.id;
+    }
     for (const f of fournisseurs) {
+      const typeFournisseurId = f.type
+        ? (typeFournisseurMap[String(f.type).trim().toLowerCase()] ?? null)
+        : null;
       await pgClient.query(
         `INSERT INTO fournisseurs
-         (id, raison_sociale, adresse, code_postal, ville, telephone, ice, email, actif, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,NOW(),NOW())
+          (id, type_fournisseur_id, raison_sociale, adresse, code_postal, ville, telephone, ice, email, actif, created_at, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,NOW(),NOW())
          ON CONFLICT (id) DO UPDATE SET
+           type_fournisseur_id = EXCLUDED.type_fournisseur_id,
            raison_sociale = EXCLUDED.raison_sociale,
            adresse = EXCLUDED.adresse,
            code_postal = EXCLUDED.code_postal,
@@ -130,6 +177,7 @@ async function main() {
            updated_at = NOW()`,
         [
           f.id,
+          typeFournisseurId,
           toNull(f.nom),
           toNull(f.adresse),
           toNull(f.code_postal),
@@ -158,8 +206,9 @@ async function main() {
        WHERE pt.code = 'taux_tva'`,
     );
     const tvaMap: Record<number, number> = {};
+
     for (const r of tvaParams) {
-      tvaMap[round2(toNum(r.valeur_num) / 100)] = r.id;
+      tvaMap[round2(toNum(r.valeur_num))] = r.id;
     }
     const { rows: uniteParams } = await pgClient.query(
       `SELECT p.id, p.libelle FROM parametres p
@@ -170,12 +219,17 @@ async function main() {
     for (const r of uniteParams) uniteMap[r.libelle] = r.id;
 
     for (const p of produits) {
-      const tauxTvaId = tvaMap[round2(toNum(p.taux_tva))] ?? null;
+      const tauxTvaPourcent = tauxTvaPourcentage(p.taux_tva);
+
+      const tauxTvaId = tvaMap[tauxTvaPourcent] ?? null;
+
       const uniteId = p.unite ? (uniteMap[p.unite] ?? null) : null;
+
       const prixAchatHt = round2(toNum(p.prix_achat_HT));
       const prixVenteHt = round2(toNum(p.prix_vente_ht));
       const margeHt = round2(prixVenteHt - prixAchatHt);
-      const tauxNum = toNum(p.taux_tva);
+
+      const tauxNum = tauxTvaDecimal(p.taux_tva);
       await pgClient.query(
         `INSERT INTO produits
          (id, reference, description, fournisseur_id, unite_id, taux_tva_id,
@@ -279,9 +333,13 @@ async function main() {
       const pu = round2(toNum(d.prix_unitaire));
       const remisePct = round2(toNum(d.remise_pct) * 100);
       const remiseHt = round2(toNum(d.remise_ht));
-      const tauxTva = round2(toNum(d.taux_tva) * 100);
+
+      const tauxTva = tauxTvaPourcentage(d.taux_tva);
+
       const montantHt = round2(toNum(d.total_ht_net));
-      const montantTva = round2(montantHt * toNum(d.taux_tva));
+
+      const montantTva = round2(montantHt * tauxTvaDecimal(d.taux_tva));
+
       const montantTtc = round2(montantHt + montantTva);
       await pgClient.query(
         `INSERT INTO facture_lignes
@@ -416,7 +474,8 @@ async function main() {
         const did = Number(d.devis_id);
         ordreDevis[did] = (ordreDevis[did] ?? 0) + 1;
         const montantHt = round2(toNum(d.total_ht_net));
-        const montantTva = round2(montantHt * toNum(d.taux_tva));
+
+        const montantTva = round2(montantHt * tauxTvaDecimal(d.taux_tva));
         await pgClient.query(
           `INSERT INTO devis_lignes
    (devis_id, produit_id, ordre_ligne, designation, quantite,
@@ -432,7 +491,7 @@ async function main() {
             round2(toNum(d.prix_unitaire)),
             round2(toNum(d.remise_pct) * 100),
             round2(toNum(d.remise_ht)),
-            round2(toNum(d.taux_tva) * 100),
+            tauxTvaPourcentage(d.taux_tva),
             montantHt,
             montantTva,
             round2(montantHt + montantTva),
@@ -525,7 +584,8 @@ async function main() {
         const aid = avoirIdMap[Number(a.avoir_id)] ?? Number(a.avoir_id);
         ordreAvoir[aid] = (ordreAvoir[aid] ?? 0) + 1;
         const montantHt = round2(toNum(a.total_ht_net));
-        const montantTva = round2(montantHt * toNum(a.taux_tva));
+
+        const montantTva = round2(montantHt * tauxTvaDecimal(a.taux_tva));
         await pgClient.query(
           `INSERT INTO avoir_lignes
            (avoir_id, produit_id, designation, quantite,
@@ -539,7 +599,7 @@ async function main() {
             round2(toNum(a.quantite)),
             round2(toNum(a.prix_unitaire)),
             round2(toNum(a.remise_pct) * 100),
-            round2(toNum(a.taux_tva) * 100),
+            tauxTvaPourcentage(a.taux_tva),
             montantHt,
             montantTva,
             round2(montantHt + montantTva),
