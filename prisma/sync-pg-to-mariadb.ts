@@ -369,10 +369,10 @@ async function syncProduits(pg: Pool, db: mysql.Connection, lookups: LookupMaps)
   console.log('• Sync produits')
   const { rows } = await pg.query(`
     SELECT id, reference, description, fournisseur_id, unite_id, taux_tva_id,
-           dernier_prix_achat_ht, prix_vente_ht, marge_ht
+           dernier_prix_achat_ht, prix_vente_ht, marge_ht, stock_actuel
     FROM public.produits
     ORDER BY id
-  `)
+`)
 
   for (const r of rows) {
     const [[current]] = await db.query<any[]>(
@@ -415,7 +415,7 @@ async function syncProduits(pg: Pool, db: mysql.Connection, lookups: LookupMaps)
         r.unite_id ? (lookups.uniteById.get(Number(r.unite_id)) ?? null) : null,
         current?.remise_initiale ?? 0,
         r.fournisseur_id ? Number(r.fournisseur_id) : null,
-        current?.stock_actuel ?? 0,
+        round2(toNumber(r.stock_actuel)),
         current?.alerte ?? null,
         prixAchatHt,
         coeffMarge(prixAchatHt, prixVenteHt, margeHt),
