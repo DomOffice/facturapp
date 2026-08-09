@@ -36,6 +36,52 @@ export default function ProduitsPageClient({
   const router = useRouter();
   const [query, setQuery] = useState("");
 
+  const [stockEditId, setStockEditId] = useState<number | null>(null);
+  const [stockEditValue, setStockEditValue] = useState("");
+  const [stockSaving, setStockSaving] = useState(false);
+
+  async function sauvegarderStock(produitId: number) {
+    const valeur = Number(stockEditValue.replace(",", "."));
+
+    if (!Number.isFinite(valeur) || valeur < 0) {
+      alert("Le stock doit être un nombre positif ou nul.");
+      return;
+    }
+
+    setStockSaving(true);
+
+    try {
+      const response = await fetch(`/api/produits/${produitId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          stockActuel: valeur,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(
+          data?.error ?? "Erreur lors de la mise à jour du stock",
+        );
+      }
+
+      setStockEditId(null);
+      setStockEditValue("");
+      router.refresh();
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la mise à jour du stock",
+      );
+    } finally {
+      setStockSaving(false);
+    }
+  }
+
   const filtered = useMemo(() => {
     if (!query || query.length < 2) return produits;
     return produits.filter(
@@ -73,18 +119,78 @@ export default function ProduitsPageClient({
       label: "Stock",
       sortable: true,
       render: (row) => {
+        const produitId = Number(row.id);
         const stock = Number(row.stockActuel);
+        const edition = stockEditId === produitId;
+
+        if (edition) {
+          return (
+            <div
+              className="flex items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={stockEditValue}
+                onChange={(e) => setStockEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    sauvegarderStock(produitId);
+                  }
+
+                  if (e.key === "Escape") {
+                    setStockEditId(null);
+                    setStockEditValue("");
+                  }
+                }}
+                className="form-input w-32 min-w-32 py-1 px-3 text-sm"
+                autoFocus
+              />
+
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                disabled={stockSaving}
+                onClick={() => sauvegarderStock(produitId)}
+              >
+                OK
+              </button>
+
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                disabled={stockSaving}
+                onClick={() => {
+                  setStockEditId(null);
+                  setStockEditValue("");
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          );
+        }
 
         return (
-          <span
+          <button
+            type="button"
             className={
               stock <= 0
-                ? "font-semibold text-red-600"
-                : "font-medium text-slate-700"
+                ? "font-semibold text-red-600 hover:underline"
+                : "font-medium text-slate-700 hover:underline"
             }
+            onClick={(e) => {
+              e.stopPropagation();
+              setStockEditId(produitId);
+              setStockEditValue(String(stock));
+            }}
+            title="Modifier le stock"
           >
             {formatStock(stock)}
-          </span>
+          </button>
         );
       },
     },

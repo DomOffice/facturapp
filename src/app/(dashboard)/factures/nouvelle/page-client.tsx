@@ -73,6 +73,7 @@ export default function NouvelleFactureClient({
   const [lignes, setLignes] = useState<Ligne[]>(factureExistante?.lignes ?? []);
   const [produits, setProduits] = useState<Produit[]>([]);
   const [searchProduit, setSearchProduit] = useState("");
+  const searchProduitRef = useRef<HTMLInputElement>(null);
   const [showPrixAchat, setShowPrixAchat] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -80,7 +81,7 @@ export default function NouvelleFactureClient({
   const [popupOpen, setPopupOpen] = useState(false);
   const popupProduitRef = useRef<Produit | null>(null);
   const editLigneIdRef = useRef<string | null>(null);
-  const [popupQte, setPopupQte] = useState("1");
+  const [popupQte, setPopupQte] = useState("");
   const [popupDesc, setPopupDesc] = useState("");
   const qteInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,7 +104,15 @@ export default function NouvelleFactureClient({
   }, []);
 
   useEffect(() => {
-    if (popupOpen) setTimeout(() => qteInputRef.current?.focus(), 50);
+    if (popupOpen) {
+      setTimeout(() => {
+        qteInputRef.current?.focus();
+
+        if (editLigneIdRef.current) {
+          qteInputRef.current?.select();
+        }
+      }, 50);
+    }
   }, [popupOpen]);
 
   const produitsFiltres = useMemo(() => {
@@ -129,7 +138,7 @@ export default function NouvelleFactureClient({
   function ouvrirPopupQte(produit: Produit) {
     popupProduitRef.current = produit;
     editLigneIdRef.current = null;
-    setPopupQte("1");
+    setPopupQte("");
     setPopupDesc(produit.description);
     setPopupOpen(true);
   }
@@ -191,6 +200,14 @@ export default function NouvelleFactureClient({
     setPopupOpen(false);
     popupProduitRef.current = null;
     editLigneIdRef.current = null;
+
+    if (!editLigneId) {
+      setSearchProduit("");
+
+      setTimeout(() => {
+        searchProduitRef.current?.focus();
+      }, 50);
+    }
   }
 
   function validerRemise() {
@@ -461,6 +478,8 @@ export default function NouvelleFactureClient({
               apiUrl="/api/produits?q="
               mode="filter"
               onSearch={setSearchProduit}
+              value={searchProduit}
+              inputRef={searchProduitRef}
               className="flex-1"
             />
           </div>
