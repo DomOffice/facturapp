@@ -1,6 +1,6 @@
 # 06 — Conventions de code FacturApp
 
-Dernière mise à jour : 2026-08-08
+Dernière mise à jour : 2026-08-10
 
 ## 1. Principe général
 
@@ -81,3 +81,11 @@ Toute évolution importante doit mettre à jour au minimum :
 - journal des décisions si une règle métier est décidée ;
 - bugs connus si une limite est acceptée ;
 - feuille de route si une priorité change.
+
+
+## 9. Règles environnement / synchronisation
+
+- ne jamais exécuter `sync-pg-to-mariadb.ts` depuis le PC DEV ;
+- vérifier `DATABASE_URL` avant dump, restore, Prisma destructif ou synchronisation ;
+- une fonctionnalité PDF doit être testée sur une facture courte et une facture multipage ;
+- sous Windows PROD, arrêter PM2 avant `prisma generate` si le moteur Prisma est verrouillé.

@@ -1,8 +1,6 @@
 # Arborescence FacturApp — vue utile
 
-Dernière mise à jour : 2026-08-08
-
-L’ancienne version de ce fichier contenait plusieurs milliers de lignes incluant les dépendances et artefacts générés. Cette vue volontairement concise ne conserve que les zones utiles au développement.
+Dernière mise à jour : 2026-08-10
 
 ```text
 facturapp/
@@ -11,16 +9,25 @@ facturapp/
 ├── prisma/
 │   ├── schema.prisma
 │   ├── seed.ts
-│   └── sync-mariadb-to-pg.ts
+│   ├── sync-mariadb-to-pg.ts
+│   └── sync-pg-to-mariadb.ts
 ├── public/
-├── scripts/
+├── scripts/                         # local/serveur, non suivi à date
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/
 │   │   ├── (dashboard)/
+│   │   │   ├── factures/
+│   │   │   │   ├── nouvelle/
+│   │   │   │   └── [id]/
+│   │   │   ├── produits/
 │   │   │   ├── factures-fournisseurs/
 │   │   │   └── tva/
+│   │   ├── admin/
+│   │   │   └── sync/
 │   │   └── api/
+│   │       ├── factures/
+│   │       ├── produits/
 │   │       └── factures-fournisseurs/
 │   │           ├── upload/
 │   │           ├── ocr/[id]/
@@ -28,6 +35,9 @@ facturapp/
 │   ├── components/
 │   │   └── ocr/
 │   └── lib/
+│       ├── exports/
+│       │   └── pdf/
+│       │       └── facture-pdf.ts
 │       └── ocr/
 │           └── drivers/
 ├── .env.example
@@ -42,4 +52,7 @@ Ne pas documenter dans cette arborescence :
 node_modules/
 .next/
 ocr/.venv/
+tsconfig.tsbuildinfo
 ```
+
+`tsconfig.tsbuildinfo` est encore suivi à date mais doit être retiré du versionnement.

@@ -1,6 +1,6 @@
 # 04 — Bugs connus FacturApp
 
-Dernière mise à jour : 2026-08-08
+Dernière mise à jour : 2026-08-10
 
 ## 1. Limites connues actives
 
@@ -10,7 +10,7 @@ Lorsque certaines lignes ne sont pas rapprochées mais que l’utilisateur force
 
 Statut : accepté temporairement.
 
-### Facture Mechouar multipage
+### Facture Mechouar multipage OCR
 
 Les totaux HT / TVA / TTC peuvent être correctement reconnus alors que le détail des lignes retombe sur `fallback_generique`.
 
@@ -18,7 +18,15 @@ Statut : acceptable actuellement, car les factures Mechouar servent à la compta
 
 ### Dépendances npm anciennes
 
-`npm ci` signale plusieurs vulnérabilités et Next.js 14.2.5 n’est plus à jour.
+Au dernier `npm install` PROD :
+
+```text
+20 vulnérabilités
+- 1 low
+- 1 moderate
+- 14 high
+- 4 critical
+```
 
 Statut : ne pas corriger avec `npm audit fix --force` sans campagne de test dédiée.
 
@@ -26,16 +34,35 @@ Statut : ne pas corriger avec `npm audit fix --force` sans campagne de test déd
 
 `pm2 startup` retourne `Init system not found` sous Windows.
 
-Le mécanisme retenu est une tâche planifiée Windows :
+Le mécanisme retenu est une tâche planifiée Windows exécutant `pm2 resurrect`.
+
+Statut : validation finale par vrai redémarrage Windows encore à faire.
+
+### `tsconfig.tsbuildinfo` versionné
+
+Le fichier est généré par TypeScript et se modifie localement sur DEV comme sur PROD. Il a déjà bloqué/parasité les mises à jour Git serveur.
+
+Statut : à retirer du suivi Git et ajouter à `.gitignore` lors d’un prochain commit de maintenance.
+
+### Verrou Prisma sous Windows
+
+`npx prisma generate` peut échouer avec :
 
 ```text
-DomOffice API (PM2)
-→ cmd.exe /c "pm2 resurrect"
+EPERM: operation not permitted, rename ... query_engine-windows.dll.node.tmp... -> query_engine-windows.dll.node
 ```
 
-La tâche possède encore un ancien `WorkingDirectory` (`C:\domoffice-api`). La modification PowerShell a échoué car Windows demande les informations d’identification enregistrées pour la tâche.
+Cause : processus Node/PM2 utilisant encore le moteur Prisma.
 
-Statut : à valider / corriger proprement avant de considérer l’auto-start comme garanti.
+Contournement validé :
+
+```powershell
+pm2 stop facturapp
+npx prisma generate
+npx tsc --noEmit
+npm run build
+pm2 restart facturapp
+```
 
 ## 2. Bugs corrigés récemment
 
@@ -49,7 +76,12 @@ Statut : à valider / corriger proprement avant de considérer l’auto-start co
 - absence des tables OCR/stock en production après déploiement ;
 - multiples daemons PM2 concurrents ;
 - lancement Next.js en mode développement via PM2 ;
-- démarrage `next start` sans build `.next`.
+- démarrage `next start` sans build `.next` ;
+- synchronisation PostgreSQL → MariaDB du stock ;
+- récupération des vraies références/unité dans les PDF ;
+- mise en page PDF monopage et multipage ;
+- passage inutile sur une page 2 pour les totaux ;
+- ergonomie de saisie article dans une nouvelle facture.
 
 ## 3. Points à surveiller
 
@@ -57,4 +89,6 @@ Statut : à valider / corriger proprement avant de considérer l’auto-start co
 - sécurité réelle du contenu des fichiers importés ;
 - dérive entre `schema.prisma` et la base PostgreSQL ;
 - anciennes valeurs d’environnement ou anciens chemins Windows après déplacement du projet ;
-- `tsconfig.tsbuildinfo` actuellement versionné alors qu’il s’agit d’un cache généré.
+- confusion possible entre PostgreSQL DEV et PROD ;
+- synchronisation inverse exécutée sur le mauvais environnement ;
+- comportement visuel du PDF après toute nouvelle modification de jsPDF/autotable.

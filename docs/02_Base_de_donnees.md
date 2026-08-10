@@ -1,18 +1,28 @@
 # 02 — Base de données FacturApp
 
-Dernière mise à jour : 2026-08-08
+Dernière mise à jour : 2026-08-10
 
 ## 1. Principe
 
-FacturApp utilise PostgreSQL. MariaDB reste la base historique de l’application VB6 et la source de réimport des données métier existantes.
+FacturApp utilise PostgreSQL. MariaDB reste la base historique de l’application VB6 et la base de coexistence pendant la transition.
 
-Les données PostgreSQL peuvent être distinguées en deux familles :
+Deux PostgreSQL distincts existent :
 
-### Données historiques synchronisées depuis VB6
+- PostgreSQL **DEV** : local au PC de développement, dédié aux tests ;
+- PostgreSQL **PROD** : local au serveur FacturApp, utilisé par l’application de production.
 
+La base DEV doit rester isolée des synchronisations de production.
+
+## 2. Données historiques et données propres à FacturApp
+
+### Données historiques synchronisables
+
+- entreprise ;
+- paramètres ;
 - clients ;
 - fournisseurs ;
 - produits ;
+- historique des prix ;
 - factures et lignes ;
 - paiements ;
 - devis et lignes ;
@@ -27,56 +37,86 @@ Les données PostgreSQL peuvent être distinguées en deux familles :
 - mouvements de stock ;
 - données OCR structurées et diagnostics.
 
-La synchronisation VB6 ne doit pas supprimer ces tables spécifiques.
+Une synchronisation historique ne doit jamais supprimer ces tables spécifiques.
 
-## 2. Modèles OCR / stock
+## 3. MariaDB historique observée
+
+Tables principales constatées :
+
+```text
+avoirs
+avoir_details
+bon_commande
+bon_commande_details
+charges
+clients
+devis
+devis_details
+entreprise
+factures
+facture_details
+fournisseurs
+paiements
+parametres
+prix_produits
+produits
+stock_entrees
+```
+
+### TVA MariaDB
+
+Les taux métier sont stockés sous forme décimale, par exemple :
+
+```text
+0.0000
+0.2000
+```
+
+Les paramètres historiques contiennent aussi les valeurs `.7`, `.14`, `.20`. Les scripts doivent normaliser ces représentations.
+
+### Stock MariaDB
+
+Historiquement, les produits étaient présents mais `stock_actuel` n’était pas réellement exploité. La synchronisation PostgreSQL → MariaDB prend désormais en charge ce champ afin de commencer la reprise du stock côté historique.
+
+### Historique des prix
+
+La table `prix_produits` est active et contient l’historique `prix_achat_ht`, `prix_vente_ht`, `coeff_marge`, `date_achat` et fournisseur éventuel.
+
+### Charges
+
+La table `charges` existe mais était vide lors des contrôles du sprint. Elle reste destinée notamment au calcul de TVA payée.
+
+### Bons de commande
+
+Présents en MariaDB mais développement fonctionnel actuellement en attente.
+
+### Entreprise
+
+MariaDB possède une table `entreprise` et les coordonnées société sont désormais reprises dans FacturApp et ses PDF.
+
+### Paiements
+
+Le modèle actuel reste un paiement unique par facture, ce qui correspond au fonctionnement réel des clients.
+
+## 4. Modèles OCR / stock FacturApp
 
 ### DocumentImporte
 
 Point d’entrée d’un document fournisseur.
 
-Contient notamment :
-
-- fournisseur ;
-- fichier original / stocké ;
-- statut ;
-- texte OCR ;
-- JSON d’extraction ;
-- dates techniques.
-
 ### LigneImportee
 
 Version persistée d’une ligne OCR validée ou partiellement validée.
-
-Contient notamment :
-
-- référence fournisseur ;
-- désignation ;
-- quantité ;
-- prix ;
-- taux TVA ;
-- montant TVA ;
-- montant total ;
-- produit associé éventuel ;
-- statut.
 
 ### IntegrationStock
 
 Trace l’intégration globale d’un document fournisseur au stock.
 
-Une facture Mechouar ne doit pas créer d’intégration stock.
-
 ### MouvementStock
 
-Trace chaque entrée stock issue d’une ligne rapprochée :
+Trace chaque entrée stock issue d’une ligne rapprochée.
 
-- produit ;
-- quantité ;
-- stock avant ;
-- stock après ;
-- document source.
-
-## 3. États métier principaux
+## 5. États métier principaux
 
 Les documents fournisseurs utilisent notamment :
 
@@ -85,7 +125,7 @@ Les documents fournisseurs utilisent notamment :
 
 Les lignes peuvent aussi rester dans un état sans stock lorsqu’une validation partielle est forcée.
 
-## 4. Règles TVA / stock
+## 6. Règles TVA / stock
 
 | Profil | TVA | Stock |
 |---|---:|---:|
@@ -96,7 +136,7 @@ Les lignes peuvent aussi rester dans un état sans stock lorsqu’une validation
 
 Les autres fournisseurs suivent par défaut le comportement facture fournisseur : TVA + stock, sauf règle documentaire spécifique.
 
-## 5. TVA
+## 7. TVA
 
 La TVA payée provient des factures fournisseurs assujetties et des charges.
 
@@ -104,7 +144,7 @@ La TVA perçue provient des factures clients.
 
 La page `/tva` offre des filtres par date, client et fournisseur.
 
-## 6. Synchronisation MariaDB → PostgreSQL
+## 8. Synchronisation MariaDB → PostgreSQL
 
 Script :
 
@@ -125,20 +165,58 @@ Le type fournisseur est synchronisé quand une correspondance de paramètre exis
 
 Pour les clients, le portable peut être repris comme téléphone de secours si le téléphone principal est vide.
 
-## 7. Réinitialisation pendant la phase de test
+## 9. Synchronisation PostgreSQL PROD → MariaDB
 
-Tant que PostgreSQL ne contient pas de données irremplaçables, une reconstruction depuis `prisma/schema.prisma` est acceptable après décision explicite :
+Script :
 
-```powershell
-npx prisma db push --force-reset --accept-data-loss
-npx prisma generate
+```text
+prisma/sync-pg-to-mariadb.ts
 ```
 
-Puis exécuter le seed ou la synchronisation VB6 selon le besoin.
+Règle impérative : **uniquement PostgreSQL PROD → MariaDB**.
 
-Cette stratégie n’est pas une règle de production définitive. Lorsque FacturApp deviendra la source principale, une stratégie de migrations versionnées devra être mise en place.
+Le script synchronise actuellement :
 
-## 8. Seed
+```text
+parametres
+entreprise
+clients
+fournisseurs
+produits
+prix_produits
+factures
+facture_details
+devis
+devis_details
+avoirs
+avoir_details
+paiements
+```
+
+Il recale les `AUTO_INCREMENT` MariaDB et prend en charge le stock produit.
+
+Validation réelle effectuée : création d’une facture dans FacturApp PROD, synchronisation, puis apparition correcte dans MariaDB.
+
+Interface d’administration :
+
+```text
+/admin/sync
+```
+
+## 10. Réinitialisation DEV
+
+La base DEV peut être remplacée par un dump de PROD pour obtenir des données de test cohérentes.
+
+Avant tout dump ou restore :
+
+1. contrôler le `.env` ;
+2. vérifier le serveur, le port et le nom de base ;
+3. confirmer que le dump provient bien de PROD ;
+4. ne jamais supposer que `DATABASE_URL` pointe au bon endroit.
+
+Une erreur de `.env` a déjà provoqué un dump de la mauvaise base pendant le sprint.
+
+## 11. Seed
 
 Le fichier :
 
@@ -154,14 +232,16 @@ crée notamment :
 - types de paramètres ;
 - paramètres de TVA, unités, types fournisseurs, etc.
 
-Si `prisma db seed` n’est pas configuré dans `package.json`, le seed peut être exécuté directement avec `tsx` pendant la phase de développement.
+Attention : lors d’une restauration d’un dump PROD, les données réelles d’entreprise doivent être présentes. Si elles manquent, le PDF peut afficher les valeurs de seed/par défaut.
 
-## 9. Prisma — règles de prudence
+## 12. Prisma — règles de prudence
 
 - `prisma generate` : sans impact base.
 - `prisma validate` : sans impact base.
 - `prisma db pull` : peut réécrire le fichier Prisma.
 - `prisma db push` : modifie la base.
 - `prisma migrate reset` : destructif.
+
+Sous Windows PROD, `prisma generate` peut nécessiter l’arrêt de PM2 à cause du verrouillage du moteur Prisma.
 
 Avant toute opération structurelle, vérifier la base réellement ciblée par `DATABASE_URL`.

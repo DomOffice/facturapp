@@ -1,6 +1,6 @@
 # 07 — Journal des décisions FacturApp
 
-Dernière mise à jour : 2026-08-08
+Dernière mise à jour : 2026-08-10
 
 ## 2026-06 / 2026-07 — Principes OCR conservés
 
@@ -68,22 +68,65 @@ Si HT et TTC sont fiables mais la TVA globale est mal lue, le profil `mechouar_f
 TVA = TTC - HT
 ```
 
-## 2026-08 — Migration VB6
+## 2026-08 — Deux bases PostgreSQL séparées
 
-MariaDB reste la source de réimport historique.
+Décision :
 
-Le script de synchronisation ne doit pas remplir les tables propres à FacturApp.
+- PostgreSQL DEV reste local au PC de développement ;
+- PostgreSQL PROD reste local au serveur ;
+- les deux bases peuvent porter le même nom logique mais ne doivent jamais être confondues ;
+- le `.env` et `DATABASE_URL` doivent être contrôlés avant dump, restore ou Prisma destructif.
 
-Les taux TVA historiques sont normalisés pour accepter `0.20` ou `20` comme représentation de 20 %.
+La base DEV peut être remplacée par un dump de PROD pour les tests.
 
-## 2026-08 — Base PostgreSQL de test reconstructible
+## 2026-08 — Synchronisation bidirectionnelle contrôlée
 
-Pendant la phase actuelle, les données PostgreSQL peuvent être supprimées si nécessaire, car elles peuvent être réimportées depuis VB6 et le seed recrée l’administrateur / paramètres.
+MariaDB reste la base historique de référence pendant la transition, mais FacturApp PROD doit pouvoir répercuter ses nouvelles données vers MariaDB.
 
-Cette liberté ne s’appliquera plus lorsque FacturApp deviendra la base métier principale.
+Deux scripts sont donc conservés :
+
+```text
+prisma/sync-mariadb-to-pg.ts
+prisma/sync-pg-to-mariadb.ts
+```
+
+Règle non négociable : `sync-pg-to-mariadb.ts` utilise uniquement PostgreSQL PROD.
+
+La synchronisation inverse a été validée par création d’une facture dans FacturApp puis contrôle dans MariaDB.
+
+## 2026-08 — Reprise du stock MariaDB
+
+Le stock MariaDB historique était très largement à zéro et la table `stock_entrees` n’était pas exploitée. Décision : commencer à alimenter `produits.stock_actuel` depuis PostgreSQL PROD lors de la synchronisation inverse.
+
+Le stock peut aussi être corrigé manuellement dans `/produits` côté FacturApp.
+
+## 2026-08 — Paiements
+
+Décision : ne pas complexifier le modèle pour les paiements fractionnés tant que le besoin réel reste un paiement unique par facture.
+
+## 2026-08 — Entreprise
+
+Les données entreprise ne doivent plus être codées en dur dans les exports. Elles sont lues depuis la base et transmises au générateur PDF.
+
+## 2026-08 — PDF facture
+
+Décision : conserver la génération jsPDF actuelle mais rapprocher fortement la présentation du document historique VB6.
+
+Principes retenus :
+
+- données société/client dynamiques ;
+- vraies références et unités ;
+- tableau lisible sans quadrillage horizontal entre articles ;
+- totaux et TVA regroupés ;
+- ventilation automatique des taux TVA ;
+- pied de page compact ;
+- gestion multipage ;
+- pas de saut de page si la zone de clôture tient encore dans l’espace disponible.
 
 ## 2026-08 — Exploitation Windows
 
-PM2 est utilisé sous Windows mais `pm2 startup` n’est pas disponible dans cet environnement.
+PM2 reste utilisé sous Windows.
 
-Le redémarrage automatique doit donc passer par le Planificateur de tâches Windows avec `pm2 resurrect` et un `pm2 save` à jour.
+Lors d’un `prisma generate`, si Windows verrouille `query_engine-windows.dll.node`, arrêter d’abord l’application PM2, puis générer, compiler et redémarrer.
+
+`tsconfig.tsbuildinfo` doit à terme être retiré de Git.
