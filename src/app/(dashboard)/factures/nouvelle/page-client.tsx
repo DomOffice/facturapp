@@ -241,6 +241,11 @@ export default function NouvelleFactureClient({
     })),
   );
 
+  const totalArticles = lignes.reduce(
+    (total, ligne) => total + ligne.quantite,
+    0,
+  );
+
   function ouvrirPopupQte(produit: Produit) {
     popupProduitRef.current = produit;
     editLigneIdRef.current = null;
@@ -534,9 +539,16 @@ export default function NouvelleFactureClient({
         </div>
 
         <div className="card p-4 flex flex-col justify-center gap-1 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-500">Total lignes</span>
-            <span className="font-medium">{totaux.totalLignes}</span>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Total lignes</span>
+              <span className="font-medium">{totaux.totalLignes}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-slate-500">Total articles</span>
+              <span className="font-medium">{formatStock(totalArticles)}</span>
+            </div>
           </div>
           <div className="flex justify-between pt-1 border-t border-slate-100">
             <span className="text-slate-500">Total HT</span>
