@@ -37,9 +37,9 @@ Sur le serveur production
 Quand tu veux récupérer la nouvelle version :
 
 cd C:\serveur\facturapp-clean
-Pour Vèrifier comment du dernier commit
-git log --oneline HEAD..origin/main
-git pull --ff-only origin main
+Pour Vérifier comment du dernier commit
+git fetch origin
+git log --oneline HEAD..origin/main / git log -3 HEAD..origin/maingit pull --ff-only origin main
 npm install
 npm run build
 pm2 restart facturapp

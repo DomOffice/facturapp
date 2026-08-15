@@ -20,7 +20,7 @@ const PYTHON_OCR_PATH = process.env.PYTHON_OCR_PATH || "python";
 
 const OCR_SCRIPT_PATH =
   process.env.OCR_SCRIPT_PATH ||
-  path.join(process.cwd(), "ocr-service", "ocr_document.py");
+  path.join(process.cwd(), "ocr", "ocr_document.py");
 
 function lireNumeroFacture(donneesExtraites: unknown): string | null {
   if (
