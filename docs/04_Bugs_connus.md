@@ -1,6 +1,6 @@
 # 04 — Bugs connus FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## 1. Limites connues actives
 
@@ -38,11 +38,11 @@ Le mécanisme retenu est une tâche planifiée Windows exécutant `pm2 resurrect
 
 Statut : validation finale par vrai redémarrage Windows encore à faire.
 
-### `tsconfig.tsbuildinfo` versionné
+### `tsconfig.tsbuildinfo`
 
-Le fichier est généré par TypeScript et se modifie localement sur DEV comme sur PROD. Il a déjà bloqué/parasité les mises à jour Git serveur.
+Le fichier est généré par TypeScript. Il a été retiré du suivi Git et ajouté à `.gitignore` le 2026-08-15.
 
-Statut : à retirer du suivi Git et ajouter à `.gitignore` lors d’un prochain commit de maintenance.
+Statut : corrigé.
 
 ### Verrou Prisma sous Windows
 
@@ -92,3 +92,34 @@ pm2 restart facturapp
 - confusion possible entre PostgreSQL DEV et PROD ;
 - synchronisation inverse exécutée sur le mauvais environnement ;
 - comportement visuel du PDF après toute nouvelle modification de jsPDF/autotable.
+
+
+## Mise à jour 2026-08-15
+
+### OCR PROD — performance CPU
+
+L'OCR fonctionne sur le serveur mais reste lent sur Intel Core i5-7500 (4 cœurs / 4 threads), surtout avec MKLDNN désactivé.
+
+Mesures sur un PDF de référence :
+
+```text
+MAX_SIDE=2800 : PaddleOCR ~80,31 s
+MAX_SIDE=2200 : PaddleOCR ~55,25 s
+MAX_SIDE=2000 : PaddleOCR ~48,50 s
+```
+
+Le compromis retenu doit être validé selon la qualité de reconnaissance. Ne pas sacrifier la fiabilité pour quelques secondes.
+
+### PaddlePaddle / oneDNN / PIR
+
+Erreur observée en PROD :
+
+```text
+NotImplementedError: ConvertPirAttribute2RuntimeAttribute not support ...
+```
+
+Contournement actuel : désactivation de PIR et MKLDNN/oneDNN dans `ocr/ocr_document.py`. Un futur sprint pourra figer une combinaison PaddlePaddle/PaddleOCR permettant de réactiver l'accélération CPU.
+
+### Référence / Type produit
+
+Une incohérence de conception entre la notion métier de Type et le champ historique `reference` a été identifiée dans le catalogue facture. Ne pas corriger superficiellement dans ce sprint ; prévoir une analyse dédiée du modèle de données, des écrans, synchronisations et compatibilité VB6.

@@ -1,6 +1,6 @@
 # 03 — Améliorations FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## 1. Fonctionnalités désormais terminées
 
@@ -139,3 +139,35 @@ Le générateur `src/lib/exports/pdf/facture-pdf.ts` a été largement refondu :
 - file de traitement OCR ;
 - recherche plein texte documentaire ;
 - prévisualisation PDF plus avancée.
+
+
+## Ajouts validés — 2026-08-15
+
+### Création / modification facture
+
+- création d'un article directement depuis `/factures/nouvelle`, via popup réutilisant `ProduitForm` ;
+- conservation intégrale de la facture en cours pendant la création ;
+- description préremplie par la recherche si aucun article n'est trouvé ;
+- quantité `0` sur une ligne existante : confirmation puis suppression ;
+- colonnes des tableaux Articles redimensionnables ;
+- barre de défilement horizontale du catalogue épaissie ;
+- `Afficher prix achat` affiche désormais aussi PA HT / PA TTC dans le catalogue.
+
+### Produits
+
+- création du produit et de sa première ligne `prix_produits` dans une transaction ;
+- compatibilité améliorée avec la lecture historique VB6 des prix.
+
+### Administration
+
+- ajout prévu/implémenté d'un accès `/admin/sync` dans la navigation Administration ;
+- barre d'activité de synchronisation recommandée sans faux pourcentage tant que l'API ne publie pas une progression réelle.
+
+### OCR PROD
+
+- installation Python 3.12.10 sur le serveur ;
+- chemin OCR corrigé vers `ocr/ocr_document.py` ;
+- dépendances Python installées ;
+- OCR local opérationnel sur serveur CPU ;
+- instrumentation de chronométrage ajoutée au script serveur pour mesurer initialisation, temps par page et temps total ;
+- essais de réduction de `MAX_SIDE` effectués pour accélérer l'inférence.

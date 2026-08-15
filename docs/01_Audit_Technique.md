@@ -1,6 +1,6 @@
 # 01 — Audit technique FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## 1. État général
 
@@ -84,3 +84,30 @@ Le PDF facture est fonctionnel en monopage et multipage. Les ajustements de pré
 ## 6. Conclusion
 
 Le sprint d’août 2026 ferme une étape importante : stock exploitable, synchronisation inverse validée, ergonomie de création de facture améliorée et PDF client largement stabilisé. La prochaine phase peut reprendre sur les fonctionnalités métier restantes, mais la priorité transversale reste l’industrialisation de l’exploitation et des tests.
+
+
+## Mise à jour audit — 2026-08-15
+
+### Facturation
+
+Améliorations validées sur `/factures/nouvelle` :
+
+- création rapide d'un produit dans une modale sans perdre la facture en cours ;
+- préremplissage de la description avec le texte recherché lorsque le catalogue ne retourne rien ;
+- quantité `0` sur une ligne existante = proposition de suppression avec confirmation ;
+- colonnes des deux tableaux Articles redimensionnables ;
+- scrollbar horizontale du catalogue rendue plus maniable ;
+- option `Afficher prix achat` étendue au catalogue avec PA HT / PA TTC ;
+- le tri du catalogue n'a volontairement pas été modifié : une correction de conception Référence / Type est reportée à un sprint ultérieur.
+
+### Produits / historique de prix
+
+La cause d'un défaut apparent de synchronisation vers VB6 a été identifiée : VB6 récupère PA, PV, marge et date depuis la dernière ligne de `prix_produits`. Les produits créés auparavant dans FacturApp pouvaient ne pas avoir de ligne d'historique. La création produit a donc été corrigée pour créer la première ligne `prix_produits` transactionnellement.
+
+Les produits 811 et 812 ont été identifiés comme cas historiques à rattraper de façon ciblée, sans migration massive aveugle.
+
+### OCR PROD
+
+L'OCR a été exécuté pour la première fois sur le serveur. Incidents résolus successivement : Python absent/alias Microsoft Store, chemin `ocr-service` incorrect, PyMuPDF absent, PaddleOCR absent. Une incompatibilité PaddlePaddle/oneDNN/PIR a nécessité la désactivation de PIR/MKLDNN.
+
+La performance CPU reste un point de vigilance : sur un PDF de test, l'inférence PaddleOCR est passée d'environ 80 s à 55 s avec `MAX_SIDE=2200`, et à 48,5 s avec `MAX_SIDE=2000`. La qualité OCR doit primer sur le gain marginal de temps.

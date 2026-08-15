@@ -1,6 +1,6 @@
 # 00 — Architecture FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## 1. Objectif
 
@@ -314,3 +314,45 @@ C:\Users\SRV-BDD\.pm2\dump.pm2
 
 Sous Windows, `npx prisma generate` peut échouer avec `EPERM` si PM2/Node garde `query_engine-windows.dll.node` ouvert. Dans ce cas, arrêter `facturapp` avec PM2, régénérer Prisma, construire, puis redémarrer.
 
+
+
+## Mise à jour 2026-08-15 — facturation, produits et OCR PROD
+
+### Création de produits depuis une facture
+
+La page `/factures/nouvelle` permet désormais de créer un produit sans quitter la facture en cours. Le formulaire existant `ProduitForm` est réutilisé dans une fenêtre modale. Quand la création part d'une recherche sans résultat, le texte recherché préremplit la description du nouveau produit. Après création, le catalogue est rechargé et le produit peut être ajouté immédiatement à la facture.
+
+La page de modification `/factures/[id]/modifier` utilise le même composant client et fournit donc également les listes Type / Unité / TVA / Fournisseur nécessaires à cette création embarquée.
+
+### Historisation initiale des prix produit
+
+La création d'un produit via l'API doit créer dans une même transaction Prisma :
+
+```text
+produits
++
+prix_produits (première ligne d'historique)
+```
+
+Cette règle est importante pour la compatibilité VB6 : l'ancien écran VB6 lit le dernier prix d'un produit dans `prix_produits`, et non uniquement les champs courants de `produits`.
+
+### OCR en production
+
+Le script OCR versionné est :
+
+```text
+ocr/ocr_document.py
+```
+
+Le chemin API a été corrigé de `ocr-service/ocr_document.py` vers `ocr/ocr_document.py`.
+
+En PROD, Python 3.12.10 est installé sous le profil `SRV-BDD`. PaddleOCR / PaddlePaddle et PyMuPDF sont requis. Pour contourner une incompatibilité PaddlePaddle/oneDNN/PIR observée sur le serveur CPU, le script utilise actuellement :
+
+```python
+os.environ["FLAGS_enable_pir_api"] = "0"
+os.environ["FLAGS_use_mkldnn"] = "0"
+```
+
+et initialise PaddleOCR avec `enable_mkldnn=False`.
+
+Le serveur possède un Intel Core i5-7500, 4 cœurs / 4 threads. `cpu_threads=4` est donc conservé.

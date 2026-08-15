@@ -1,6 +1,6 @@
 # 02 — Base de données FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## 1. Principe
 
@@ -245,3 +245,19 @@ Attention : lors d’une restauration d’un dump PROD, les données réelles d�
 Sous Windows PROD, `prisma generate` peut nécessiter l’arrêt de PM2 à cause du verrouillage du moteur Prisma.
 
 Avant toute opération structurelle, vérifier la base réellement ciblée par `DATABASE_URL`.
+
+
+## Mise à jour 2026-08-15 — produits et prix
+
+Le modèle métier distingue :
+
+```text
+produits       = état courant du produit
+prix_produits  = historique des prix / fournisseur
+```
+
+Cette distinction est aussi importante pour l'application VB6 historique : son écran produits charge le dernier enregistrement de `prix_produits` par `produit_id`, trié par `date_achat DESC, id DESC`.
+
+La création d'un produit dans FacturApp doit donc alimenter les deux structures dans une transaction Prisma. Les produits créés avant cette correction peuvent posséder leurs valeurs courantes dans `produits` sans ligne correspondante dans `prix_produits`.
+
+Contrôle effectué : PostgreSQL PROD contient 811 produits, dont 776 avec `dernier_prix_achat_ht > 0` et 35 avec prix achat nul/NULL. MariaDB présente le même ordre de grandeur ; ces 35 cas sont considérés comme données historiques/tests à qualifier puis désactiver dans FacturApp, pas comme un défaut de synchronisation.

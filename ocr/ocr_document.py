@@ -4,6 +4,12 @@ import sys
 import traceback
 from pathlib import Path
 
+import os
+import time
+
+os.environ["FLAGS_enable_pir_api"] = "0"
+os.environ["FLAGS_use_mkldnn"] = "0"
+
 import fitz  # PyMuPDF
 from paddleocr import PaddleOCR
 from PIL import Image
@@ -17,16 +23,22 @@ if hasattr(sys.stderr, "reconfigure"):
 
 
 PDF_DPI = 200
-MAX_SIDE = 2800
+MAX_SIDE = 2200
 FORMATS_IMAGE = {".jpg", ".jpeg", ".png"}
 
+
+debut_initialisation = time.perf_counter()
 
 ocr = PaddleOCR(
     lang="fr",
     use_doc_orientation_classify=False,
     use_doc_unwarping=False,
-    use_textline_orientation=True,
+    use_textline_orientation=False,
+    enable_mkldnn=False,
+    cpu_threads=4,
 )
+
+duree_initialisation = time.perf_counter() - debut_initialisation
 
 
 def journaliser(message: str) -> None:
@@ -137,7 +149,17 @@ def ocr_image(image_path: Path) -> dict:
     optimiser_image(image_path)
 
     journaliser(f"Analyse PaddleOCR : {image_path.name}")
+
+    debut_ocr = time.perf_counter()
+
     resultats = ocr.predict(str(image_path))
+
+    duree_ocr = time.perf_counter() - debut_ocr
+
+    journaliser(
+        f"Analyse PaddleOCR terminée : {image_path.name} "
+        f"en {duree_ocr:.2f} s"
+    )
 
     lignes = []
     textes = []
@@ -165,6 +187,7 @@ def ocr_image(image_path: Path) -> dict:
                 if index < len(rec_scores)
                 else 0.0
             )
+
             position = (
                 normaliser_position(rec_polys[index])
                 if index < len(rec_polys)
@@ -178,6 +201,7 @@ def ocr_image(image_path: Path) -> dict:
                     "position": position,
                 }
             )
+
             textes.append(str(texte))
 
     return {
@@ -228,6 +252,12 @@ def traiter_document(fichier: Path, temp_dir: Path) -> dict:
 
 
 def main() -> None:
+    debut_total = time.perf_counter()
+
+    journaliser(
+        f"Initialisation PaddleOCR : {duree_initialisation:.2f} s"
+    )
+
     if len(sys.argv) < 2:
         resultat = {
             "success": False,
@@ -264,6 +294,9 @@ def main() -> None:
         }
     finally:
         supprimer_dossier_temporaire(temp_dir)
+        
+    duree_totale = time.perf_counter() - debut_total
+    journaliser(f"Traitement total : {duree_totale:.2f} s")
 
     # Une seule sortie JSON sur stdout, y compris en cas d'erreur.
     print(json.dumps(resultat, ensure_ascii=False))

@@ -1,6 +1,6 @@
 # 10 — Reprise du projet FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## État actuel
 
@@ -140,3 +140,21 @@ Commencer par :
 3. vérifier `git status` DEV et PROD ;
 4. confirmer les `.env` et les deux PostgreSQL ;
 5. choisir le prochain objectif parmi feuille de route P0/P1.
+
+
+## Reprise après sprint du 2026-08-15
+
+Derniers travaux validés :
+
+- ergonomie avancée de `/factures/nouvelle` ;
+- création produit embarquée ;
+- historisation initiale `prix_produits` ;
+- synchronisation nouveau produit testée en PROD ;
+- diagnostic VB6 confirmé : les prix de l'écran produits proviennent du dernier `prix_produits` ;
+- OCR PROD installé et fonctionnel ;
+- chemin OCR corrigé vers `ocr/ocr_document.py` ;
+- performances OCR mesurées et améliorées par réduction de `MAX_SIDE`.
+
+Point de reprise immédiat : **récupérer depuis le serveur la version finale de `ocr/ocr_document.py`, la remettre dans le PC DEV, comparer et versionner**. Ne pas laisser cette version uniquement en PROD.
+
+Le prochain sprint peut ensuite choisir entre : stabilisation OCR/performance, correction conceptuelle Référence/Type produit, ou poursuite des priorités P0/P1 d'exploitation.

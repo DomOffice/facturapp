@@ -1,6 +1,6 @@
 # 07 — Journal des décisions FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## 2026-06 / 2026-07 — Principes OCR conservés
 
@@ -130,3 +130,28 @@ PM2 reste utilisé sous Windows.
 Lors d’un `prisma generate`, si Windows verrouille `query_engine-windows.dll.node`, arrêter d’abord l’application PM2, puis générer, compiler et redémarrer.
 
 `tsconfig.tsbuildinfo` doit à terme être retiré de Git.
+
+
+## 2026-08-15 — Facturation / produits / OCR PROD
+
+### Création produit depuis facture
+
+Décision : réutiliser `ProduitForm` dans une modal au lieu de dupliquer un formulaire ou de naviguer vers `/produits/nouveau`. La facture en cours reste donc intacte.
+
+### Quantité zéro
+
+Décision : sur une ligne existante, saisir `0` propose la suppression avec confirmation nominative de l'article. Sur un nouvel article non encore ajouté, `0` annule simplement l'ajout.
+
+### Historique prix produit
+
+Décision : chaque nouvelle création produit doit créer une première ligne `prix_produits` dans la même transaction Prisma. Raison : compatibilité historique et VB6, qui lit le dernier prix depuis cette table.
+
+### Données historiques sans prix
+
+Décision : ne pas inventer de prix pour les 35 produits à PA nul/NULL observés dans PostgreSQL et MariaDB. Ils seront qualifiés puis désactivés dans FacturApp s'ils correspondent à des tests/doublons.
+
+### OCR PROD
+
+Décision : conserver l'OCR local. Python 3.12.10 est installé en PROD. Le script de référence reste `ocr/ocr_document.py`. Les ajustements faits directement sur le serveur doivent être rapatriés sur DEV puis versionnés ; le serveur ne doit pas devenir une source parallèle de code.
+
+Pour stabilité CPU, PIR et MKLDNN sont actuellement désactivés. `cpu_threads=4` correspond aux 4 cœurs logiques du serveur. Les optimisations de résolution/taille doivent être mesurées sur un même document de référence.

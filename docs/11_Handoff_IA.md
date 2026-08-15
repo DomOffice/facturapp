@@ -1,6 +1,6 @@
 # 11 — Handoff intégral IA / reprise FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 > Ce document est conçu pour être copié tel quel dans une nouvelle conversation avec une IA afin de reprendre FacturApp sans réexpliquer l’historique.
 
@@ -706,3 +706,17 @@ Si un détail dépend du code exact, lire le dépôt ou demander le fichier pré
 ---
 
 # FIN DU PROMPT DE REPRISE
+
+---
+
+# ADDENDUM — Sprint du 2026-08-15
+
+Pour l'état le plus récent, lire également :
+
+```text
+docs/PROMPT_REPRISE_FACTURAPP_2026-08-15.md
+```
+
+Points majeurs ajoutés depuis le handoff du 2026-08-10 : création produit depuis facture, ergonomie avancée des tableaux facture, historisation initiale `prix_produits`, correction du diagnostic VB6, `tsconfig.tsbuildinfo` retiré de Git, premier fonctionnement OCR PROD, installation Python/PaddleOCR, correction du chemin `ocr/ocr_document.py`, workaround PIR/MKLDNN et mesures de performance OCR.
+
+Action de reprise immédiate : rapatrier la version de `ocr/ocr_document.py` modifiée sur PROD vers DEV, la comparer, choisir la valeur finale de `MAX_SIDE`, puis la versionner depuis DEV.

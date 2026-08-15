@@ -1,6 +1,6 @@
 # 05 — Feuille de route FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-15
 
 ## Sprint clôturé — Stock / synchronisation / facturation / PDF
 
@@ -23,7 +23,7 @@ Dernière mise à jour : 2026-08-10
 ### P0 — Exploitation serveur
 
 - [ ] Valider la tâche Windows `DomOffice API (PM2)` par vrai redémarrage.
-- [ ] Retirer `tsconfig.tsbuildinfo` du suivi Git et l’ajouter à `.gitignore`.
+- [x] Retirer `tsconfig.tsbuildinfo` du suivi Git et l’ajouter à `.gitignore`.
 - [ ] Versionner `ecosystem.config.cjs` après nettoyage.
 - [ ] Créer un script de déploiement reproductible.
 - [ ] Automatiser les sauvegardes PostgreSQL PROD.
@@ -80,3 +80,30 @@ Avant que FacturApp remplace définitivement VB6 :
 - redémarrage automatique validé ;
 - tests de non-régression sur fonctions financières, PDF, synchronisation et stock ;
 - décision explicite sur l’arrêt du rôle de MariaDB comme base historique de référence.
+
+
+## Sprint 2026-08-15 — clôture
+
+- [x] Création rapide d'un produit depuis une facture sans navigation.
+- [x] Préremplissage Description depuis la recherche catalogue.
+- [x] Suppression sécurisée d'une ligne de facture par quantité `0`.
+- [x] Colonnes des tableaux Articles redimensionnables.
+- [x] Affichage PA HT / PA TTC dans le catalogue avec `Afficher prix achat`.
+- [x] Amélioration de la scrollbar horizontale du catalogue.
+- [x] Retrait de `tsconfig.tsbuildinfo` du suivi Git et ajout au `.gitignore`.
+- [x] Création transactionnelle de la première ligne `prix_produits` à la création produit.
+- [x] Validation de la synchronisation d'un nouveau produit PostgreSQL PROD → MariaDB.
+- [x] Diagnostic de compatibilité VB6 : les prix affichés proviennent de `prix_produits`.
+- [x] Installation et premier fonctionnement OCR sur le serveur PROD.
+- [x] Correction du chemin OCR `ocr-service` → `ocr`.
+- [x] Ajout d'une instrumentation de performance OCR.
+
+### Prochaines priorités proposées
+
+- [ ] Rapatrier et versionner depuis DEV la version finale de `ocr/ocr_document.py` actuellement ajustée sur le serveur.
+- [ ] Choisir définitivement `MAX_SIDE` (2200 recommandé par prudence tant que 2000 n'est pas validé sur plusieurs fournisseurs).
+- [ ] Figer les versions Python/PaddleOCR/PaddlePaddle dans `ocr/requirements.txt`.
+- [ ] Tester OCR PROD sur Mechouar, CasInfo, MZ Tech et documents génériques.
+- [ ] Étudier une combinaison Paddle permettant de réactiver MKLDNN sans erreur PIR.
+- [ ] Sprint dédié à la conception Référence / Type produit.
+- [ ] Désactiver dans FacturApp les anciens articles à prix achat nul identifiés comme tests/doublons, après vérification de leur historique commercial.
