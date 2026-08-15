@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SmartSearch, { fuzzyMatch } from "@/components/ui/smart-search";
+import ProduitForm from "@/components/forms/produit-form";
 import {
   calculerLigne,
   calculerTotauxFacture,
@@ -26,6 +27,12 @@ function formatStock(valeur: number): string {
     maximumFractionDigits: 2,
   }).format(valeur);
 }
+
+type Option = {
+  id: number;
+  libelle: string;
+  valeurNum?: number | null;
+};
 
 type Client = { id: number; raisonSociale: string };
 
@@ -58,10 +65,18 @@ export default function NouvelleFactureClient({
   clients,
   prochainNumero,
   factureExistante,
+  typesProduit,
+  unites,
+  tauxTva,
+  fournisseurs,
 }: {
   clients: Client[];
   prochainNumero: string;
   factureExistante?: FactureExistante;
+  typesProduit: Option[];
+  unites: Option[];
+  tauxTva: Option[];
+  fournisseurs: Option[];
 }) {
   const router = useRouter();
   const [clientId, setClientId] = useState<number | null>(
@@ -76,6 +91,9 @@ export default function NouvelleFactureClient({
   const searchProduitRef = useRef<HTMLInputElement>(null);
   const [showPrixAchat, setShowPrixAchat] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [popupProduitCreation, setPopupProduitCreation] = useState(false);
+  const [descriptionProduitInitiale, setDescriptionProduitInitiale] =
+    useState("");
 
   // Popup quantité
   const [popupOpen, setPopupOpen] = useState(false);
@@ -141,6 +159,42 @@ export default function NouvelleFactureClient({
     setPopupQte("");
     setPopupDesc(produit.description);
     setPopupOpen(true);
+  }
+
+  async function produitCree(produitCree: { id: number }) {
+    try {
+      const response = await fetch("/api/produits?actif=true");
+
+      if (!response.ok) {
+        throw new Error("Impossible de recharger les produits");
+      }
+
+      const data = await response.json();
+      const nouvelleListe: Produit[] = Array.isArray(data) ? data : [];
+
+      setProduits(nouvelleListe);
+      setPopupProduitCreation(false);
+      setSearchProduit("");
+
+      const nouveauProduit =
+        nouvelleListe.find((produit) => produit.id === produitCree.id) ?? null;
+
+      if (nouveauProduit) {
+        setTimeout(() => {
+          ouvrirPopupQte(nouveauProduit);
+        }, 50);
+      } else {
+        setTimeout(() => {
+          searchProduitRef.current?.focus();
+        }, 50);
+      }
+    } catch {
+      setPopupProduitCreation(false);
+
+      alert(
+        "Le produit a bien été créé, mais la liste des articles n'a pas pu être actualisée.",
+      );
+    }
   }
 
   function modifierLigne(ligne: Ligne) {
@@ -473,6 +527,16 @@ export default function NouvelleFactureClient({
             <span className="text-xs text-slate-400">
               {produitsFiltres.length} / {produits.length}
             </span>
+            <button
+              type="button"
+              onClick={() => {
+                setDescriptionProduitInitiale("");
+                setPopupProduitCreation(true);
+              }}
+              className="btn-secondary whitespace-nowrap"
+            >
+              + Nouvel article
+            </button>
             <SmartSearch
               placeholder="Rechercher par fragments..."
               apiUrl="/api/produits?q="
@@ -535,7 +599,18 @@ export default function NouvelleFactureClient({
                       colSpan={6}
                       className="py-6 text-center text-xs text-slate-400"
                     >
-                      Aucun article trouvé pour « {searchProduit} »
+                      <div>Aucun article trouvé pour « {searchProduit} »</div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDescriptionProduitInitiale(searchProduit.trim());
+                          setPopupProduitCreation(true);
+                        }}
+                        className="btn-primary mt-3"
+                      >
+                        + Créer cet article
+                      </button>
                     </td>
                   </tr>
                 )}
@@ -544,6 +619,54 @@ export default function NouvelleFactureClient({
           </div>
         </div>
       </div>
+
+      {/* POPUP CRÉATION PRODUIT */}
+      {popupProduitCreation && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setPopupProduitCreation(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div>
+                <h3 className="font-semibold text-slate-800">Nouvel article</h3>
+
+                <p className="text-xs text-slate-500 mt-1">
+                  L&apos;article sera ajouté au catalogue sans quitter la
+                  facture.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPopupProduitCreation(false)}
+                className="text-slate-400 hover:text-slate-700 text-xl"
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6">
+              <ProduitForm
+                produit={{
+                  description: descriptionProduitInitiale,
+                }}
+                typesProduit={typesProduit}
+                unites={unites}
+                tauxTva={tauxTva}
+                fournisseurs={fournisseurs}
+                onProduitCree={produitCree}
+                onAnnuler={() => setPopupProduitCreation(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* POPUP QUANTITÉ */}
       {popupOpen && (

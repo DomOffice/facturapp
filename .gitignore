@@ -75,3 +75,6 @@ Desktop.ini
 .DS_Store
 
 build/
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
