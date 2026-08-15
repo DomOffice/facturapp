@@ -182,3 +182,23 @@ body {
 .catalogue-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+/* Barre d'activité de la synchronisation */
+.sync-progress {
+  width: 35%;
+  animation: sync-progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes sync-progress-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  50% {
+    transform: translateX(95%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}

@@ -35,11 +35,48 @@ export async function POST(req: NextRequest) {
   if (!authorized) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
   }
-  
+
   const data = await req.json()
+
   if (!data.description?.trim()) {
-    return NextResponse.json({ error: 'La description est obligatoire' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'La description est obligatoire' },
+      { status: 400 },
+    )
   }
-  const produit = await prisma.produit.create({ data })
-  return NextResponse.json(produit, { status: 201 })
+
+  try {
+    const produit = await prisma.$transaction(async (tx) => {
+      // 1. Création du produit
+      const nouveauProduit = await tx.produit.create({
+        data,
+      })
+
+      // 2. Création de la première ligne d'historique des prix
+      await tx.prixProduit.create({
+        data: {
+          produitId: nouveauProduit.id,
+          dateAchat: new Date(),
+          prixAchatHt: data.dernierPrixAchatHt ?? 0,
+          prixAchatTtc: data.dernierPrixAchatTtc ?? 0,
+          prixVenteHt: data.prixVenteHt ?? 0,
+          prixVenteTtc: data.prixVenteTtc ?? 0,
+          margeHt: data.margeHt ?? 0,
+          tauxTvaId: data.tauxTvaId ?? null,
+          fournisseurId: data.fournisseurId ?? null,
+        },
+      })
+
+      return nouveauProduit
+    })
+
+    return NextResponse.json(produit, { status: 201 })
+  } catch (error) {
+    console.error('Erreur création produit :', error)
+
+    return NextResponse.json(
+      { error: 'Erreur lors de la création du produit' },
+      { status: 500 },
+    )
+  }
 }
