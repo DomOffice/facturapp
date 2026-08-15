@@ -61,6 +61,59 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function ResizableTh({
+  children,
+  width,
+  onResize,
+  className = "",
+}: {
+  children?: React.ReactNode;
+  width: number;
+  onResize: (width: number) => void;
+  className?: string;
+}) {
+  const startResize = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startWidth = width;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const nouvelleLargeur = Math.max(45, startWidth + event.clientX - startX);
+
+      onResize(nouvelleLargeur);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  return (
+    <th
+      className={`relative ${className}`}
+      style={{
+        width,
+        minWidth: width,
+        maxWidth: width,
+      }}
+    >
+      {children}
+
+      <div
+        onMouseDown={startResize}
+        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none hover:bg-indigo-300"
+        title="Glisser pour redimensionner"
+      />
+    </th>
+  );
+}
+
 export default function NouvelleFactureClient({
   clients,
   prochainNumero,
@@ -91,6 +144,41 @@ export default function NouvelleFactureClient({
   const searchProduitRef = useRef<HTMLInputElement>(null);
   const [showPrixAchat, setShowPrixAchat] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [largeursFacture, setLargeursFacture] = useState([
+    45, // #
+    220, // Désignation
+    60, // Qté
+    90, // PU HT
+    75, // Remise
+    65, // TVA
+    100, // Montant HT
+    100, // TTC
+    90, // P.Achat
+    45, // Suppression
+  ]);
+
+  const [largeursCatalogue, setLargeursCatalogue] = useState([
+    100, // Type
+    230, // Description
+    70, // Stock
+    90, // PV HT
+    90, // PA HT
+    60, // TVA
+    100, // PV TTC
+    100, // PA TTC
+  ]);
+
+  function modifierLargeurFacture(index: number, largeur: number) {
+    setLargeursFacture((precedentes) =>
+      precedentes.map((valeur, i) => (i === index ? largeur : valeur)),
+    );
+  }
+
+  function modifierLargeurCatalogue(index: number, largeur: number) {
+    setLargeursCatalogue((precedentes) =>
+      precedentes.map((valeur, i) => (i === index ? largeur : valeur)),
+    );
+  }
   const [popupProduitCreation, setPopupProduitCreation] = useState(false);
   const [descriptionProduitInitiale, setDescriptionProduitInitiale] =
     useState("");
@@ -212,13 +300,62 @@ export default function NouvelleFactureClient({
     if (!produit) return;
 
     let qte = 1;
+
     try {
       // eslint-disable-next-line no-new-func
       const res = Function('"use strict"; return (' + popupQte + ")")();
       qte = arrondi2(Number(res));
-      if (isNaN(qte) || qte <= 0) qte = 1;
+
+      if (isNaN(qte) || qte < 0) {
+        qte = 1;
+      }
     } catch {
-      qte = parseFloat(popupQte) || 1;
+      const valeur = parseFloat(popupQte);
+      qte = isNaN(valeur) || valeur < 0 ? 1 : valeur;
+    }
+
+    // En modification, une quantité à 0 supprime la ligne de la facture.
+    if (qte === 0 && editLigneId) {
+      const ligneASupprimer = lignes.find(
+        (ligne) => ligne.tempId === editLigneId,
+      );
+
+      const designation = ligneASupprimer?.designation || "cet article";
+
+      const confirmation = window.confirm(
+        `Voulez-vous supprimer "${designation}" ?`,
+      );
+
+      if (!confirmation) {
+        return;
+      }
+
+      setLignes((prev) => prev.filter((ligne) => ligne.tempId !== editLigneId));
+
+      setPopupOpen(false);
+      popupProduitRef.current = null;
+      editLigneIdRef.current = null;
+
+      setTimeout(() => {
+        searchProduitRef.current?.focus();
+      }, 50);
+
+      return;
+    }
+
+    // Lors de l'ajout d'un nouvel article, quantité 0 = ne rien ajouter.
+    if (qte === 0) {
+      setPopupOpen(false);
+      popupProduitRef.current = null;
+      editLigneIdRef.current = null;
+
+      setSearchProduit("");
+
+      setTimeout(() => {
+        searchProduitRef.current?.focus();
+      }, 50);
+
+      return;
     }
 
     const tauxTva = Number(produit.tauxTva?.valeurNum ?? 20);
@@ -440,82 +577,143 @@ export default function NouvelleFactureClient({
           <div className="px-4 py-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             Articles — double clic pour modifier
           </div>
-          <table className="data-table text-xs">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Désignation</th>
-                <th>Qté</th>
-                <th>PU HT</th>
-                <th>Remise</th>
-                <th>TVA%</th>
-                <th>Montant HT</th>
-                <th>TTC</th>
-                {showPrixAchat && <th>P.Achat</th>}
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lignes.map((l, i) => (
-                <tr
-                  key={l.tempId}
-                  onDoubleClick={() => modifierLigne(l)}
-                  className="hover:bg-indigo-50"
-                >
-                  <td className="text-slate-400">{i + 1}</td>
-                  <td className="max-w-32 truncate font-medium">
-                    {l.designation}
-                  </td>
-                  <td>{l.quantite}</td>
-                  <td>{formatMontant(l.prixUnitaireHt)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPopupRemiseLigneId(l.tempId);
-                        setPopupRemiseVal(String(l.remisePourcentage));
-                        setPopupRemise(true);
-                      }}
-                      className="text-amber-500 hover:underline"
-                    >
-                      {l.remisePourcentage > 0
-                        ? `${l.remisePourcentage}%`
-                        : "—"}
-                    </button>
-                  </td>
-                  <td>{l.tauxTva}%</td>
-                  <td className="font-medium">{formatMontant(l.montantHt)}</td>
-                  <td className="font-semibold text-indigo-600">
-                    {formatMontant(l.montantTtc)}
-                  </td>
-                  {showPrixAchat && (
-                    <td className="text-slate-400">
-                      {formatMontant(l.prixAchatHt)}
-                    </td>
-                  )}
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => supprimerLigne(l.tempId)}
-                      className="text-red-400 hover:text-red-600 text-xs"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {lignes.length === 0 && (
+          <div className="overflow-x-auto">
+            <table className="data-table text-xs table-fixed">
+              <thead>
                 <tr>
-                  <td
-                    colSpan={10}
-                    className="text-center text-slate-300 py-6 text-xs"
+                  <ResizableTh
+                    width={largeursFacture[0]}
+                    onResize={(w) => modifierLargeurFacture(0, w)}
                   >
-                    Double clic sur un article ci-dessous pour l&apos;ajouter
-                  </td>
+                    #
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursFacture[1]}
+                    onResize={(w) => modifierLargeurFacture(1, w)}
+                  >
+                    Désignation
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursFacture[2]}
+                    onResize={(w) => modifierLargeurFacture(2, w)}
+                  >
+                    Qté
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursFacture[3]}
+                    onResize={(w) => modifierLargeurFacture(3, w)}
+                  >
+                    PU HT
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursFacture[4]}
+                    onResize={(w) => modifierLargeurFacture(4, w)}
+                  >
+                    Remise
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursFacture[5]}
+                    onResize={(w) => modifierLargeurFacture(5, w)}
+                  >
+                    TVA%
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursFacture[6]}
+                    onResize={(w) => modifierLargeurFacture(6, w)}
+                  >
+                    Montant HT
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursFacture[7]}
+                    onResize={(w) => modifierLargeurFacture(7, w)}
+                  >
+                    TTC
+                  </ResizableTh>
+
+                  {showPrixAchat && (
+                    <ResizableTh
+                      width={largeursFacture[8]}
+                      onResize={(w) => modifierLargeurFacture(8, w)}
+                    >
+                      P.Achat
+                    </ResizableTh>
+                  )}
+
+                  <ResizableTh
+                    width={largeursFacture[9]}
+                    onResize={(w) => modifierLargeurFacture(9, w)}
+                  />
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {lignes.map((l, i) => (
+                  <tr
+                    key={l.tempId}
+                    onDoubleClick={() => modifierLigne(l)}
+                    className="hover:bg-indigo-50"
+                  >
+                    <td className="text-slate-400">{i + 1}</td>
+                    <td className="truncate font-medium">{l.designation}</td>
+                    <td>{l.quantite}</td>
+                    <td>{formatMontant(l.prixUnitaireHt)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPopupRemiseLigneId(l.tempId);
+                          setPopupRemiseVal(String(l.remisePourcentage));
+                          setPopupRemise(true);
+                        }}
+                        className="text-amber-500 hover:underline"
+                      >
+                        {l.remisePourcentage > 0
+                          ? `${l.remisePourcentage}%`
+                          : "—"}
+                      </button>
+                    </td>
+                    <td>{l.tauxTva}%</td>
+                    <td className="font-medium">
+                      {formatMontant(l.montantHt)}
+                    </td>
+                    <td className="font-semibold text-indigo-600">
+                      {formatMontant(l.montantTtc)}
+                    </td>
+                    {showPrixAchat && (
+                      <td className="text-slate-400">
+                        {formatMontant(l.prixAchatHt)}
+                      </td>
+                    )}
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => supprimerLigne(l.tempId)}
+                        className="text-red-400 hover:text-red-600 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {lignes.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={10}
+                      className="text-center text-slate-300 py-6 text-xs"
+                    >
+                      Double clic sur un article ci-dessous pour l&apos;ajouter
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Catalogue produits */}
@@ -547,16 +745,69 @@ export default function NouvelleFactureClient({
               className="flex-1"
             />
           </div>
-          <div className="overflow-y-auto max-h-80">
-            <table className="data-table text-xs">
+          <div className="overflow-x-auto overflow-y-auto max-h-80 catalogue-scrollbar">
+            <table className="data-table text-xs table-fixed">
               <thead>
                 <tr>
-                  <th>Référence</th>
-                  <th>Description</th>
-                  <th>Stock</th>
-                  <th>PV HT</th>
-                  <th>TVA</th>
-                  <th>PV TTC</th>
+                  <ResizableTh
+                    width={largeursCatalogue[0]}
+                    onResize={(w) => modifierLargeurCatalogue(0, w)}
+                  >
+                    Type
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursCatalogue[1]}
+                    onResize={(w) => modifierLargeurCatalogue(1, w)}
+                  >
+                    Description
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursCatalogue[2]}
+                    onResize={(w) => modifierLargeurCatalogue(2, w)}
+                  >
+                    Stock
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursCatalogue[3]}
+                    onResize={(w) => modifierLargeurCatalogue(3, w)}
+                  >
+                    PV HT
+                  </ResizableTh>
+
+                  {showPrixAchat && (
+                    <ResizableTh
+                      width={largeursCatalogue[4]}
+                      onResize={(w) => modifierLargeurCatalogue(4, w)}
+                    >
+                      PA HT
+                    </ResizableTh>
+                  )}
+
+                  <ResizableTh
+                    width={largeursCatalogue[5]}
+                    onResize={(w) => modifierLargeurCatalogue(5, w)}
+                  >
+                    TVA
+                  </ResizableTh>
+
+                  <ResizableTh
+                    width={largeursCatalogue[6]}
+                    onResize={(w) => modifierLargeurCatalogue(6, w)}
+                  >
+                    PV TTC
+                  </ResizableTh>
+
+                  {showPrixAchat && (
+                    <ResizableTh
+                      width={largeursCatalogue[7]}
+                      onResize={(w) => modifierLargeurCatalogue(7, w)}
+                    >
+                      PA TTC
+                    </ResizableTh>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -567,9 +818,7 @@ export default function NouvelleFactureClient({
                     className="hover:bg-indigo-50 cursor-pointer"
                   >
                     <td className="text-slate-400">{p.reference}</td>
-                    <td className="font-medium max-w-32 truncate">
-                      {p.description}
-                    </td>
+                    <td className="font-medium truncate">{p.description}</td>
                     <td>
                       <span
                         className={
@@ -582,7 +831,15 @@ export default function NouvelleFactureClient({
                       </span>
                     </td>
                     <td>{formatMontant(Number(p.prixVenteHt))}</td>
+
+                    {showPrixAchat && (
+                      <td className="text-amber-600 font-medium">
+                        {formatMontant(Number(p.dernierPrixAchatHt ?? 0))}
+                      </td>
+                    )}
+
                     <td>{p.tauxTva?.valeurNum ?? 0}%</td>
+
                     <td className="font-semibold text-indigo-600">
                       {formatMontant(
                         arrondi2(
@@ -591,12 +848,23 @@ export default function NouvelleFactureClient({
                         ),
                       )}
                     </td>
+
+                    {showPrixAchat && (
+                      <td className="text-amber-600 font-medium">
+                        {formatMontant(
+                          arrondi2(
+                            Number(p.dernierPrixAchatHt ?? 0) *
+                              (1 + Number(p.tauxTva?.valeurNum ?? 0) / 100),
+                          ),
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {produitsFiltres.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={showPrixAchat ? 8 : 6}
                       className="py-6 text-center text-xs text-slate-400"
                     >
                       <div>Aucun article trouvé pour « {searchProduit} »</div>
