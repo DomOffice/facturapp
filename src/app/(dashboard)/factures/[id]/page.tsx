@@ -7,6 +7,7 @@ import { formatMontant } from "@/lib/utils/currency";
 import FactureActions from "./facture-actions";
 import AvoirButton from "./avoir-button";
 import DevaliderButton from "./devalider-button";
+import RetourFacturesButton from "./retour-factures-button";
 
 export default async function FactureDetailPage({
   params,
@@ -59,7 +60,7 @@ export default async function FactureDetailPage({
     lignes: facture.lignes.map((l) => ({
       ordreLigne: l.ordreLigne,
       reference: l.produit?.reference ?? "",
-      unite: l.produit?.unite?.libelle ?? '',
+      unite: l.produit?.unite?.libelle ?? "",
       designation: l.designation,
       quantite: Number(l.quantite),
       prixUnitaireHt: Number(l.prixUnitaireHt),
@@ -134,9 +135,7 @@ export default async function FactureDetailPage({
           </div>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
-          <Link href="/factures" className="btn-ghost btn-sm">
-            ← Retour
-          </Link>
+          <RetourFacturesButton />
           {!estValidee && (
             <Link
               href={`/factures/${facture.id}/modifier`}
