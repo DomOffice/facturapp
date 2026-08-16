@@ -153,8 +153,9 @@ export default function NouvelleFactureClient({
     65, // TVA
     100, // Montant HT
     100, // TTC
-    90, // P.Achat
-    45, // Suppression
+    100, // Achat TTC
+    100, // Marge
+    55, // Suppression
   ]);
 
   const [largeursCatalogue, setLargeursCatalogue] = useState([
@@ -245,6 +246,17 @@ export default function NouvelleFactureClient({
     (total, ligne) => total + ligne.quantite,
     0,
   );
+
+  const totalAchatTtc = arrondi2(
+    lignes.reduce((total, ligne) => {
+      const achatTtcLigne =
+        ligne.quantite * ligne.prixAchatHt * (1 + ligne.tauxTva / 100);
+
+      return total + achatTtcLigne;
+    }, 0),
+  );
+
+  const ecartTtc = arrondi2(totaux.totalTtc - totalAchatTtc);
 
   function ouvrirPopupQte(produit: Produit) {
     popupProduitRef.current = produit;
@@ -589,7 +601,7 @@ export default function NouvelleFactureClient({
           <div className="px-4 py-2 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wide">
             Articles — double clic pour modifier
           </div>
-          <div className="overflow-x-auto">
+          <div className="facture-table-scroll overflow-x-auto">
             <table className="data-table text-xs table-fixed">
               <thead>
                 <tr>
@@ -654,14 +666,26 @@ export default function NouvelleFactureClient({
                       width={largeursFacture[8]}
                       onResize={(w) => modifierLargeurFacture(8, w)}
                     >
-                      P.Achat
+                      Achat TTC
+                    </ResizableTh>
+                  )}
+
+                  {showPrixAchat && (
+                    <ResizableTh
+                      width={largeursFacture[9]}
+                      onResize={(w) => modifierLargeurFacture(9, w)}
+                      className="text-right"
+                    >
+                      Marge
                     </ResizableTh>
                   )}
 
                   <ResizableTh
-                    width={largeursFacture[9]}
-                    onResize={(w) => modifierLargeurFacture(9, w)}
-                  />
+                    width={largeursFacture[10]}
+                    onResize={(w) => modifierLargeurFacture(10, w)}
+                  >
+                    Supprimer
+                  </ResizableTh>
                 </tr>
               </thead>
               <tbody>
@@ -699,14 +723,53 @@ export default function NouvelleFactureClient({
                     </td>
                     {showPrixAchat && (
                       <td className="text-slate-400">
-                        {formatMontant(l.prixAchatHt)}
+                        {formatMontant(
+                          arrondi2(
+                            l.quantite * l.prixAchatHt * (1 + l.tauxTva / 100),
+                          ),
+                        )}
                       </td>
                     )}
-                    <td>
+                    {showPrixAchat &&
+                      (() => {
+                        const achatTtcLigne = arrondi2(
+                          l.quantite * l.prixAchatHt * (1 + l.tauxTva / 100),
+                        );
+
+                        const margeTtcLigne = arrondi2(
+                          l.montantTtc - achatTtcLigne,
+                        );
+
+                        const tauxMarge =
+                          achatTtcLigne > 0
+                            ? (margeTtcLigne / achatTtcLigne) * 100
+                            : 0;
+
+                        const couleurMarge =
+                          tauxMarge < 0
+                            ? "text-red-600"
+                            : tauxMarge < 20
+                              ? "text-orange-500"
+                              : "text-emerald-600";
+
+                        return (
+                          <td className="px-2 text-right whitespace-nowrap">
+                            <span className={`font-semibold ${couleurMarge}`}>
+                              {formatMontant(margeTtcLigne)}
+                            </span>
+                          </td>
+                        );
+                      })()}
+
+                    <td className="text-center px-2">
                       <button
                         type="button"
-                        onClick={() => supprimerLigne(l.tempId)}
-                        className="text-red-400 hover:text-red-600 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          supprimerLigne(l.tempId);
+                        }}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-400 hover:bg-red-50 hover:text-red-600"
+                        title="Supprimer la ligne"
                       >
                         ✕
                       </button>
@@ -716,7 +779,7 @@ export default function NouvelleFactureClient({
                 {lignes.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={showPrixAchat ? 11 : 9}
                       className="text-center text-slate-300 py-6 text-xs"
                     >
                       Double clic sur un article ci-dessous pour l&apos;ajouter
