@@ -192,6 +192,10 @@ export default function NouvelleFactureClient({
   const [popupDesc, setPopupDesc] = useState("");
   const qteInputRef = useRef<HTMLInputElement>(null);
 
+  const [popupDoublon, setPopupDoublon] = useState(false);
+  const [ligneDoublonId, setLigneDoublonId] = useState<string | null>(null);
+  const [nouvelleQteDoublon, setNouvelleQteDoublon] = useState(0);
+
   // Popup remise
   const [popupRemise, setPopupRemise] = useState(false);
   const [popupRemiseLigneId, setPopupRemiseLigneId] = useState<string | null>(
@@ -311,6 +315,57 @@ export default function NouvelleFactureClient({
     setPopupOpen(true);
   }
 
+  function traiterDoublon(action: "ajouter" | "remplacer" | "annuler") {
+    if (action === "annuler" || !ligneDoublonId) {
+      setPopupDoublon(false);
+      setLigneDoublonId(null);
+      setNouvelleQteDoublon(0);
+
+      setTimeout(() => {
+        searchProduitRef.current?.focus();
+      }, 50);
+
+      return;
+    }
+
+    setLignes((prev) =>
+      prev.map((ligne) => {
+        if (ligne.tempId !== ligneDoublonId) {
+          return ligne;
+        }
+
+        const quantiteFinale =
+          action === "ajouter"
+            ? arrondi2(ligne.quantite + nouvelleQteDoublon)
+            : nouvelleQteDoublon;
+
+        const calc = calculerLigne(
+          quantiteFinale,
+          ligne.prixUnitaireHt,
+          ligne.remisePourcentage,
+          ligne.tauxTva,
+        );
+
+        return {
+          ...ligne,
+          quantite: quantiteFinale,
+          montantHt: calc.montantHt,
+          montantTva: calc.montantTva,
+          montantTtc: calc.montantTtc,
+        };
+      }),
+    );
+
+    setPopupDoublon(false);
+    setLigneDoublonId(null);
+    setNouvelleQteDoublon(0);
+    setSearchProduit("");
+
+    setTimeout(() => {
+      searchProduitRef.current?.focus();
+    }, 50);
+  }
+
   function validerPopupQte() {
     const produit = popupProduitRef.current;
     const editLigneId = editLigneIdRef.current;
@@ -402,6 +457,23 @@ export default function NouvelleFactureClient({
         prev.map((l) => (l.tempId === editLigneId ? nouvelleLigne : l)),
       );
     } else {
+      const ligneExistante = lignes.find(
+        (ligne) => ligne.produitId === produit.id,
+      );
+
+      if (ligneExistante) {
+        setPopupOpen(false);
+
+        setLigneDoublonId(ligneExistante.tempId);
+        setNouvelleQteDoublon(qte);
+        setPopupDoublon(true);
+
+        popupProduitRef.current = null;
+        editLigneIdRef.current = null;
+
+        return;
+      }
+
       setLignes((prev) => [...prev, nouvelleLigne]);
     }
 
@@ -1063,6 +1135,92 @@ export default function NouvelleFactureClient({
           </div>
         </div>
       )}
+
+      {/* POPUP PRODUIT DÉJÀ PRÉSENT */}
+      {popupDoublon &&
+        (() => {
+          const ligneExistante = lignes.find(
+            (ligne) => ligne.tempId === ligneDoublonId,
+          );
+
+          return (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl shadow-2xl p-6 w-[430px] border border-slate-200">
+                <h3 className="font-semibold text-slate-800 mb-2">
+                  Article déjà présent
+                </h3>
+
+                <p className="text-sm text-slate-600 mb-4">
+                  <span className="font-medium">
+                    {ligneExistante?.designation ?? "Cet article"}
+                  </span>{" "}
+                  est déjà présent dans la facture.
+                </p>
+
+                <div className="bg-slate-50 rounded-lg p-3 mb-5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Quantité actuelle</span>
+                    <span className="font-semibold">
+                      {formatStock(ligneExistante?.quantite ?? 0)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between mt-1">
+                    <span className="text-slate-500">
+                      Nouvelle quantité saisie
+                    </span>
+                    <span className="font-semibold">
+                      {formatStock(nouvelleQteDoublon)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between mt-1 pt-1 border-t border-slate-200">
+                    <span className="text-slate-500">
+                      Quantité après addition
+                    </span>
+                    <span className="font-semibold text-indigo-600">
+                      {formatStock(
+                        arrondi2(
+                          (ligneExistante?.quantite ?? 0) + nouvelleQteDoublon,
+                        ),
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-sm font-medium text-slate-700 mb-3">
+                  Que souhaitez-vous faire ?
+                </p>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => traiterDoublon("ajouter")}
+                    className="btn-primary w-full"
+                  >
+                    Ajouter à la quantité existante
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => traiterDoublon("remplacer")}
+                    className="btn-secondary w-full"
+                  >
+                    Remplacer par la nouvelle quantité
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => traiterDoublon("annuler")}
+                    className="btn-ghost w-full"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
       {/* POPUP REMISE */}
       {popupRemise && (
