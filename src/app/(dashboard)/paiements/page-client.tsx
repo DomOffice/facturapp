@@ -1,6 +1,6 @@
 "use client";
 // src/app/(dashboard)/paiements/page-client.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { exporterPaiementsExcel } from "@/lib/exports/excel/export-excel";
 import { useRouter } from "next/navigation";
 import { formatMontant } from "@/lib/utils/currency";
@@ -57,6 +57,8 @@ export default function PaiementsClient({
 
   const [rechercheClient, setRechercheClient] = useState("");
 
+  const [lignesSelectionnees, setLignesSelectionnees] = useState<number[]>([]);
+
   const clientsFiltres = useMemo(() => {
     const normaliser = (valeur: string) =>
       valeur
@@ -92,6 +94,11 @@ export default function PaiementsClient({
     });
   }, [paiements, clientsSelectionnes, nonPayeesSeulement]);
 
+  useEffect(() => {
+    setLignesSelectionnees(paiementsAffiches.map((paiement) => paiement.id));
+  }, [paiementsAffiches]);
+
+  /*
   const totauxAffiches = useMemo(() => {
     return paiementsAffiches.reduce(
       (totaux, paiement) => {
@@ -106,13 +113,56 @@ export default function PaiementsClient({
       },
     );
   }, [paiementsAffiches]);
+*/
 
+  const paiementsSelectionnes = useMemo(() => {
+    return paiementsAffiches.filter((paiement) =>
+      lignesSelectionnees.includes(paiement.id),
+    );
+  }, [paiementsAffiches, lignesSelectionnees]);
+
+  const totauxAffiches = useMemo(() => {
+    return paiementsSelectionnes.reduce(
+      (totaux, paiement) => {
+        totaux.ht += paiement.montantHt;
+        totaux.ttc += paiement.montantTtc;
+
+        return totaux;
+      },
+      {
+        ht: 0,
+        ttc: 0,
+      },
+    );
+  }, [paiementsSelectionnes]);
   function basculerClient(clientId: number) {
     setClientsSelectionnes((selectionActuelle) =>
       selectionActuelle.includes(clientId)
         ? selectionActuelle.filter((id) => id !== clientId)
         : [...selectionActuelle, clientId],
     );
+  }
+
+  function basculerLigne(paiementId: number) {
+    setLignesSelectionnees((selectionActuelle) =>
+      selectionActuelle.includes(paiementId)
+        ? selectionActuelle.filter((id) => id !== paiementId)
+        : [...selectionActuelle, paiementId],
+    );
+  }
+
+  function basculerToutesLesLignes() {
+    const idsAffiches = paiementsAffiches.map((paiement) => paiement.id);
+
+    const toutesSelectionnees = idsAffiches.every((id) =>
+      lignesSelectionnees.includes(id),
+    );
+
+    if (toutesSelectionnees) {
+      setLignesSelectionnees([]);
+    } else {
+      setLignesSelectionnees(idsAffiches);
+    }
   }
 
   function appliquerFiltres() {
@@ -229,7 +279,15 @@ export default function PaiementsClient({
         <div className="relative">
           <label className="form-label">Clients</label>
 
-          <details className="relative">
+          <details
+            className="relative"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.currentTarget.open = false;
+              }
+            }}
+          >
             <summary className="form-select w-64 cursor-pointer list-none">
               {clientsSelectionnes.length === 0
                 ? "Tous les clients"
@@ -312,6 +370,10 @@ export default function PaiementsClient({
             Réinitialiser
           </button>
         )}
+
+        <span className="mr-3 text-slate-400">
+          {paiementsSelectionnes.length}/{paiementsAffiches.length} facture(s)
+        </span>
 
         <div className="ml-auto text-sm text-slate-500">
           Somme HT :{" "}
@@ -418,6 +480,20 @@ export default function PaiementsClient({
         <table className="data-table">
           <thead>
             <tr>
+              <th className="w-10 text-center">
+                <input
+                  type="checkbox"
+                  checked={
+                    paiementsAffiches.length > 0 &&
+                    paiementsAffiches.every((paiement) =>
+                      lignesSelectionnees.includes(paiement.id),
+                    )
+                  }
+                  onChange={basculerToutesLesLignes}
+                  className="h-4 w-4 cursor-pointer"
+                  title="Tout sélectionner / désélectionner"
+                />
+              </th>
               <th>N° Facture</th>
               <th>Date</th>
               <th>Client</th>
@@ -437,6 +513,17 @@ export default function PaiementsClient({
                 onClick={() => selectPaiement(p)}
                 className={`cursor-pointer ${selected?.id === p.id ? "bg-indigo-50" : ""}`}
               >
+                <td
+                  className="w-10 text-center"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={lignesSelectionnees.includes(p.id)}
+                    onChange={() => basculerLigne(p.id)}
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                </td>
                 <td className="font-mono font-semibold text-indigo-600">
                   {p.numeroFacture}
                 </td>
@@ -474,7 +561,7 @@ export default function PaiementsClient({
             {paiementsAffiches.length === 0 && (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={11}
                   className="py-8 text-center text-sm text-slate-400"
                 >
                   Aucun paiement ne correspond aux filtres sélectionnés.
