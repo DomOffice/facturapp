@@ -227,7 +227,7 @@ export default function FacturesPageClient({
         </select>
       </div>
 
-      <RechercheArticleFacture />
+      <RechercheArticleFacture filtreFacture={query} />
       
       <div className="card overflow-hidden">
         <SortableTable

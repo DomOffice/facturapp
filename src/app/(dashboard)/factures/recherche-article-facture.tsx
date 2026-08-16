@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatMontant } from "@/lib/utils/currency";
+import { fuzzyMatch } from "@/components/ui/smart-search";
 
 type ResultatRechercheArticle = {
   id: number;
@@ -25,7 +26,13 @@ type ResultatRechercheArticle = {
   montantTtc: number;
 };
 
-export default function RechercheArticleFacture() {
+type RechercheArticleFactureProps = {
+  filtreFacture?: string;
+};
+
+export default function RechercheArticleFacture({
+  filtreFacture = "",
+}: RechercheArticleFactureProps) {
   const [query, setQuery] = useState("");
   const [resultats, setResultats] = useState<ResultatRechercheArticle[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,13 +75,27 @@ export default function RechercheArticleFacture() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const totalQuantite = resultats.reduce(
+  const resultatsFiltres = useMemo(() => {
+    const filtre = filtreFacture.trim();
+
+    if (filtre.length < 2) {
+      return resultats;
+    }
+
+    return resultats.filter(
+      (ligne) =>
+        fuzzyMatch(ligne.clientNom, filtre) ||
+        fuzzyMatch(ligne.numeroFacture, filtre),
+    );
+  }, [resultats, filtreFacture]);
+
+  const totalQuantite = resultatsFiltres.reduce(
     (total, ligne) => total + ligne.quantite,
     0,
   );
 
   const nombreFactures = new Set(
-    resultats.map((ligne) => ligne.factureId),
+    resultatsFiltres.map((ligne) => ligne.factureId),
   ).size;
 
   return (
@@ -136,14 +157,14 @@ export default function RechercheArticleFacture() {
         {query.trim().length >= 2 && !loading && !erreur && (
           <div className="text-xs text-slate-500 mt-3">
             <span className="font-semibold text-slate-700">
-              {resultats.length}
+              {resultatsFiltres.length}
             </span>{" "}
             ligne(s) trouvée(s) dans{" "}
             <span className="font-semibold text-slate-700">
               {nombreFactures}
             </span>{" "}
             facture(s)
-            {resultats.length > 0 && (
+            {resultatsFiltres.length > 0 && (
               <>
                 {" "}
                 — quantité totale :{" "}
@@ -157,29 +178,21 @@ export default function RechercheArticleFacture() {
           </div>
         )}
 
-        {erreur && (
-          <div className="text-sm text-red-600 mt-3">
-            {erreur}
-          </div>
-        )}
+        {erreur && <div className="text-sm text-red-600 mt-3">{erreur}</div>}
       </div>
 
-      {query.trim().length >= 2 && !loading && resultats.length > 0 && (
+      {query.trim().length >= 2 && !loading && resultatsFiltres.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-3 py-2 font-medium text-slate-500">
-                  Date
-                </th>
+                <th className="px-3 py-2 font-medium text-slate-500">Date</th>
 
                 <th className="px-3 py-2 font-medium text-slate-500">
                   Facture
                 </th>
 
-                <th className="px-3 py-2 font-medium text-slate-500">
-                  Client
-                </th>
+                <th className="px-3 py-2 font-medium text-slate-500">Client</th>
 
                 <th className="px-3 py-2 font-medium text-slate-500">
                   Référence
@@ -212,7 +225,7 @@ export default function RechercheArticleFacture() {
             </thead>
 
             <tbody>
-              {resultats.map((ligne) => (
+              {resultatsFiltres.map((ligne) => (
                 <tr
                   key={ligne.id}
                   className="border-b border-slate-100 hover:bg-slate-50"
@@ -266,17 +279,11 @@ export default function RechercheArticleFacture() {
 
                   <td className="px-3 py-2 text-center">
                     {ligne.statut === "validee" ? (
-                      <span className="badge badge-info">
-                        Validée
-                      </span>
+                      <span className="badge badge-info">Validée</span>
                     ) : ligne.statut === "brouillon" ? (
-                      <span className="badge badge-neutral">
-                        Brouillon
-                      </span>
+                      <span className="badge badge-neutral">Brouillon</span>
                     ) : (
-                      <span className="badge badge-danger">
-                        Annulée
-                      </span>
+                      <span className="badge badge-danger">Annulée</span>
                     )}
                   </td>
                 </tr>
@@ -289,7 +296,7 @@ export default function RechercheArticleFacture() {
       {query.trim().length >= 2 &&
         !loading &&
         !erreur &&
-        resultats.length === 0 && (
+        resultatsFiltres.length === 0 && (
           <div className="p-6 text-center text-sm text-slate-400">
             Aucun article facturé ne correspond à « {query} »
           </div>
