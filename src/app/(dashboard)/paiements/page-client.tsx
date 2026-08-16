@@ -92,6 +92,21 @@ export default function PaiementsClient({
     });
   }, [paiements, clientsSelectionnes, nonPayeesSeulement]);
 
+  const totauxAffiches = useMemo(() => {
+    return paiementsAffiches.reduce(
+      (totaux, paiement) => {
+        totaux.ht += paiement.montantHt;
+        totaux.ttc += paiement.montantTtc;
+
+        return totaux;
+      },
+      {
+        ht: 0,
+        ttc: 0,
+      },
+    );
+  }, [paiementsAffiches]);
+
   function basculerClient(clientId: number) {
     setClientsSelectionnes((selectionActuelle) =>
       selectionActuelle.includes(clientId)
@@ -301,11 +316,11 @@ export default function PaiementsClient({
         <div className="ml-auto text-sm text-slate-500">
           Somme HT :{" "}
           <span className="font-semibold text-slate-700">
-            {formatMontant(sommeHt)}
+            {formatMontant(totauxAffiches.ht)}
           </span>{" "}
           | Somme TTC :{" "}
           <span className="font-semibold text-indigo-600">
-            {formatMontant(sommeTtc)}
+            {formatMontant(totauxAffiches.ttc)}
           </span>
         </div>
       </div>
@@ -466,7 +481,6 @@ export default function PaiementsClient({
                 </td>
               </tr>
             )}
-            
           </tbody>
         </table>
       </div>
