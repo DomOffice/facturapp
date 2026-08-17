@@ -99,6 +99,7 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
 
   const [
     facturesPeriode,
+    totalBrouillons,
     facturesNonPayees,
     tvaVentes,
     charges,
@@ -136,14 +137,39 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
       },
     }),
 
-    // Factures validées non encaissées sur la période.
-    prisma.paiement.count({
+    // Nombre total de brouillons actuellement présents en BDD.
+    // Ce compteur est volontairement indépendant du filtre de période.
+    prisma.facture.count({
       where: {
-        datePaiement: null,
-        facture: {
-          statut: "validee",
-          ...filtrePeriode,
-        },
+        statut: "brouillon",
+      },
+    }),
+
+    // Nombre total de factures validées non encaissées.
+    //
+    // On compte les FACTURES et non les lignes de paiement.
+    // Une facture est considérée non encaissée si :
+    // - elle ne possède encore aucun enregistrement de paiement,
+    // - ou son paiement existe mais n'a pas de date de paiement.
+    //
+    // Ce compteur est volontairement indépendant du filtre de période.
+    prisma.facture.count({
+      where: {
+        statut: "validee",
+        OR: [
+          {
+            paiement: {
+              is: null,
+            },
+          },
+          {
+            paiement: {
+              is: {
+                datePaiement: null,
+              },
+            },
+          },
+        ],
       },
     }),
 
@@ -216,12 +242,7 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
     (facture) => facture.statut === "validee",
   );
 
-  const facturesBrouillons = facturesPeriode.filter(
-    (facture) => facture.statut === "brouillon",
-  );
-
   const totalFactures = facturesValidees.length;
-  const totalBrouillons = facturesBrouillons.length;
 
   const chiffreAffaires = facturesValidees.reduce(
     (total, facture) => total + Number(facture.totalTtc),
