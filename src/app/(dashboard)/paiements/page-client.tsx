@@ -193,6 +193,12 @@ export default function PaiementsClient({
     setModeReglementId(p.modeReglementId);
     setNumeroPiece(p.numeroPiece ?? "");
     setRemarque(p.remarque ?? "");
+    setTimeout(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }, 50);
   }
 
   async function sauvegarder() {
@@ -285,6 +291,7 @@ export default function PaiementsClient({
               if (event.key === "Escape") {
                 event.preventDefault();
                 event.currentTarget.open = false;
+                setRechercheClient("");
               }
             }}
           >

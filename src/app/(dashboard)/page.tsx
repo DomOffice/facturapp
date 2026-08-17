@@ -90,49 +90,75 @@ function doitComptabiliserTvaFournisseur(
 // Removed duplicate export default function UtilisateursPage() { ... }
 
 async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
+  const filtrePeriode = {
+    dateFacture: {
+      gte: dateDebut,
+      lt: dateFinExclusive,
+    },
+  };
+
   const [
-    totalFactures,
+    facturesPeriode,
     facturesNonPayees,
-    chiffreAffaires,
     tvaVentes,
     charges,
     documentsFournisseurs,
     dernieresFactures,
   ] = await Promise.all([
-    prisma.facture.count({
+    // Toutes les factures utiles au dashboard : validées + brouillons.
+    // Les KPI CA et marge sont calculés ensuite à partir de cette même source
+    // afin d'éviter tout décalage entre les indicateurs.
+    prisma.facture.findMany({
       where: {
-        statut: "validee",
+        statut: {
+          in: ["validee", "brouillon"],
+        },
+        ...filtrePeriode,
+      },
+      select: {
+        id: true,
+        statut: true,
+        totalHt: true,
+        totalTtc: true,
+
+        lignes: {
+          select: {
+            quantite: true,
+            prixAchatHt: true,
+
+            produit: {
+              select: {
+                dernierPrixAchatHt: true,
+              },
+            },
+          },
+        },
       },
     }),
 
+    // Factures validées non encaissées sur la période.
     prisma.paiement.count({
       where: {
         datePaiement: null,
-      },
-    }),
-
-    prisma.facture.aggregate({
-      where: {
-        statut: "validee",
-      },
-      _sum: {
-        totalTtc: true,
-      },
-    }),
-
-    prisma.facture.aggregate({
-      where: {
-        statut: "validee",
-        dateFacture: {
-          gte: dateDebut,
-          lt: dateFinExclusive,
+        facture: {
+          statut: "validee",
+          ...filtrePeriode,
         },
+      },
+    }),
+
+    // TVA perçue : uniquement les factures validées.
+    prisma.facture.aggregate({
+      where: {
+        statut: "validee",
+        ...filtrePeriode,
       },
       _sum: {
         totalTva: true,
       },
     }),
 
+    // Charges sur la période.
     prisma.charge.findMany({
       where: {
         dateCharge: {
@@ -145,6 +171,7 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
       },
     }),
 
+    // Documents fournisseurs.
     prisma.documentImporte.findMany({
       where: {
         statut: {
@@ -162,10 +189,17 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
       },
     }),
 
+    // Dernières factures de la période, brouillons compris.
     prisma.facture.findMany({
+      where: {
+        statut: {
+          in: ["validee", "brouillon"],
+        },
+        ...filtrePeriode,
+      },
       take: 8,
       orderBy: {
-        createdAt: "desc",
+        dateFacture: "desc",
       },
       include: {
         client: {
@@ -177,6 +211,61 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
       },
     }),
   ]);
+
+  const facturesValidees = facturesPeriode.filter(
+    (facture) => facture.statut === "validee",
+  );
+
+  const facturesBrouillons = facturesPeriode.filter(
+    (facture) => facture.statut === "brouillon",
+  );
+
+  const totalFactures = facturesValidees.length;
+  const totalBrouillons = facturesBrouillons.length;
+
+  const chiffreAffaires = facturesValidees.reduce(
+    (total, facture) => total + Number(facture.totalTtc),
+    0,
+  );
+
+  const chiffreAffairesAvecBrouillons = facturesPeriode.reduce(
+    (total, facture) => total + Number(facture.totalTtc),
+    0,
+  );
+
+  // Marge HT théorique = ventes HT - coût d'achat HT.
+  // On privilégie le prix d'achat mémorisé sur la ligne de facture.
+  // Pour les anciennes lignes où ce prix serait à 0,
+  // on utilise en secours le dernier prix d'achat actuel du produit.
+  const totalVenteHtAvecBrouillons = facturesPeriode.reduce(
+    (total, facture) => total + Number(facture.totalHt),
+    0,
+  );
+
+  const totalAchatHtAvecBrouillons = facturesPeriode.reduce(
+    (totalFactures, facture) => {
+      const totalAchatFacture = facture.lignes.reduce((totalLignes, ligne) => {
+        const quantite = Number(ligne.quantite);
+
+        const prixAchatLigne = Number(ligne.prixAchatHt);
+
+        const dernierPrixAchatProduit = Number(
+          ligne.produit?.dernierPrixAchatHt ?? 0,
+        );
+
+        const prixAchatRetenu =
+          prixAchatLigne > 0 ? prixAchatLigne : dernierPrixAchatProduit;
+
+        return totalLignes + quantite * prixAchatRetenu;
+      }, 0);
+
+      return totalFactures + totalAchatFacture;
+    },
+    0,
+  );
+
+  const margeTheorique =
+    totalVenteHtAvecBrouillons - totalAchatHtAvecBrouillons;
 
   const tvaCharges = charges.reduce(
     (total, charge) => total + Number(charge.montantTva),
@@ -249,8 +338,11 @@ async function getDashboardData(dateDebut: Date, dateFinExclusive: Date) {
 
   return {
     totalFactures,
+    totalBrouillons,
     facturesNonPayees,
     chiffreAffaires,
+    chiffreAffairesAvecBrouillons,
+    margeTheorique,
     tvaVentes,
     tvaCharges,
     tvaFacturesFournisseurs,
@@ -293,7 +385,11 @@ export default async function DashboardPage({
 
   const data = await getDashboardData(dateDebut, dateFinExclusive);
 
-  const ca = Number(data.chiffreAffaires._sum.totalTtc ?? 0);
+  const ca = data.chiffreAffaires;
+
+  const caAvecBrouillons = data.chiffreAffairesAvecBrouillons;
+
+  const margeHtTheorique = data.margeTheorique;
 
   const tvaPercue = Number(data.tvaVentes._sum.totalTva ?? 0);
 
@@ -301,6 +397,10 @@ export default async function DashboardPage({
 
   const debutStr = formaterDateInput(dateDebut);
   const finStr = formaterDateInput(dateFin);
+
+  const debutAnneeStr = `${maintenant.getFullYear()}-01-01`;
+  const finAnneeStr = formaterDateInput(finParDefaut);
+  const lienCetteAnnee = `/?debut=${debutAnneeStr}&fin=${finAnneeStr}`;
 
   return (
     <div className="p-4 md:p-6">
@@ -328,21 +428,120 @@ export default async function DashboardPage({
         </Link>
       </div>
 
+      {/* Filtre global de période */}
+      <div className="card p-3 md:p-4 mb-4">
+        <form
+          method="GET"
+          className="flex flex-col md:flex-row md:items-end gap-3"
+        >
+          <div>
+            <label
+              htmlFor="dashboard-debut"
+              className="block text-xs font-medium text-slate-500 mb-1"
+            >
+              Date début
+            </label>
+            <input
+              id="dashboard-debut"
+              type="date"
+              name="debut"
+              defaultValue={debutStr}
+              className="form-input"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="dashboard-fin"
+              className="block text-xs font-medium text-slate-500 mb-1"
+            >
+              Date fin
+            </label>
+            <input
+              id="dashboard-fin"
+              type="date"
+              name="fin"
+              defaultValue={finStr}
+              className="form-input"
+            />
+          </div>
+
+          <button type="submit" className="btn-primary">
+            Actualiser
+          </button>
+
+          <Link href="/" className="btn-secondary text-center">
+            Ce mois
+          </Link>
+
+          <Link href={lienCetteAnnee} className="btn-secondary text-center">
+            Cette année
+          </Link>
+
+          <div className="md:ml-auto text-xs text-slate-400">
+            Période du{" "}
+            <span className="font-medium text-slate-600">
+              {dateDebut.toLocaleDateString("fr-FR")}
+            </span>{" "}
+            au{" "}
+            <span className="font-medium text-slate-600">
+              {dateFin.toLocaleDateString("fr-FR")}
+            </span>
+          </div>
+        </form>
+      </div>
+
       {/* KPIs — 2 colonnes sur mobile, 4 sur desktop */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="kpi-card">
           <div className="kpi-label">CA TTC</div>
+
           <div className="kpi-value text-lg md:text-2xl">
             {formatMontant(ca)}
           </div>
-          <div className="text-xs text-slate-400 mt-1">MAD</div>
+
+          <div className="text-xs text-slate-400 mt-1">factures validées</div>
+
+          <div className="mt-3 pt-2 border-t border-slate-100 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500">Avec brouillons</span>
+
+              <span className="text-sm font-semibold text-indigo-600">
+                {formatMontant(caAvecBrouillons)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500">Marge HT théorique</span>
+
+              <span
+                className={`text-sm font-semibold ${
+                  margeHtTheorique >= 0 ? "text-emerald-600" : "text-red-600"
+                }`}
+              >
+                {formatMontant(margeHtTheorique)}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Factures</div>
+
           <div className="kpi-value text-lg md:text-2xl">
             {data.totalFactures}
           </div>
+
           <div className="text-xs text-slate-400 mt-1">validées</div>
+
+          <div className="mt-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500">Brouillons</span>
+
+              <span className="text-sm font-semibold text-amber-600">
+                {data.totalBrouillons}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Non encaissées</div>
@@ -352,72 +551,31 @@ export default async function DashboardPage({
           <div className="text-xs text-slate-400 mt-1">en attente</div>
         </div>
         <div className="kpi-card">
-          <form method="GET">
-            <div className="kpi-label mb-2">Situation TVA</div>
+          <div className="kpi-label mb-2">Situation TVA</div>
 
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div>
-                <label
-                  htmlFor="dashboard-tva-debut"
-                  className="block text-[10px] text-slate-400 mb-1"
-                >
-                  Date début
-                </label>
+          <div className="space-y-2 border-t border-slate-100 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500">TVA perçue</span>
 
-                <input
-                  id="dashboard-tva-debut"
-                  type="date"
-                  name="debut"
-                  defaultValue={debutStr}
-                  className="form-input w-full px-2 py-1 text-xs"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="dashboard-tva-fin"
-                  className="block text-[10px] text-slate-400 mb-1"
-                >
-                  Date fin
-                </label>
-
-                <input
-                  id="dashboard-tva-fin"
-                  type="date"
-                  name="fin"
-                  defaultValue={finStr}
-                  className="form-input w-full px-2 py-1 text-xs"
-                />
-              </div>
+              <span className="text-sm font-semibold text-emerald-600">
+                {formatMontant(tvaPercue)}
+              </span>
             </div>
 
-            <button type="submit" className="btn-secondary btn-sm w-full mb-3">
-              Actualiser
-            </button>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500">TVA dépensée</span>
 
-            <div className="space-y-2 border-t border-slate-100 pt-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-500">TVA perçue</span>
-
-                <span className="text-sm font-semibold text-emerald-600">
-                  {formatMontant(tvaPercue)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-500">TVA dépensée</span>
-
-                <span className="text-sm font-semibold text-amber-600">
-                  {formatMontant(tvaDepensee)}
-                </span>
-              </div>
-              <div className="text-[10px] leading-4 text-slate-400">
-                Fournisseurs : {formatMontant(data.tvaFacturesFournisseurs)}
-                {" · "}
-                Charges : {formatMontant(data.tvaCharges)}
-              </div>
+              <span className="text-sm font-semibold text-amber-600">
+                {formatMontant(tvaDepensee)}
+              </span>
             </div>
-          </form>
+
+            <div className="text-[10px] leading-4 text-slate-400">
+              Fournisseurs : {formatMontant(data.tvaFacturesFournisseurs)}
+              {" · "}
+              Charges : {formatMontant(data.tvaCharges)}
+            </div>
+          </div>
         </div>
       </div>
 
