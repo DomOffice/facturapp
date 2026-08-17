@@ -1,6 +1,6 @@
 # 05 — Feuille de route FacturApp
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-08-17
 
 ## Sprint clôturé — Stock / synchronisation / facturation / PDF
 
@@ -107,3 +107,30 @@ Avant que FacturApp remplace définitivement VB6 :
 - [ ] Étudier une combinaison Paddle permettant de réactiver MKLDNN sans erreur PIR.
 - [ ] Sprint dédié à la conception Référence / Type produit.
 - [ ] Désactiver dans FacturApp les anciens articles à prix achat nul identifiés comme tests/doublons, après vérification de leur historique commercial.
+
+## Sprint UI commercial — 2026-08-16 / 2026-08-17
+
+### Terminé
+
+- [x] Total articles sur nouvelle facture.
+- [x] Achat TTC et marge par ligne.
+- [x] Alerte couleur sur marge de ligne.
+- [x] Gestion d'un produit déjà présent : ajouter / remplacer / annuler.
+- [x] Rafraîchissement de la liste des factures au retour.
+- [x] Recherche d'un article dans toutes les factures.
+- [x] Affinage de la recherche article par client / numéro de facture.
+- [x] Totaux paiements selon clients sélectionnés.
+- [x] Sélection fine des factures pour les totaux paiements.
+- [x] Fermeture sélecteur clients par ESC + effacement recherche.
+- [x] Remontée vers l'encart de saisie lors de la sélection d'une facture.
+- [x] Dashboard : brouillons + CA avec brouillons + filtre global de période.
+- [x] Dashboard : bouton `Cette année`.
+
+### Reprise immédiate
+
+- [ ] **Corriger et valider la marge HT théorique du dashboard.**
+- [ ] Vérifier le calcul sur au moins une facture validée et un brouillon dont quantité, prix achat HT et vente HT sont connus.
+- [ ] Après correction, vérifier `Ce mois`, `Cette année` et une période personnalisée.
+- [ ] Documenter la source de prix achat retenue pour les factures historiques.
+
+Le reste des priorités P0/P1 d'exploitation serveur, sauvegarde, déploiement et synchronisation reste inchangé.

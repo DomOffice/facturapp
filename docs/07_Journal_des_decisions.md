@@ -1,6 +1,6 @@
 # 07 — Journal des décisions FacturApp
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-08-17
 
 ## 2026-06 / 2026-07 — Principes OCR conservés
 
@@ -155,3 +155,25 @@ Décision : ne pas inventer de prix pour les 35 produits à PA nul/NULL observé
 Décision : conserver l'OCR local. Python 3.12.10 est installé en PROD. Le script de référence reste `ocr/ocr_document.py`. Les ajustements faits directement sur le serveur doivent être rapatriés sur DEV puis versionnés ; le serveur ne doit pas devenir une source parallèle de code.
 
 Pour stabilité CPU, PIR et MKLDNN sont actuellement désactivés. `cpu_threads=4` correspond aux 4 cœurs logiques du serveur. Les optimisations de résolution/taille doivent être mesurées sur un même document de référence.
+
+## 2026-08-16 — Ergonomie facture et contrôle de marge
+
+Décision : dans `/factures/nouvelle`, la comparaison achat/vente doit se faire au niveau de la ligne. `Afficher prix achat` expose un montant Achat TTC cohérent avec le TTC de vente. Une colonne Marge sert d'indicateur d'alerte, avec signal visuel lorsque la remise dégrade la rentabilité.
+
+Décision : un même produit ne doit pas créer silencieusement plusieurs lignes dans une facture. Lors d'un nouvel ajout d'un produit déjà présent, l'utilisateur choisit explicitement entre additionner la quantité, remplacer la quantité ou annuler.
+
+## 2026-08-16 — Recherche historique des ventes
+
+Décision : `/factures` doit permettre de retrouver dans quelles factures un article a été vendu. La recherche reprend la logique multi-fragments utilisée ailleurs dans FacturApp et peut être affinée par la recherche client / numéro déjà présente.
+
+## 2026-08-16 — Paiements : sélection à deux niveaux
+
+Décision : les totaux de `/paiements` suivent d'abord la sélection de clients, puis une sélection fine des factures. Toutes les lignes visibles sont cochées par défaut afin que le comportement courant reste naturel.
+
+## 2026-08-17 — Dashboard
+
+Décision : conserver le gros chiffre `CA TTC` comme CA des factures **validées**. Afficher séparément un indicateur `Avec brouillons` pour la projection incluant les brouillons.
+
+Décision : le filtre de dates devient global au dashboard, avec raccourcis `Ce mois` et `Cette année`.
+
+Décision : la `Marge HT théorique` doit représenter **ventes HT - coût d'achat HT** pour les factures validées + brouillons de la période. Le calcul exact sur les données historiques reste à fiabiliser ; ne pas assimiler `CA TTC - Total HT` à une marge (ce serait essentiellement de la TVA).

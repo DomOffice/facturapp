@@ -1,6 +1,6 @@
 # 01 — Audit technique FacturApp
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-08-17
 
 ## 1. État général
 
@@ -111,3 +111,21 @@ Les produits 811 et 812 ont été identifiés comme cas historiques à rattraper
 L'OCR a été exécuté pour la première fois sur le serveur. Incidents résolus successivement : Python absent/alias Microsoft Store, chemin `ocr-service` incorrect, PyMuPDF absent, PaddleOCR absent. Une incompatibilité PaddlePaddle/oneDNN/PIR a nécessité la désactivation de PIR/MKLDNN.
 
 La performance CPU reste un point de vigilance : sur un PDF de test, l'inférence PaddleOCR est passée d'environ 80 s à 55 s avec `MAX_SIDE=2200`, et à 48,5 s avec `MAX_SIDE=2000`. La qualité OCR doit primer sur le gain marginal de temps.
+
+## Mise à jour audit — 2026-08-17
+
+### Facturation et recherche
+
+Les écrans de facturation ont gagné plusieurs fonctions utiles sans changement de modèle : prévention des doublons de produit dans une même facture, comparaison vente/achat par ligne, recherche historique d'un article dans toutes les factures et affinage par client.
+
+### Paiements
+
+Le calcul des totaux est désormais interactif : sélection client puis sélection fine des factures. Le comportement attendu est que toutes les lignes visibles soient cochées par défaut et que les totaux reflètent uniquement les lignes cochées.
+
+### Dashboard
+
+Le dashboard intègre désormais les brouillons et un filtre de période global. Le point restant à sécuriser est la **marge HT théorique** : certaines factures historiques peuvent avoir `totalAchatHt` ou `prixAchatHt` à zéro/non renseigné, ce qui peut faire apparaître une marge égale au total HT. Ce point est un bug actif à corriger avant de considérer le KPI fiable.
+
+### Source de vérité du code pendant les interventions IA
+
+Règle renforcée : avant toute modification, travailler sur le fichier réellement courant. Si l'utilisateur fournit le fichier, ce fichier prévaut. Sinon vérifier le dépôt GitHub à jour. Ne pas reconstruire un fichier complet à partir d'une version supposée ou ancienne.

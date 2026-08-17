@@ -1,6 +1,6 @@
 # 10 — Reprise du projet FacturApp
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-08-17
 
 ## État actuel
 
@@ -158,3 +158,66 @@ Derniers travaux validés :
 Point de reprise immédiat : **récupérer depuis le serveur la version finale de `ocr/ocr_document.py`, la remettre dans le PC DEV, comparer et versionner**. Ne pas laisser cette version uniquement en PROD.
 
 Le prochain sprint peut ensuite choisir entre : stabilisation OCR/performance, correction conceptuelle Référence/Type produit, ou poursuite des priorités P0/P1 d'exploitation.
+
+## Reprise après sprint UI commercial — 2026-08-17
+
+### Travaux validés depuis le 2026-08-15
+
+`/factures/nouvelle` :
+
+- Total articles ;
+- Achat TTC par ligne ;
+- colonne Marge avec alerte couleur ;
+- séparation marge / suppression et scrollbar horizontale renforcée ;
+- gestion du produit déjà présent : ajouter quantité / remplacer / annuler.
+
+`/factures` :
+
+- rafraîchissement au retour d'une facture ;
+- recherche transversale par article ;
+- recherche multi-fragments ;
+- affinage des résultats article par client / numéro de facture.
+
+`/paiements` :
+
+- totaux selon clients sélectionnés ;
+- cases par facture, cochées par défaut ;
+- totaux selon factures cochées ;
+- ESC ferme le volet clients et vide la recherche ;
+- clic facture remonte vers la zone de saisie.
+
+Dashboard `/` :
+
+- nombre de brouillons ;
+- CA TTC validé + indicateur avec brouillons ;
+- filtre global date début / date fin ;
+- boutons `Ce mois` et `Cette année`.
+
+### Point de reprise immédiat
+
+**Bug encore ouvert : `Marge HT théorique` du dashboard.**
+
+L'utilisateur a indiqué que la dernière version locale de `src/app/(dashboard)/page.tsx` est la **V3** fournie pendant la conversation. Le résultat de marge reste incorrect et affiche le total HT.
+
+Le dernier correctif proposé n'a pas été confirmé comme appliqué : récupérer les lignes des factures de la période et calculer le coût d'achat ligne par ligne avec priorité à `FactureLigne.prixAchatHt`, puis fallback vers `Produit.dernierPrixAchatHt` lorsque le prix historique est nul.
+
+Avant toute intervention : lire le fichier local/GitHub réellement courant et ne pas repartir d'une ancienne copie.
+
+### Test d'acceptation de la marge
+
+Choisir une période contenant une facture dont on connaît :
+
+```text
+quantité
+prix achat HT
+montant vente HT après remise
+```
+
+Vérifier manuellement :
+
+```text
+coût achat HT = somme(quantité × prix achat HT retenu)
+marge HT = total vente HT - coût achat HT
+```
+
+Faire le même test avec un brouillon.

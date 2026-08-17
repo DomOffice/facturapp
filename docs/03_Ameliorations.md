@@ -1,6 +1,6 @@
 # 03 — Améliorations FacturApp
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-08-17
 
 ## 1. Fonctionnalités désormais terminées
 
@@ -171,3 +171,48 @@ Le générateur `src/lib/exports/pdf/facture-pdf.ts` a été largement refondu :
 - OCR local opérationnel sur serveur CPU ;
 - instrumentation de chronométrage ajoutée au script serveur pour mesurer initialisation, temps par page et temps total ;
 - essais de réduction de `MAX_SIDE` effectués pour accélérer l'inférence.
+
+## Ajouts validés — 2026-08-16 / 2026-08-17
+
+### `/factures/nouvelle`
+
+- ajout de `Total articles` à côté de `Total lignes` ;
+- affichage du montant **Achat TTC de ligne** lorsque `Afficher prix achat` est activé ;
+- ajout d'une colonne **Marge** après Achat TTC ;
+- couleur de marge utilisée comme alerte : marge confortable en vert, marge faible en orange, marge négative en rouge ;
+- séparation visuelle de la colonne Marge et de la croix de suppression ;
+- scrollbar horizontale épaissie à environ 14 px ;
+- lorsqu'un produit déjà présent est ajouté une seconde fois, choix explicite :
+  - ajouter la nouvelle quantité à l'existante ;
+  - remplacer la quantité existante ;
+  - annuler ;
+- retour depuis une facture vers `/factures` avec rafraîchissement de la liste afin d'éviter un F5 manuel.
+
+### `/factures`
+
+- nouvelle recherche transversale **par article facturé** ;
+- recherche multi-fragments de type « Google » : les fragments peuvent être saisis dans un ordre libre ;
+- résultats avec facture, date, client, référence, désignation, quantité, prix, remise, TTC et statut ;
+- clic sur le numéro pour ouvrir la facture ;
+- combinaison des deux recherches existantes : rechercher d'abord l'article, puis affiner avec la barre client / numéro de facture.
+
+### `/paiements`
+
+- les totaux de l'encart supérieur suivent les clients sélectionnés ;
+- ajout d'une case à cocher par facture ;
+- toutes les factures visibles sont cochées par défaut ;
+- les totaux HT/TTC ne prennent en compte que les factures cochées ;
+- case d'en-tête pour tout sélectionner / désélectionner ;
+- `ESC` ferme le volet de sélection des clients et vide le champ de recherche sans perdre les clients cochés ;
+- clic sur une facture : remontée automatique en haut de page pour afficher l'encart de saisie.
+
+### Dashboard `/`
+
+- nombre de brouillons affiché dans la carte Factures ;
+- CA TTC principal conservé pour les factures validées ;
+- information complémentaire CA TTC avec brouillons ;
+- filtre global `Date début / Date fin` ;
+- raccourcis `Ce mois` et `Cette année` ;
+- liste des dernières factures filtrée par période.
+
+**À finaliser :** calcul et validation de la `Marge HT théorique`. Le KPI est présent mais sa formule/donnée d'achat n'est pas encore considérée fiable.

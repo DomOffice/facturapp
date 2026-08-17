@@ -1,6 +1,6 @@
 # 04 — Bugs connus FacturApp
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-08-17
 
 ## 1. Limites connues actives
 
@@ -123,3 +123,25 @@ Contournement actuel : désactivation de PIR et MKLDNN/oneDNN dans `ocr/ocr_docu
 ### Référence / Type produit
 
 Une incohérence de conception entre la notion métier de Type et le champ historique `reference` a été identifiée dans le catalogue facture. Ne pas corriger superficiellement dans ce sprint ; prévoir une analyse dédiée du modèle de données, des écrans, synchronisations et compatibilité VB6.
+
+## Mise à jour 2026-08-17
+
+### Dashboard — marge HT théorique incorrecte
+
+Symptôme observé : la valeur affichée comme `Marge HT théorique` peut être égale au `Total HT`, ce qui signifie que le coût d'achat utilisé par le calcul vaut zéro ou n'est pas correctement alimenté.
+
+Contexte : certaines factures historiques peuvent avoir `Facture.totalAchatHt = 0` et/ou des lignes avec `FactureLigne.prixAchatHt = 0`. Une tentative de calcul via `totalHt - totalAchatHt` n'a pas corrigé le résultat.
+
+Correctif proposé mais **non encore validé au moment de ce handoff** :
+
+1. récupérer les lignes des factures validées + brouillons de la période ;
+2. pour chaque ligne, utiliser en priorité `ligne.prixAchatHt` ;
+3. si ce prix est nul, utiliser en secours `ligne.produit.dernierPrixAchatHt` ;
+4. calculer `coût achat HT = quantité × prix achat retenu` ;
+5. calculer `marge HT théorique = total ventes HT - total achats HT`.
+
+Statut : **OUVERT — priorité de reprise immédiate**.
+
+### Dashboard — brouillons et période
+
+Les brouillons sont désormais destinés à entrer dans les KPI secondaires (`Brouillons`, `CA avec brouillons`, marge théorique) et le filtre de période est global. Ces points sont considérés fonctionnels sous réserve d'une nouvelle vérification après correction de la marge.

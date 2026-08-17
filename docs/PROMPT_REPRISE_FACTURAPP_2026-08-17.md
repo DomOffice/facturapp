@@ -1,8 +1,4 @@
-# 11 — Handoff intégral IA / reprise FacturApp
-
-Dernière mise à jour : 2026-08-17
-
-# PROMPT DE REPRISE À FOURNIR À L'IA
+# PROMPT DE REPRISE FACTURAPP — état au 2026-08-17
 
 Tu reprends le projet **FacturApp** en tant que **chef de projet technique et développeur principal**.
 

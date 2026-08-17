@@ -1,6 +1,6 @@
 # 06 — Conventions de code FacturApp
 
-Dernière mise à jour : 2026-08-10
+Dernière mise à jour : 2026-08-17
 
 ## 1. Principe général
 
@@ -89,3 +89,21 @@ Toute évolution importante doit mettre à jour au minimum :
 - vérifier `DATABASE_URL` avant dump, restore, Prisma destructif ou synchronisation ;
 - une fonctionnalité PDF doit être testée sur une facture courte et une facture multipage ;
 - sous Windows PROD, arrêter PM2 avant `prisma generate` si le moteur Prisma est verrouillé.
+
+## 10. Méthode d'intervention avec l'IA — utilisateur novice TypeScript
+
+Pour chaque changement demandé, fournir dans cet ordre :
+
+1. chemin exact du fichier ;
+2. bloc exact à rechercher ;
+3. bloc complet de remplacement ou code complet à ajouter ;
+4. commandes de validation ;
+5. test fonctionnel précis ;
+6. proposition de titre de commit après validation.
+
+Règle de source de vérité :
+
+- si l'utilisateur joint le fichier courant, travailler exclusivement à partir de ce fichier ;
+- sinon vérifier le fichier courant dans GitHub avant de proposer un patch ;
+- ne jamais produire un fichier complet en supposant qu'une ancienne version est encore courante ;
+- éviter les migrations, `db push`, `db pull` ou commandes destructives lorsqu'une évolution ne concerne que l'interface / logique applicative.

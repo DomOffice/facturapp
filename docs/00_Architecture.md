@@ -1,6 +1,6 @@
 # 00 — Architecture FacturApp
 
-Dernière mise à jour : 2026-08-15
+Dernière mise à jour : 2026-08-17
 
 ## 1. Objectif
 
@@ -356,3 +356,14 @@ os.environ["FLAGS_use_mkldnn"] = "0"
 et initialise PaddleOCR avec `enable_mkldnn=False`.
 
 Le serveur possède un Intel Core i5-7500, 4 cœurs / 4 threads. `cpu_threads=4` est donc conservé.
+
+## Mise à jour 2026-08-17 — ergonomie commerciale et dashboard
+
+Évolutions applicatives récentes, sans modification de schéma PostgreSQL :
+
+- `/factures/nouvelle` : total des articles, affichage achat TTC par ligne, colonne marge, alerte visuelle de marge, gestion d'un produit déjà présent (ajouter quantité / remplacer quantité / annuler) ;
+- `/factures` : recherche transversale d'un article dans les lignes de factures, avec accès direct à la facture et affinage secondaire par client / numéro de facture ;
+- `/paiements` : totaux recalculés selon les clients sélectionnés puis selon les factures cochées, toutes cochées par défaut ; fermeture du sélecteur clients par `ESC`, effacement de la recherche client et remontée vers la zone de saisie lors de la sélection d'une facture ;
+- `/` : enrichissement des KPI avec brouillons, CA TTC incluant les brouillons et filtre global de période ; bouton `Cette année` ajouté.
+
+Le calcul de la **marge HT théorique du dashboard reste en cours de correction/validation**. Ne pas considérer sa valeur actuelle comme fiable tant que le correctif n'a pas été testé sur des factures dont le prix d'achat est connu.
