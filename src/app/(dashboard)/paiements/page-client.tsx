@@ -24,6 +24,17 @@ type Paiement = {
 
 type Option = { id: number; libelle: string };
 
+type ColonneTri =
+  | "numeroFacture"
+  | "dateFacture"
+  | "clientNom"
+  | "montantHt"
+  | "montantTtc"
+  | "datePaiement"
+  | "modeReglement"
+  | "numeroPiece";
+
+type DirectionTri = "asc" | "desc";
 export default function PaiementsClient({
   paiements,
   clients,
@@ -59,6 +70,10 @@ export default function PaiementsClient({
 
   const [lignesSelectionnees, setLignesSelectionnees] = useState<number[]>([]);
 
+  const [colonneTri, setColonneTri] = useState<ColonneTri>("numeroFacture");
+
+  const [directionTri, setDirectionTri] = useState<DirectionTri>("asc");
+
   const clientsFiltres = useMemo(() => {
     const normaliser = (valeur: string) =>
       valeur
@@ -82,8 +97,26 @@ export default function PaiementsClient({
     });
   }, [clients, rechercheClient]);
 
+  function changerTri(colonne: ColonneTri) {
+    if (colonneTri === colonne) {
+      setDirectionTri((direction) => (direction === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setColonneTri(colonne);
+    setDirectionTri("asc");
+  }
+
+  function indicateurTri(colonne: ColonneTri) {
+    if (colonneTri !== colonne) {
+      return "↕";
+    }
+
+    return directionTri === "asc" ? "↑" : "↓";
+  }
+
   const paiementsAffiches = useMemo(() => {
-    return paiements.filter((paiement) => {
+    const resultat = paiements.filter((paiement) => {
       const clientSelectionne =
         clientsSelectionnes.length === 0 ||
         clientsSelectionnes.includes(paiement.clientId);
@@ -92,7 +125,78 @@ export default function PaiementsClient({
 
       return clientSelectionne && estNonPaye;
     });
-  }, [paiements, clientsSelectionnes, nonPayeesSeulement]);
+
+    return [...resultat].sort((a, b) => {
+      let comparaison = 0;
+
+      switch (colonneTri) {
+        case "numeroFacture":
+          comparaison = a.numeroFacture.localeCompare(b.numeroFacture, "fr", {
+            numeric: true,
+            sensitivity: "base",
+          });
+          break;
+
+        case "dateFacture":
+          comparaison =
+            new Date(a.dateFacture).getTime() -
+            new Date(b.dateFacture).getTime();
+          break;
+
+        case "clientNom":
+          comparaison = a.clientNom.localeCompare(b.clientNom, "fr", {
+            sensitivity: "base",
+          });
+          break;
+
+        case "montantHt":
+          comparaison = a.montantHt - b.montantHt;
+          break;
+
+        case "montantTtc":
+          comparaison = a.montantTtc - b.montantTtc;
+          break;
+
+        case "datePaiement": {
+          const dateA = a.datePaiement ? new Date(a.datePaiement).getTime() : 0;
+
+          const dateB = b.datePaiement ? new Date(b.datePaiement).getTime() : 0;
+
+          comparaison = dateA - dateB;
+          break;
+        }
+
+        case "modeReglement":
+          comparaison = (a.modeReglementLibelle ?? "").localeCompare(
+            b.modeReglementLibelle ?? "",
+            "fr",
+            {
+              sensitivity: "base",
+            },
+          );
+          break;
+
+        case "numeroPiece":
+          comparaison = (a.numeroPiece ?? "").localeCompare(
+            b.numeroPiece ?? "",
+            "fr",
+            {
+              numeric: true,
+              sensitivity: "base",
+            },
+          );
+          break;
+      }
+
+      return directionTri === "asc" ? comparaison : -comparaison;
+    });
+  }, [
+    paiements,
+    clientsSelectionnes,
+    nonPayeesSeulement,
+    colonneTri,
+    directionTri,
+  ]);
 
   useEffect(() => {
     setLignesSelectionnees(paiementsAffiches.map((paiement) => paiement.id));
@@ -501,14 +605,104 @@ export default function PaiementsClient({
                   title="Tout sélectionner / désélectionner"
                 />
               </th>
-              <th>N° Facture</th>
-              <th>Date</th>
-              <th>Client</th>
-              <th>Montant HT</th>
-              <th>Montant TTC</th>
-              <th>Date encaissement</th>
-              <th>Mode règlement</th>
-              <th>Numéro pièce</th>
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("numeroFacture")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  N° Facture
+                  <span className="text-xs">
+                    {indicateurTri("numeroFacture")}
+                  </span>
+                </button>
+              </th>
+
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("dateFacture")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  Date
+                  <span className="text-xs">
+                    {indicateurTri("dateFacture")}
+                  </span>
+                </button>
+              </th>
+
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("clientNom")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  Client
+                  <span className="text-xs">{indicateurTri("clientNom")}</span>
+                </button>
+              </th>
+
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("montantHt")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  Montant HT
+                  <span className="text-xs">{indicateurTri("montantHt")}</span>
+                </button>
+              </th>
+
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("montantTtc")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  Montant TTC
+                  <span className="text-xs">{indicateurTri("montantTtc")}</span>
+                </button>
+              </th>
+
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("datePaiement")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  Date encaissement
+                  <span className="text-xs">
+                    {indicateurTri("datePaiement")}
+                  </span>
+                </button>
+              </th>
+
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("modeReglement")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  Mode règlement
+                  <span className="text-xs">
+                    {indicateurTri("modeReglement")}
+                  </span>
+                </button>
+              </th>
+
+              <th>
+                <button
+                  type="button"
+                  onClick={() => changerTri("numeroPiece")}
+                  className="flex w-full items-center gap-1 text-left hover:text-indigo-600"
+                >
+                  Numéro pièce
+                  <span className="text-xs">
+                    {indicateurTri("numeroPiece")}
+                  </span>
+                </button>
+              </th>
+
               <th>Remarque</th>
               <th>Justif.</th>
             </tr>

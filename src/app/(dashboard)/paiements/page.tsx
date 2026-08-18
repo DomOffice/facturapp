@@ -18,6 +18,44 @@ export default async function PaiementsPage({
     .map((valeur) => Number(valeur))
     .filter((id) => Number.isInteger(id) && id > 0);
 
+  /*
+   * Rattrapage des factures validées ne possédant pas encore
+   * de ligne de suivi dans la table paiements.
+   *
+   * Cas typique :
+   * - anciennes factures ;
+   * - factures importées ;
+   * - factures créées avant l'ajout de la création automatique
+   *   de la ligne paiement.
+   *
+   * factureId est UNIQUE dans paiements :
+   * cette opération est donc idempotente.
+   */
+  const facturesSansPaiement = await prisma.facture.findMany({
+    where: {
+      statut: "validee",
+      paiement: {
+        is: null,
+      },
+    },
+    select: {
+      id: true,
+      totalHt: true,
+      totalTtc: true,
+    },
+  });
+
+  if (facturesSansPaiement.length > 0) {
+    await prisma.paiement.createMany({
+      data: facturesSansPaiement.map((facture) => ({
+        factureId: facture.id,
+        montantHt: facture.totalHt,
+        montantTtc: facture.totalTtc,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
   const [paiements, clients, modesReglement] = await Promise.all([
     prisma.paiement.findMany({
       where: {
