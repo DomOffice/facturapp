@@ -266,24 +266,41 @@ model FactureLigne {
 }
 
 // ─── PAIEMENTS ──────────────────────────────────────────────────────
-
 model Paiement {
-  id              Int        @id @default(autoincrement())
-  factureId       Int        @unique @map("facture_id")
-  datePaiement    DateTime?  @map("date_paiement") @db.Date
-  modeReglementId Int?       @map("mode_reglement_id")
-  numeroPiece     String?    @map("numero_piece") @db.VarChar(100)
-  remarque        String?    @db.VarChar(255)
-  justificatifUrl String?    @map("justificatif_url") @db.VarChar(255)
-  montantHt       Decimal    @default(0) @map("montant_ht") @db.Decimal(14, 2)
-  montantTtc      Decimal    @default(0) @map("montant_ttc") @db.Decimal(14, 2)
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
-  facture         Facture    @relation(fields: [factureId], references: [id])
-  modeReglement   Parametre? @relation("ModeReglement", fields: [modeReglementId], references: [id])
+  id              Int       @id @default(autoincrement())
+  factureId       Int       @unique @map("facture_id")
+  datePaiement    DateTime? @map("date_paiement") @db.Date
+  modeReglementId Int?      @map("mode_reglement_id")
+  numeroPiece     String?   @map("numero_piece") @db.VarChar(100)
+  remarque        String?   @db.VarChar(255)
+  justificatifUrl String?   @map("justificatif_url") @db.VarChar(255)
+  montantHt       Decimal   @default(0) @map("montant_ht") @db.Decimal(14, 2)
+  montantTtc      Decimal   @default(0) @map("montant_ttc") @db.Decimal(14, 2)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  facture       Facture            @relation(fields: [factureId], references: [id])
+  modeReglement Parametre?         @relation("ModeReglement", fields: [modeReglementId], references: [id])
+  documents     PaiementDocument[]
 
   @@index([datePaiement])
   @@map("paiements")
+}
+
+model PaiementDocument {
+  id                 Int      @id @default(autoincrement())
+  paiementId         Int      @map("paiement_id")
+  nomFichierOriginal String   @map("nom_fichier_original") @db.VarChar(255)
+  nomFichierStocke   String   @map("nom_fichier_stocke") @db.VarChar(255)
+  cheminFichier      String   @map("chemin_fichier") @db.VarChar(500)
+  typeMime           String   @map("type_mime") @db.VarChar(100)
+  tailleFichier      Int      @map("taille_fichier")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  paiement Paiement @relation(fields: [paiementId], references: [id], onDelete: Cascade)
+
+  @@index([paiementId])
+  @@map("paiement_documents")
 }
 
 // ─── CHARGES ────────────────────────────────────────────────────────

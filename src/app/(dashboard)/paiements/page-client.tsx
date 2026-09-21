@@ -22,6 +22,14 @@ type Paiement = {
   justificatifUrl: string | null;
 };
 
+type PaiementDocument = {
+  id: number;
+  nomFichierOriginal: string;
+  typeMime: string;
+  tailleFichier: number;
+  createdAt: string;
+};
+
 type Option = { id: number; libelle: string };
 
 type ColonneTri =
@@ -60,6 +68,13 @@ export default function PaiementsClient({
   const [remarque, setRemarque] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadingExcel, setLoadingExcel] = useState(false);
+
+  const [documents, setDocuments] = useState<PaiementDocument[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(
+    null,
+  );
 
   const [clientsSelectionnes, setClientsSelectionnes] =
     useState<number[]>(filtreClientIds);
@@ -291,12 +306,155 @@ export default function PaiementsClient({
     setRechercheClient("");
     router.push("/paiements");
   }
+
+  async function chargerDocuments(paiementId: number) {
+    setLoadingDocuments(true);
+
+    try {
+      const res = await fetch(`/api/paiements/${paiementId}/documents`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          data.error || "Erreur lors du chargement des documents",
+        );
+      }
+
+      setDocuments(data.documents ?? []);
+    } catch (err: unknown) {
+      setDocuments([]);
+
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors du chargement des documents",
+      );
+    } finally {
+      setLoadingDocuments(false);
+    }
+  }
+
+  async function ajouterDocument(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!selected) return;
+
+    const fichier = event.target.files?.[0];
+
+    if (!fichier) return;
+
+    event.target.value = "";
+
+    const formatsAutorises = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+    ];
+
+    if (!formatsAutorises.includes(fichier.type)) {
+      alert("Format non autorisé. Formats acceptés : PDF, JPEG, PNG");
+      return;
+    }
+
+    if (fichier.size > 10 * 1024 * 1024) {
+      alert("Fichier trop volumineux. Taille maximale : 10 Mo");
+      return;
+    }
+
+    setUploadingDocument(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("fichier", fichier);
+
+      const res = await fetch(`/api/paiements/${selected.id}/documents`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors de l'ajout du document");
+      }
+
+      await chargerDocuments(selected.id);
+    } catch (err: unknown) {
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors de l'ajout du document",
+      );
+    } finally {
+      setUploadingDocument(false);
+    }
+  }
+
+  async function supprimerDocument(documentId: number) {
+    if (!selected) return;
+
+    const document = documents.find((element) => element.id === documentId);
+
+    const confirmation = window.confirm(
+      `Voulez-vous supprimer la pièce jointe "${
+        document?.nomFichierOriginal ?? "sélectionnée"
+      }" ?`,
+    );
+
+    if (!confirmation) return;
+
+    setDeletingDocumentId(documentId);
+
+    try {
+      const res = await fetch(
+        `/api/paiements/${selected.id}/documents/${documentId}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors de la suppression");
+      }
+
+      setDocuments((liste) =>
+        liste.filter((element) => element.id !== documentId),
+      );
+    } catch (err: unknown) {
+      alert(
+        err instanceof Error ? err.message : "Erreur lors de la suppression",
+      );
+    } finally {
+      setDeletingDocumentId(null);
+    }
+  }
+
+  function formatTailleFichier(taille: number) {
+    if (taille < 1024) {
+      return `${taille} o`;
+    }
+
+    if (taille < 1024 * 1024) {
+      return `${(taille / 1024).toFixed(1)} Ko`;
+    }
+
+    return `${(taille / (1024 * 1024)).toFixed(1)} Mo`;
+  }
   function selectPaiement(p: Paiement) {
     setSelected(p);
     setDatePaiement(p.datePaiement ? p.datePaiement.split("T")[0] : "");
     setModeReglementId(p.modeReglementId);
     setNumeroPiece(p.numeroPiece ?? "");
     setRemarque(p.remarque ?? "");
+
+    setDocuments([]);
+    void chargerDocuments(p.id);
+
     setTimeout(() => {
       window.scrollTo({
         top: 0,
@@ -571,6 +729,91 @@ export default function PaiementsClient({
               />
             </div>
           </div>
+          <div className="mt-4 rounded-md border border-slate-200 bg-white p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-700">
+                  Pièces jointes
+                </div>
+
+                <div className="text-xs text-slate-500">
+                  PDF, JPEG ou PNG — 10 Mo maximum par fichier
+                </div>
+              </div>
+
+              <label
+                className={`btn-secondary cursor-pointer ${
+                  uploadingDocument ? "pointer-events-none opacity-60" : ""
+                }`}
+              >
+                {uploadingDocument
+                  ? "Ajout en cours..."
+                  : "📎 Ajouter une pièce jointe"}
+
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  className="hidden"
+                  disabled={uploadingDocument}
+                  onChange={ajouterDocument}
+                />
+              </label>
+            </div>
+
+            {loadingDocuments ? (
+              <div className="py-2 text-sm text-slate-500">
+                Chargement des pièces jointes...
+              </div>
+            ) : documents.length === 0 ? (
+              <div className="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-400">
+                Aucune pièce jointe pour ce paiement.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {documents.map((document) => (
+                  <div
+                    key={document.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <div
+                        className="truncate text-sm font-medium text-slate-700"
+                        title={document.nomFichierOriginal}
+                      >
+                        📄 {document.nomFichierOriginal}
+                      </div>
+
+                      <div className="text-xs text-slate-400">
+                        {formatTailleFichier(document.tailleFichier)}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <a
+                        href={`/api/paiements/${selected.id}/documents/${document.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-secondary btn-sm"
+                      >
+                        Ouvrir
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => supprimerDocument(document.id)}
+                        disabled={deletingDocumentId === document.id}
+                        className="btn-ghost btn-sm text-red-600"
+                      >
+                        {deletingDocumentId === document.id
+                          ? "Suppression..."
+                          : "Supprimer"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex gap-2 mt-3">
             <button
               onClick={sauvegarder}
@@ -579,7 +822,13 @@ export default function PaiementsClient({
             >
               {saving ? "Enregistrement..." : "Valider"}
             </button>
-            <button onClick={() => setSelected(null)} className="btn-secondary">
+            <button
+              onClick={() => {
+                setSelected(null);
+                setDocuments([]);
+              }}
+              className="btn-secondary"
+            >
               Annuler
             </button>
           </div>
