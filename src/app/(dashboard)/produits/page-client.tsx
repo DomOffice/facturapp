@@ -202,6 +202,12 @@ export default function ProduitsPageClient({
       render: (row) => formatMontant(Number(row.dernierPrixAchatHt)),
     },
     {
+      key: "dernierPrixAchatTtc",
+      label: "P.Achat TTC",
+      sortable: true,
+      render: (row) => formatMontant(Number(row.dernierPrixAchatTtc)),
+    },
+    {
       key: "prixVenteHt",
       label: "P.Vente HT",
       sortable: true,
