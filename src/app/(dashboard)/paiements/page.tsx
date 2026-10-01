@@ -80,6 +80,10 @@ export default async function PaiementsPage({
           include: { client: { select: { id: true, raisonSociale: true } } },
         },
         modeReglement: { select: { libelle: true } },
+        documents: {
+          select: { id: true },
+          take: 1,
+        },
       },
       orderBy: { facture: { numeroFacture: "asc" } },
     }),
@@ -116,7 +120,10 @@ export default async function PaiementsPage({
         modeReglementLibelle: p.modeReglement?.libelle ?? null,
         numeroPiece: p.numeroPiece,
         remarque: p.remarque,
-        justificatifUrl: p.justificatifUrl,
+        justificatifUrl:
+          (p.documents && p.documents.length > 0) || p.justificatifUrl
+            ? "present"
+            : null,
       }))}
       clients={clients}
       modesReglement={modesReglement}

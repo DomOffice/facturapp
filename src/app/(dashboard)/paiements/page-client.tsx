@@ -44,7 +44,7 @@ type ColonneTri =
 
 type DirectionTri = "asc" | "desc";
 export default function PaiementsClient({
-  paiements,
+  paiements: paiementsInitiaux,
   clients,
   modesReglement,
   sommeHt,
@@ -61,6 +61,13 @@ export default function PaiementsClient({
   filtreClientIds: number[];
 }) {
   const router = useRouter();
+  const [listePaiements, setListePaiements] =
+    useState<Paiement[]>(paiementsInitiaux);
+
+  useEffect(() => {
+    setListePaiements(paiementsInitiaux);
+  }, [paiementsInitiaux]);
+
   const [selected, setSelected] = useState<Paiement | null>(null);
   const [datePaiement, setDatePaiement] = useState("");
   const [modeReglementId, setModeReglementId] = useState<number | null>(null);
@@ -131,7 +138,7 @@ export default function PaiementsClient({
   }
 
   const paiementsAffiches = useMemo(() => {
-    const resultat = paiements.filter((paiement) => {
+    const resultat = listePaiements.filter((paiement) => {
       const clientSelectionne =
         clientsSelectionnes.length === 0 ||
         clientsSelectionnes.includes(paiement.clientId);
@@ -206,7 +213,7 @@ export default function PaiementsClient({
       return directionTri === "asc" ? comparaison : -comparaison;
     });
   }, [
-    paiements,
+    listePaiements,
     clientsSelectionnes,
     nonPayeesSeulement,
     colonneTri,
@@ -382,6 +389,15 @@ export default function PaiementsClient({
       }
 
       await chargerDocuments(selected.id);
+
+      // Met à jour la colonne Justif dans le tableau immédiatement
+      setListePaiements((liste) =>
+        liste.map((p) =>
+          p.id === selected.id ? { ...p, justificatifUrl: "present" } : p,
+        ),
+      );
+      router.refresh();
+
     } catch (err: unknown) {
       alert(
         err instanceof Error
@@ -422,9 +438,17 @@ export default function PaiementsClient({
         throw new Error(data.error || "Erreur lors de la suppression");
       }
 
-      setDocuments((liste) =>
-        liste.filter((element) => element.id !== documentId),
-      );
+      const restants = documents.filter((element) => element.id !== documentId);
+      setDocuments(restants);
+
+      if (restants.length === 0) {
+        setListePaiements((liste) =>
+          liste.map((p) =>
+            p.id === selected.id ? { ...p, justificatifUrl: null } : p,
+          ),
+        );
+        router.refresh();
+      }
     } catch (err: unknown) {
       alert(
         err instanceof Error ? err.message : "Erreur lors de la suppression",
@@ -491,7 +515,7 @@ export default function PaiementsClient({
     setLoadingExcel(true);
     try {
       await exporterPaiementsExcel(
-        paiements.map((p) => ({
+        listePaiements.map((p) => ({
           numeroFacture: p.numeroFacture,
           dateFacture: p.dateFacture,
           clientNom: p.clientNom,
