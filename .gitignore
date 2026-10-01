@@ -78,3 +78,7 @@ build/
 
 # TypeScript build cache
 tsconfig.tsbuildinfo
+
+# Scripts locaux serveur et config PM2
+scripts/
+ecosystem.config.cjs
