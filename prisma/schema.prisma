@@ -119,6 +119,7 @@ model Client {
   factures      Facture[]
   avoirs        Avoir[]
   devis         Devis[]
+  bonsLivraison BonLivraison[]
 
   @@index([raisonSociale])
   @@index([telephone])
@@ -178,6 +179,7 @@ model Produit {
   factureLignes            FactureLigne[]
   avoirLignes              AvoirLigne[]
   devisLignes              DevisLigne[]
+  bonLivraisonLignes       BonLivraisonLigne[]
   lignesImportees          LigneImportee[]
   associationsFournisseurs AssociationArticleFournisseur[]
   mouvementsStock          MouvementStock[]
@@ -234,6 +236,7 @@ model Facture {
   lignes           FactureLigne[]
   paiement         Paiement?
   avoirs           Avoir[]
+  bonsLivraison    BonLivraison[]
 
   @@unique([annee, numeroSequence])
   @@index([clientId])
@@ -538,4 +541,48 @@ model MouvementStock {
   @@index([produitId])
   @@index([dateMouvement])
   @@map("mouvements_stock")
+}
+
+// ─── BONS DE LIVRAISON ──────────────────────────────────────────────
+
+model BonLivraison {
+  id             Int                  @id @default(autoincrement())
+  annee          Int
+  numeroSequence Int                  @map("numero_sequence")
+  numeroBl       String               @unique @map("numero_bl") @db.VarChar(30)
+  clientId       Int                  @map("client_id")
+  dateLivraison  DateTime             @default(now()) @map("date_livraison") @db.Date
+  statut         String               @default("livre") @db.VarChar(30) // livre | facture | annule
+  factureId      Int?                 @map("facture_id")
+  remarque       String?              @db.Text
+  creePar        Int?                 @map("cree_par")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  client         Client               @relation(fields: [clientId], references: [id])
+  facture        Facture?             @relation(fields: [factureId], references: [id], onDelete: SetNull)
+  lignes         BonLivraisonLigne[]
+
+  @@unique([annee, numeroSequence])
+  @@index([clientId])
+  @@index([dateLivraison])
+  @@index([statut])
+  @@map("bons_livraison")
+}
+
+model BonLivraisonLigne {
+  id             Int          @id @default(autoincrement())
+  bonLivraisonId Int          @map("bon_livraison_id")
+  ordreLigne     Int          @map("ordre_ligne")
+  produitId      Int?         @map("produit_id")
+  designation    String       @db.VarChar(255)
+  quantite       Decimal      @db.Decimal(14, 2)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  bonLivraison   BonLivraison @relation(fields: [bonLivraisonId], references: [id], onDelete: Cascade)
+  produit        Produit?     @relation(fields: [produitId], references: [id])
+
+  @@index([bonLivraisonId])
+  @@map("bon_livraison_lignes")
 }

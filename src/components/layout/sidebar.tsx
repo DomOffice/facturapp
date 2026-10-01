@@ -22,6 +22,7 @@ const navGroups: NavGroup[] = [
     label: "Facturation",
     items: [
       { href: "/factures", label: "Factures", icon: <IconDoc /> },
+      { href: "/bl", label: "Bons de livraison", icon: <IconBL /> },
       { href: "/devis", label: "Devis", icon: <IconDevis /> },
       { href: "/avoirs", label: "Avoirs", icon: <IconAvoir /> },
       { href: "/paiements", label: "Paiements", icon: <IconCash /> },
@@ -463,6 +464,23 @@ function IconSync() {
     >
       <path d="M2 5h10M9 2l3 3-3 3" />
       <path d="M14 11H4M7 8l-3 3 3 3" />
+    </svg>
+  );
+}
+
+function IconBL() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <rect x="1" y="2" width="14" height="12" rx="1.5" />
+      <path d="M4 6h8M4 9h5" />
+      <path d="M11 9l2 2" strokeLinecap="round" />
     </svg>
   );
 }

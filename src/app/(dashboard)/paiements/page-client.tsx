@@ -577,9 +577,9 @@ export default function PaiementsClient({
       </div>
 
       {/* Filtres */}
-      <div className="card mb-4 p-3 flex gap-4 flex-wrap items-center">
+      <div className="card mb-4 p-3 flex gap-6 flex-wrap items-center">
         {/* Filtre Client */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <details
             className="relative"
             onKeyDown={(event) => {
@@ -590,7 +590,7 @@ export default function PaiementsClient({
               }
             }}
           >
-            <summary className="form-select w-64 cursor-pointer list-none py-1.5 text-sm">
+            <summary className="form-select w-60 cursor-pointer list-none py-1.5 text-sm">
               {clientsSelectionnes.length === 0
                 ? "Tous les clients"
                 : `${clientsSelectionnes.length} client${
@@ -645,7 +645,7 @@ export default function PaiementsClient({
         </div>
 
         {/* Filtre Non payées */}
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 shrink-0 whitespace-nowrap">
           <input
             type="checkbox"
             checked={nonPayeesSeulement}
@@ -656,15 +656,15 @@ export default function PaiementsClient({
         </label>
 
         {/* Filtre Justificatif */}
-        <div className="flex items-center gap-1.5 text-sm text-slate-600">
-          <label htmlFor="select-filtre-justif">Justif :</label>
+        <div className="flex items-center gap-2 text-sm text-slate-600 shrink-0 whitespace-nowrap">
+          <span>Justif :</span>
           <select
             id="select-filtre-justif"
             value={filtreJustificatif}
             onChange={(e) =>
               setFiltreJustificatif(e.target.value as "tous" | "avec" | "sans")
             }
-            className="form-select py-1.5 px-2 text-sm"
+            className="form-select py-1.5 px-3 text-sm w-24"
           >
             <option value="tous">Tous</option>
             <option value="avec">Oui</option>
@@ -679,28 +679,27 @@ export default function PaiementsClient({
           <button
             type="button"
             onClick={reinitialiserFiltres}
-            className="btn-ghost btn-sm text-slate-500 hover:text-slate-800"
+            className="btn-ghost btn-sm text-slate-500 hover:text-slate-800 shrink-0"
           >
             Réinitialiser
           </button>
         )}
 
-        {/* Bloc droite : Compteur factures et Sommes HT/TTC */}
-        <div className="ml-auto flex items-center gap-4 text-sm">
-          <span className="text-slate-400">
-            {paiementsSelectionnes.length}/{paiementsAffiches.length} facture(s)
-          </span>
+        {/* Compteur de factures intermédiaire */}
+        <span className="text-sm text-slate-400 shrink-0 whitespace-nowrap pl-2 border-l border-slate-200">
+          {paiementsSelectionnes.length}/{paiementsAffiches.length} facture(s)
+        </span>
 
-          <div className="text-slate-500">
-            Somme HT :{" "}
-            <span className="font-semibold text-slate-700">
-              {formatMontant(totauxAffiches.ht)}
-            </span>{" "}
-            | Somme TTC :{" "}
-            <span className="font-semibold text-indigo-600">
-              {formatMontant(totauxAffiches.ttc)}
-            </span>
-          </div>
+        {/* Totaux financiers poussés à l'extrémité droite */}
+        <div className="ml-auto text-sm text-slate-500 shrink-0 whitespace-nowrap">
+          Somme HT :{" "}
+          <span className="font-semibold text-slate-700">
+            {formatMontant(totauxAffiches.ht)}
+          </span>{" "}
+          | Somme TTC :{" "}
+          <span className="font-semibold text-indigo-600">
+            {formatMontant(totauxAffiches.ttc)}
+          </span>
         </div>
       </div>
 
