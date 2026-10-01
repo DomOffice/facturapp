@@ -88,7 +88,9 @@ export default function PaiementsClient({
 
   const [nonPayeesSeulement, setNonPayeesSeulement] = useState(filtreNonPaye);
 
-  const [filtreJustificatif, setFiltreJustificatif] = useState<"tous" | "avec" | "sans">("tous");
+  const [filtreJustificatif, setFiltreJustificatif] = useState<
+    "tous" | "avec" | "sans"
+  >("tous");
 
   const [rechercheClient, setRechercheClient] = useState("");
 
@@ -299,7 +301,7 @@ export default function PaiementsClient({
     }
   }
 
-  function appliquerFiltres() {
+  /*function appliquerFiltres() {
     const params = new URLSearchParams();
 
     if (clientsSelectionnes.length > 0) {
@@ -313,7 +315,7 @@ export default function PaiementsClient({
     const query = params.toString();
 
     router.push(query ? `/paiements?${query}` : "/paiements");
-  }
+  }*/
 
   function reinitialiserFiltres() {
     setClientsSelectionnes([]);
@@ -575,10 +577,9 @@ export default function PaiementsClient({
       </div>
 
       {/* Filtres */}
-      <div className="card mb-4 p-3 flex gap-4 flex-wrap items-end">
+      <div className="card mb-4 p-3 flex gap-4 flex-wrap items-center">
+        {/* Filtre Client */}
         <div className="relative">
-          <label className="form-label">Clients</label>
-
           <details
             className="relative"
             onKeyDown={(event) => {
@@ -589,7 +590,7 @@ export default function PaiementsClient({
               }
             }}
           >
-            <summary className="form-select w-64 cursor-pointer list-none">
+            <summary className="form-select w-64 cursor-pointer list-none py-1.5 text-sm">
               {clientsSelectionnes.length === 0
                 ? "Tous les clients"
                 : `${clientsSelectionnes.length} client${
@@ -643,26 +644,27 @@ export default function PaiementsClient({
           </details>
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2 pb-2">
+        {/* Filtre Non payées */}
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={nonPayeesSeulement}
             onChange={(event) => setNonPayeesSeulement(event.target.checked)}
             className="h-4 w-4"
           />
-
-          <span className="text-sm text-slate-600">Non payées seulement</span>
+          <span>Non payées seulement</span>
         </label>
 
-        <div className="flex items-center gap-1.5 pb-2">
-          <label htmlFor="select-filtre-justif" className="text-sm text-slate-600">Justif :</label>
+        {/* Filtre Justificatif */}
+        <div className="flex items-center gap-1.5 text-sm text-slate-600">
+          <label htmlFor="select-filtre-justif">Justif :</label>
           <select
             id="select-filtre-justif"
             value={filtreJustificatif}
             onChange={(e) =>
               setFiltreJustificatif(e.target.value as "tous" | "avec" | "sans")
             }
-            className="form-select text-sm py-1 px-2"
+            className="form-select py-1.5 px-2 text-sm"
           >
             <option value="tous">Tous</option>
             <option value="avec">Oui</option>
@@ -670,39 +672,35 @@ export default function PaiementsClient({
           </select>
         </div>
 
-        <button
-          type="button"
-          onClick={appliquerFiltres}
-          className="btn-secondary"
-        >
-          Filtrer
-        </button>
-
+        {/* Bouton Réinitialiser */}
         {(clientsSelectionnes.length > 0 ||
           nonPayeesSeulement ||
           filtreJustificatif !== "tous") && (
           <button
             type="button"
             onClick={reinitialiserFiltres}
-            className="btn-ghost"
+            className="btn-ghost btn-sm text-slate-500 hover:text-slate-800"
           >
             Réinitialiser
           </button>
         )}
 
-        <span className="mr-3 text-slate-400">
-          {paiementsSelectionnes.length}/{paiementsAffiches.length} facture(s)
-        </span>
-
-        <div className="ml-auto text-sm text-slate-500">
-          Somme HT :{" "}
-          <span className="font-semibold text-slate-700">
-            {formatMontant(totauxAffiches.ht)}
-          </span>{" "}
-          | Somme TTC :{" "}
-          <span className="font-semibold text-indigo-600">
-            {formatMontant(totauxAffiches.ttc)}
+        {/* Bloc droite : Compteur factures et Sommes HT/TTC */}
+        <div className="ml-auto flex items-center gap-4 text-sm">
+          <span className="text-slate-400">
+            {paiementsSelectionnes.length}/{paiementsAffiches.length} facture(s)
           </span>
+
+          <div className="text-slate-500">
+            Somme HT :{" "}
+            <span className="font-semibold text-slate-700">
+              {formatMontant(totauxAffiches.ht)}
+            </span>{" "}
+            | Somme TTC :{" "}
+            <span className="font-semibold text-indigo-600">
+              {formatMontant(totauxAffiches.ttc)}
+            </span>
+          </div>
         </div>
       </div>
 
