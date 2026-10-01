@@ -177,3 +177,14 @@ Décision : conserver le gros chiffre `CA TTC` comme CA des factures **validées
 Décision : le filtre de dates devient global au dashboard, avec raccourcis `Ce mois` et `Cette année`.
 
 Décision : la `Marge HT théorique` doit représenter **ventes HT - coût d'achat HT** pour les factures validées + brouillons de la période. Le calcul exact sur les données historiques reste à fiabiliser ; ne pas assimiler `CA TTC - Total HT` à une marge (ce serait essentiellement de la TVA).
+
+## 2026-10 — Architecture Bons de Livraison (Mobile / PC)
+Décision : Scinder l'ergonomie du processus de livraison. 
+- La création de BL (`/bl/nouveau`) est strictement pensée pour une utilisation sur smartphone chez le client (tactile, rapide, sans gestion de prix).
+- La conversion et la consolidation en facture (`/bl/convertir`) sont pensées pour un écran PC au bureau (vue tableau, ajustement des prix de vente, application de la TVA).
+
+## 2026-10 — Nomenclature des factures
+Décision : La génération automatique des numéros de facture adopte formellement le format `FAyear/xxxxx` (ex: `FA2026/00001` sur 5 chiffres) pour assurer la continuité avec le système historique.
+
+## 2026-10 — Déploiement automatisé et Prisma
+Décision : Le script `deploy.ps1` intègre désormais `npx prisma db push --skip-generate` avant le build Next.js. L'argument booléen `[switch]$Full` a été corrigé pour être transmis de manière fiable depuis le fichier batch `.bat`, garantissant que les modifications de schéma sont appliquées sur PostgreSQL PROD sans intervention manuelle avant la compilation.

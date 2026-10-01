@@ -216,3 +216,15 @@ Le générateur `src/lib/exports/pdf/facture-pdf.ts` a été largement refondu :
 - liste des dernières factures filtrée par période.
 
 **À finaliser :** calcul et validation de la `Marge HT théorique`. Le KPI est présent mais sa formule/donnée d'achat n'est pas encore considérée fiable.
+
+## Mise à jour 2026-10 — Bons de Livraison (BL)
+
+### Module BL (Mobile / PC)
+- Création du modèle de données `BonLivraison` et `BonLivraisonLigne`.
+- Interface Mobile-first (`/bl/nouveau`) pour les agents terrain : gros boutons tactiles, incrémentation rapide (`+`/`-`), recherche dynamique multi-tokens.
+- Gestion interactive des doublons à la saisie (additionner, remplacer, annuler).
+- Interface PC-first (`/bl`) pour le bureau : tableau dense, tri par colonnes, sélection groupée par client.
+- Conversion consolidée (`/bl/convertir`) : regroupement intelligent des articles identiques de plusieurs BL en une seule facture.
+- Nomenclature des factures générées ajustée au format `FAyear/xxxxx` (ex: FA2026/00001).
+- Modification d'un BL possible (`/bl/[id]`) uniquement s'il n'est pas encore facturé (lecture seule ensuite).
+- Lien direct depuis la liste des BL vers la facture générée.
