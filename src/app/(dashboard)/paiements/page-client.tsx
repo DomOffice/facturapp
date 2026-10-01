@@ -397,7 +397,6 @@ export default function PaiementsClient({
         ),
       );
       router.refresh();
-
     } catch (err: unknown) {
       alert(
         err instanceof Error
@@ -889,8 +888,8 @@ export default function PaiementsClient({
       )}
 
       {/* Liste paiements */}
-      <div className="card overflow-hidden">
-        <table className="data-table">
+      <div className="card overflow-x-auto">
+        <table className="data-table w-full table-fixed min-w-[950px]">
           <thead>
             <tr>
               <th className="w-10 text-center">
@@ -933,7 +932,7 @@ export default function PaiementsClient({
                 </button>
               </th>
 
-              <th>
+              <th className="w-44 max-w-[176px]">
                 <button
                   type="button"
                   onClick={() => changerTri("clientNom")}
@@ -1005,8 +1004,8 @@ export default function PaiementsClient({
                 </button>
               </th>
 
-              <th>Remarque</th>
-              <th>Justif.</th>
+              <th className="w-32 max-w-[128px]">Remarque</th>
+              <th className="w-16 text-center whitespace-nowrap">Justif.</th>
             </tr>
           </thead>
           <tbody>
@@ -1033,7 +1032,9 @@ export default function PaiementsClient({
                 <td className="text-slate-500">
                   {new Date(p.dateFacture).toLocaleDateString("fr-FR")}
                 </td>
-                <td className="max-w-xs truncate">{p.clientNom}</td>
+                <td className="w-44 max-w-[176px] truncate" title={p.clientNom}>
+                  {p.clientNom}
+                </td>
                 <td>{formatMontant(p.montantHt)}</td>
                 <td className="font-semibold">{formatMontant(p.montantTtc)}</td>
                 <td>
@@ -1051,8 +1052,13 @@ export default function PaiementsClient({
                 <td className="text-slate-500 font-mono">
                   {p.numeroPiece ?? "—"}
                 </td>
-                <td className="text-slate-400">{p.remarque ?? "—"}</td>
-                <td>
+                <td
+                  className="w-32 max-w-[128px] truncate text-slate-400"
+                  title={p.remarque ?? ""}
+                >
+                  {p.remarque ?? "—"}
+                </td>
+                <td className="w-16 text-center whitespace-nowrap">
                   {p.justificatifUrl ? (
                     <span className="badge badge-success">Oui</span>
                   ) : (
