@@ -88,6 +88,8 @@ export default function PaiementsClient({
 
   const [nonPayeesSeulement, setNonPayeesSeulement] = useState(filtreNonPaye);
 
+  const [filtreJustificatif, setFiltreJustificatif] = useState<"tous" | "avec" | "sans">("tous");
+
   const [rechercheClient, setRechercheClient] = useState("");
 
   const [lignesSelectionnees, setLignesSelectionnees] = useState<number[]>([]);
@@ -145,7 +147,12 @@ export default function PaiementsClient({
 
       const estNonPaye = !nonPayeesSeulement || paiement.datePaiement === null;
 
-      return clientSelectionne && estNonPaye;
+      const filtreJustifValide =
+        filtreJustificatif === "tous" ||
+        (filtreJustificatif === "avec" && !!paiement.justificatifUrl) ||
+        (filtreJustificatif === "sans" && !paiement.justificatifUrl);
+
+      return clientSelectionne && estNonPaye && filtreJustifValide;
     });
 
     return [...resultat].sort((a, b) => {
@@ -216,6 +223,7 @@ export default function PaiementsClient({
     listePaiements,
     clientsSelectionnes,
     nonPayeesSeulement,
+    filtreJustificatif,
     colonneTri,
     directionTri,
   ]);
@@ -310,6 +318,7 @@ export default function PaiementsClient({
   function reinitialiserFiltres() {
     setClientsSelectionnes([]);
     setNonPayeesSeulement(false);
+    setFiltreJustificatif("tous");
     setRechercheClient("");
     router.push("/paiements");
   }
@@ -645,6 +654,22 @@ export default function PaiementsClient({
           <span className="text-sm text-slate-600">Non payées seulement</span>
         </label>
 
+        <div className="flex items-center gap-1.5 pb-2">
+          <label htmlFor="select-filtre-justif" className="text-sm text-slate-600">Justif :</label>
+          <select
+            id="select-filtre-justif"
+            value={filtreJustificatif}
+            onChange={(e) =>
+              setFiltreJustificatif(e.target.value as "tous" | "avec" | "sans")
+            }
+            className="form-select text-sm py-1 px-2"
+          >
+            <option value="tous">Tous</option>
+            <option value="avec">Oui</option>
+            <option value="sans">Vide</option>
+          </select>
+        </div>
+
         <button
           type="button"
           onClick={appliquerFiltres}
@@ -653,7 +678,9 @@ export default function PaiementsClient({
           Filtrer
         </button>
 
-        {(clientsSelectionnes.length > 0 || nonPayeesSeulement) && (
+        {(clientsSelectionnes.length > 0 ||
+          nonPayeesSeulement ||
+          filtreJustificatif !== "tous") && (
           <button
             type="button"
             onClick={reinitialiserFiltres}
@@ -869,8 +896,10 @@ export default function PaiementsClient({
           <div className="flex gap-2 mt-3">
             <button
               onClick={sauvegarder}
-              disabled={saving}
-              className="btn-primary"
+              disabled={saving || uploadingDocument}
+              className={`btn-primary ${
+                uploadingDocument ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               {saving ? "Enregistrement..." : "Valider"}
             </button>
@@ -879,7 +908,10 @@ export default function PaiementsClient({
                 setSelected(null);
                 setDocuments([]);
               }}
-              className="btn-secondary"
+              disabled={saving || uploadingDocument}
+              className={`btn-secondary ${
+                uploadingDocument ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               Annuler
             </button>
