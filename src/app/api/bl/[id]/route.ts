@@ -40,7 +40,7 @@ export async function PUT(
     const { id } = await params;
     const blId = Number(id);
     const body = await request.json();
-    const { clientId, dateLivraison, remarque, lignes } = body;
+    const { clientId, dateLivraison, remarque, estIncomplet, articlesManquants, lignes } = body;
 
     const blExistant = await prisma.bonLivraison.findUnique({
       where: { id: blId },
@@ -70,6 +70,8 @@ export async function PUT(
           clientId: Number(clientId),
           dateLivraison: new Date(dateLivraison),
           remarque: remarque || null,
+          estIncomplet: Boolean(estIncomplet),
+          articlesManquants: estIncomplet ? (articlesManquants || null) : null,
           lignes: {
             create: lignes.map((l: any, index: number) => ({
               ordreLigne: index + 1,

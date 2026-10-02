@@ -2,6 +2,8 @@
 import prisma from "@/lib/db/prisma";
 import BonsLivraisonClient from "./page-client";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Bons de livraison | FacturApp",
 };
@@ -37,6 +39,8 @@ export default async function BonsLivraisonPage() {
   // Sérialisation des types Prisma pour le composant client
   const bonsLivraisonFormates = bonsLivraison.map((bl) => ({
     ...bl,
+    estIncomplet: Boolean(bl.estIncomplet),
+    articlesManquants: bl.articlesManquants ?? null,
     dateLivraison: bl.dateLivraison.toISOString(),
     createdAt: bl.createdAt.toISOString(),
     updatedAt: bl.updatedAt.toISOString(),

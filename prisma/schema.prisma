@@ -555,6 +555,8 @@ model BonLivraison {
   statut         String               @default("livre") @db.VarChar(30) // livre | facture | annule
   factureId      Int?                 @map("facture_id")
   remarque       String?              @db.Text
+  estIncomplet   Boolean              @default(false)
+  articlesManquants String?           @db.Text
   creePar        Int?                 @map("cree_par")
   createdAt      DateTime             @default(now()) @map("created_at")
   updatedAt      DateTime             @updatedAt @map("updated_at")

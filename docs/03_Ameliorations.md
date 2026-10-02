@@ -228,3 +228,6 @@ Le générateur `src/lib/exports/pdf/facture-pdf.ts` a été largement refondu :
 - Nomenclature des factures générées ajustée au format `FAyear/xxxxx` (ex: FA2026/00001).
 - Modification d'un BL possible (`/bl/[id]`) uniquement s'il n'est pas encore facturé (lecture seule ensuite).
 - Lien direct depuis la liste des BL vers la facture générée.
+- Gestion des articles hors catalogue / non référencés : case à cocher « Signaler comme incomplet » avec champ de saisie libre des articles manquants à la création et modification.
+- Protection stricte de facturation : un BL incomplet est verrouillé avec un indicateur visuel (⚠️), non cochable et non convertible tant qu'il n'est pas régularisé.
+- Alerte intelligente avant conversion : détection et affichage des BL incomplets du même client avec le choix explicite entre « Revenir et compléter les BL » ou « Continuer sans les BL incomplets ».

@@ -24,12 +24,15 @@ FacturApp (Next.js 14, TypeScript, Prisma 5, PostgreSQL) remplace progressivemen
 **Serveur PROD :** Next.js sur port 3001, PostgreSQL local, MariaDB locale.
 Les déploiements s'effectuent via `.\deploy.bat -Full` qui gère `git pull`, `pm2`, `prisma db push`, `prisma generate` et `npm run build`.
 
-## 2. Dernières fonctionnalités acquises (Bons de Livraison)
+## 2. Dernières fonctionnalités acquises (Bons de Livraison & Garde-fous)
 
-Le module BL vient d'être mis en production avec une architecture scindée :
-- **Mobile-first (`/bl/nouveau` et `/bl/[id]`) :** Création et modification adaptées aux smartphones pour le terrain. Recherche dynamique multi-tokens, incrémentation tactile, et détection de doublons avec modale interactive (additionner/remplacer/annuler).
-- **PC-first (`/bl` et `/bl/convertir`) :** Liste avec tris et sélection groupée par client. Conversion avec consolidation automatique des articles identiques. 
-- **Facturation (`/api/bl/convertir`) :** Génération des factures au format `FAyear/xxxxx`, avec mise à jour du statut des BL en "facturé" et verrouillage en lecture seule.
+Le module BL est en production avec une architecture scindée :
+- **Mobile-first (`/bl/nouveau` et `/bl/[id]`) :** Création et modification adaptées aux smartphones pour le terrain. Recherche dynamique multi-tokens, incrémentation tactile, détection de doublons avec modale interactive (additionner/remplacer/annuler).
+- **Gestion des BL Incomplets :** Case à cocher « Incomplet » avec champ de saisie libre des articles hors catalogue / manquants pour ne pas bloquer les livraisons terrain.
+- **PC-first (`/bl` et `/bl/convertir`) :** Liste avec tris et sélection groupée par client. 
+  - Les BL incomplets sont identifiés par un badge orange et une icône ⚠️, et sont **strictement non sélectionnables** pour la facturation.
+  - Alerte intelligente au clic sur « Convertir en facture » si des BL complets ont été oubliés ou si des BL incomplets traînent pour le même client (choix entre régulariser d'abord ou continuer sans eux).
+- **Facturation (`/api/bl/convertir`) :** Génération des factures au format officiel `FAyear/xxxxx`, avec mise à jour du statut des BL en "facturé" et verrouillage en lecture seule.
 
 ## 3. Synchronisation MariaDB / PostgreSQL
 

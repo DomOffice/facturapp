@@ -188,3 +188,7 @@ Décision : La génération automatique des numéros de facture adopte formellem
 
 ## 2026-10 — Déploiement automatisé et Prisma
 Décision : Le script `deploy.ps1` intègre désormais `npx prisma db push --skip-generate` avant le build Next.js. L'argument booléen `[switch]$Full` a été corrigé pour être transmis de manière fiable depuis le fichier batch `.bat`, garantissant que les modifications de schéma sont appliquées sur PostgreSQL PROD sans intervention manuelle avant la compilation.
+
+## 2026-10 — Gestion des BL Incomplets et garde-fous de facturation
+Décision : Pour ne pas bloquer les livraisons terrain lorsqu'un article n'est pas encore créé dans la base de données, le livreur peut marquer le BL comme « incomplet » et saisir les articles manquants en texte libre.
+Règle de gestion : Tout BL portant ce flag est strictement exclu de la sélection de facturation. Si l'utilisateur lance la conversion d'un client ayant des BL incomplets en attente, une boîte de dialogue affiche le détail des articles manquants et oblige à choisir entre abandonner pour régulariser ou facturer uniquement la sélection prête.

@@ -44,14 +44,19 @@ export default function FormNouveauBlMobile({
   const [clientId, setClientId] = useState<number | "">("");
   const [rechercheClient, setRechercheClient] = useState("");
   const [dateLivraison, setDateLivraison] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [remarque, setRemarque] = useState("");
+
+  const [estIncomplet, setEstIncomplet] = useState(false);
+  const [articlesManquants, setArticlesManquants] = useState("");
+
   const [lignes, setLignes] = useState<LigneBlForm[]>([]);
 
   // Recherche produit en cours
   const [rechercheProduit, setRechercheProduit] = useState("");
-  const [produitSelectionne, setProduitSelectionne] = useState<ProduitSimple | null>(null);
+  const [produitSelectionne, setProduitSelectionne] =
+    useState<ProduitSimple | null>(null);
   const [designationLibre, setDesignationLibre] = useState("");
   const [quantiteAjout, setQuantiteAjout] = useState<number>(1);
 
@@ -74,15 +79,18 @@ export default function FormNouveauBlMobile({
   const clientsFiltres = useMemo(() => {
     if (!rechercheClient.trim()) return clientsInitiaux.slice(0, 15);
     const mots = normaliserTexte(rechercheClient).split(/\s+/).filter(Boolean);
-    return clientsInitiaux.filter((c) => {
-      const cible = normaliserTexte(`${c.raisonSociale} ${c.ville || ""}`);
-      return mots.every((mot) => cible.includes(mot));
-    }).slice(0, 15);
+    return clientsInitiaux
+      .filter((c) => {
+        const cible = normaliserTexte(`${c.raisonSociale} ${c.ville || ""}`);
+        return mots.every((mot) => cible.includes(mot));
+      })
+      .slice(0, 15);
   }, [clientsInitiaux, rechercheClient]);
 
   // Filtrage multi-mots des produits
   const produitsFiltres = useMemo(() => {
-    if (!rechercheProduit.trim() || rechercheProduit.trim().length < 2) return [];
+    if (!rechercheProduit.trim() || rechercheProduit.trim().length < 2)
+      return [];
     const mots = normaliserTexte(rechercheProduit).split(/\s+/).filter(Boolean);
 
     return produitsInitiaux
@@ -94,7 +102,9 @@ export default function FormNouveauBlMobile({
   }, [produitsInitiaux, rechercheProduit]);
 
   function tenterAjoutLigne() {
-    const libelle = produitSelectionne ? produitSelectionne.description : designationLibre.trim();
+    const libelle = produitSelectionne
+      ? produitSelectionne.description
+      : designationLibre.trim();
     if (!libelle) return;
     const qteAAjouter = quantiteAjout > 0 ? quantiteAjout : 1;
     const targetProduitId = produitSelectionne ? produitSelectionne.id : null;
@@ -122,7 +132,11 @@ export default function FormNouveauBlMobile({
     insererNouvelleLigne(targetProduitId, libelle, qteAAjouter);
   }
 
-  function insererNouvelleLigne(prodId: number | null, libelle: string, qte: number) {
+  function insererNouvelleLigne(
+    prodId: number | null,
+    libelle: string,
+    qte: number,
+  ) {
     setLignes((prev) => [
       ...prev,
       {
@@ -150,8 +164,8 @@ export default function FormNouveauBlMobile({
       prev.map((l) =>
         l.idTemp === conflit.idTempExistant
           ? { ...l, quantite: l.quantite + conflit.nouvelleQuantite }
-          : l
-      )
+          : l,
+      ),
     );
     reinitialiserChampsSaisie();
   }
@@ -162,8 +176,8 @@ export default function FormNouveauBlMobile({
       prev.map((l) =>
         l.idTemp === conflit.idTempExistant
           ? { ...l, quantite: conflit.nouvelleQuantite }
-          : l
-      )
+          : l,
+      ),
     );
     reinitialiserChampsSaisie();
   }
@@ -178,7 +192,7 @@ export default function FormNouveauBlMobile({
           }
           return l;
         })
-        .filter((l): l is LigneBlForm => l !== null)
+        .filter((l): l is LigneBlForm => l !== null),
     );
   }
 
@@ -209,6 +223,8 @@ export default function FormNouveauBlMobile({
           clientId: Number(clientId),
           dateLivraison,
           remarque: remarque.trim() || undefined,
+          estIncomplet,
+          articlesManquants: articlesManquants.trim() || undefined,
           lignes: lignes.map((l) => ({
             produitId: l.produitId,
             designation: l.designation,
@@ -219,7 +235,9 @@ export default function FormNouveauBlMobile({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Une erreur est survenue lors de l'enregistrement.");
+        throw new Error(
+          data.error || "Une erreur est survenue lors de l'enregistrement.",
+        );
       }
 
       router.push("/bl");
@@ -237,10 +255,15 @@ export default function FormNouveauBlMobile({
     <div className="max-w-xl mx-auto pb-28 px-3 sm:px-4">
       {/* En-tête mobile */}
       <div className="flex items-center justify-between py-3 mb-2 border-b border-slate-200">
-        <Link href="/bl" className="text-sm font-medium text-slate-500 hover:text-slate-800">
+        <Link
+          href="/bl"
+          className="text-sm font-medium text-slate-500 hover:text-slate-800"
+        >
           ← Retour
         </Link>
-        <h1 className="text-base font-bold text-slate-800">Nouveau Bon de Livraison</h1>
+        <h1 className="text-base font-bold text-slate-800">
+          Nouveau Bon de Livraison
+        </h1>
         <span className="w-10"></span>
       </div>
 
@@ -281,7 +304,9 @@ export default function FormNouveauBlMobile({
                 />
                 <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-white">
                   {clientsFiltres.length === 0 ? (
-                    <p className="p-2 text-xs text-slate-400 text-center">Aucun client trouvé</p>
+                    <p className="p-2 text-xs text-slate-400 text-center">
+                      Aucun client trouvé
+                    </p>
                   ) : (
                     clientsFiltres.map((c) => (
                       <button
@@ -293,8 +318,14 @@ export default function FormNouveauBlMobile({
                         }}
                         className="w-full text-left p-2.5 text-sm hover:bg-slate-50 active:bg-indigo-50 flex justify-between items-center"
                       >
-                        <span className="font-medium text-slate-800">{c.raisonSociale}</span>
-                        {c.ville && <span className="text-xs text-slate-400">{c.ville}</span>}
+                        <span className="font-medium text-slate-800">
+                          {c.raisonSociale}
+                        </span>
+                        {c.ville && (
+                          <span className="text-xs text-slate-400">
+                            {c.ville}
+                          </span>
+                        )}
                       </button>
                     ))
                   )}
@@ -326,7 +357,11 @@ export default function FormNouveauBlMobile({
             <input
               type="text"
               placeholder="Taper qques lettres combinées (ex: ton hp neg)..."
-              value={produitSelectionne ? produitSelectionne.description : rechercheProduit}
+              value={
+                produitSelectionne
+                  ? produitSelectionne.description
+                  : rechercheProduit
+              }
               onChange={(e) => {
                 setRechercheProduit(e.target.value);
                 setProduitSelectionne(null);
@@ -351,8 +386,12 @@ export default function FormNouveauBlMobile({
                       }}
                       className="w-full text-left p-2.5 text-xs hover:bg-slate-50 active:bg-indigo-50"
                     >
-                      <div className="font-semibold text-slate-800">{p.reference}</div>
-                      <div className="text-slate-600 truncate">{p.description}</div>
+                      <div className="font-semibold text-slate-800">
+                        {p.reference}
+                      </div>
+                      <div className="text-slate-600 truncate">
+                        {p.description}
+                      </div>
                     </button>
                   ))
                 )}
@@ -362,7 +401,9 @@ export default function FormNouveauBlMobile({
 
           {!produitSelectionne && (
             <div>
-              <span className="text-[11px] text-slate-400">Ou article hors catalogue :</span>
+              <span className="text-[11px] text-slate-400">
+                Ou article hors catalogue :
+              </span>
               <input
                 type="text"
                 placeholder="Désignation personnalisée..."
@@ -387,7 +428,9 @@ export default function FormNouveauBlMobile({
                 type="number"
                 min="1"
                 value={quantiteAjout}
-                onChange={(e) => setQuantiteAjout(Math.max(1, Number(e.target.value)))}
+                onChange={(e) =>
+                  setQuantiteAjout(Math.max(1, Number(e.target.value)))
+                }
                 className="w-12 text-center bg-transparent text-sm font-semibold text-slate-800 border-none focus:ring-0 p-0"
               />
               <button
@@ -417,11 +460,16 @@ export default function FormNouveauBlMobile({
           </label>
 
           {lignes.length === 0 ? (
-            <p className="text-center py-6 text-sm text-slate-400">Aucun article dans ce bon pour le moment.</p>
+            <p className="text-center py-6 text-sm text-slate-400">
+              Aucun article dans ce bon pour le moment.
+            </p>
           ) : (
             <div className="divide-y divide-slate-100">
               {lignes.map((ligne) => (
-                <div key={ligne.idTemp} className="py-2.5 flex items-center justify-between gap-3">
+                <div
+                  key={ligne.idTemp}
+                  className="py-2.5 flex items-center justify-between gap-3"
+                >
                   <p className="text-sm font-medium text-slate-800 flex-1 leading-snug">
                     {ligne.designation}
                   </p>
@@ -452,14 +500,57 @@ export default function FormNouveauBlMobile({
                       onClick={() => supprimerLigne(ligne.idTemp)}
                       className="p-1.5 text-slate-400 hover:text-red-500"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* Section 4 : Statut incomplet */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <div className="flex items-center h-5">
+              <input
+                type="checkbox"
+                checked={estIncomplet}
+                onChange={(e) => setEstIncomplet(e.target.checked)}
+                className="w-5 h-5 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-slate-800">
+                Signaler comme incomplet
+              </span>
+              <span className="text-xs text-slate-500">
+                Articles manquants au catalogue. Le BL ne pourra pas être
+                facturé en l'état.
+              </span>
+            </div>
+          </label>
+
+          {estIncomplet && (
+            <textarea
+              placeholder="Listez ici les articles manquants (désignation, quantité)..."
+              value={articlesManquants}
+              onChange={(e) => setArticlesManquants(e.target.value)}
+              className="form-input w-full text-sm p-3 rounded-xl border-amber-200 bg-amber-50 focus:border-amber-400 focus:ring-amber-400"
+              rows={3}
+            />
           )}
         </div>
 
@@ -490,12 +581,20 @@ export default function FormNouveauBlMobile({
       {conflit && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-slate-800">Article déjà présent</h3>
+            <h3 className="text-base font-bold text-slate-800">
+              Article déjà présent
+            </h3>
             <p className="text-sm text-slate-600">
-              L'article <strong className="text-slate-800">« {conflit.designation} »</strong> est déjà dans ce bon avec une quantité de <strong>{conflit.quantiteActuelle}</strong>.
+              L'article{" "}
+              <strong className="text-slate-800">
+                « {conflit.designation} »
+              </strong>{" "}
+              est déjà dans ce bon avec une quantité de{" "}
+              <strong>{conflit.quantiteActuelle}</strong>.
             </p>
             <p className="text-xs text-slate-500">
-              Que souhaitez-vous faire avec les <strong>+{conflit.nouvelleQuantite}</strong> en cours d'ajout ?
+              Que souhaitez-vous faire avec les{" "}
+              <strong>+{conflit.nouvelleQuantite}</strong> en cours d'ajout ?
             </p>
 
             <div className="flex flex-col gap-2 pt-2">
@@ -504,7 +603,8 @@ export default function FormNouveauBlMobile({
                 onClick={resoudreAddition}
                 className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold text-center"
               >
-                Additionner (Total : {conflit.quantiteActuelle + conflit.nouvelleQuantite})
+                Additionner (Total :{" "}
+                {conflit.quantiteActuelle + conflit.nouvelleQuantite})
               </button>
               <button
                 type="button"

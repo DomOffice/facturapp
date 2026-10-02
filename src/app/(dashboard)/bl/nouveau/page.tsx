@@ -2,6 +2,8 @@
 import prisma from "@/lib/db/prisma";
 import FormNouveauBlMobile from "./page-client";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Nouveau Bon de Livraison | FacturApp",
 };

@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { clientId, dateLivraison, remarque, lignes } = body;
+    const { clientId, dateLivraison, remarque, estIncomplet, articlesManquants, lignes } = body;
 
     if (!clientId) {
       return NextResponse.json(
@@ -85,6 +85,8 @@ export async function POST(request: Request) {
           clientId: Number(clientId),
           dateLivraison: dateLivraison ? new Date(dateLivraison) : new Date(),
           remarque: remarque || null,
+          estIncomplet: Boolean(estIncomplet),
+          articlesManquants: estIncomplet ? (articlesManquants || null) : null,
           statut: "livre",
           lignes: {
             create: lignes.map(

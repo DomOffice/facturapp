@@ -19,6 +19,8 @@ type BonLivraisonItem = {
   clientId: number;
   dateLivraison: string;
   statut: string;
+  estIncomplet: boolean;
+  articlesManquants: string | null;
   factureId: number | null;
   remarque: string | null;
   client: { id: number; raisonSociale: string; ville: string | null };
@@ -50,7 +52,11 @@ export default function BonsLivraisonClient({
 
   // Modale avertissement BL oubliés
   const [blOublies, setBlOublies] = useState<BonLivraisonItem[]>([]);
-  const [modaleAvertissementOuverte, setModaleAvertissementOuverte] = useState(false);
+  const [blIncompletsEnAttente, setBlIncompletsEnAttente] = useState<
+    BonLivraisonItem[]
+  >([]);
+  const [modaleAvertissementOuverte, setModaleAvertissementOuverte] =
+    useState(false);
 
   function alternerTri(colonne: ColonneTri) {
     if (colonneTri === colonne) {
@@ -71,34 +77,45 @@ export default function BonsLivraisonClient({
 
     return [...filtres].sort((a, b) => {
       let comp = 0;
-      if (colonneTri === "numeroBl") comp = a.numeroBl.localeCompare(b.numeroBl);
+      if (colonneTri === "numeroBl")
+        comp = a.numeroBl.localeCompare(b.numeroBl);
       else if (colonneTri === "dateLivraison")
-        comp = new Date(a.dateLivraison).getTime() - new Date(b.dateLivraison).getTime();
+        comp =
+          new Date(a.dateLivraison).getTime() -
+          new Date(b.dateLivraison).getTime();
       else if (colonneTri === "client")
         comp = a.client.raisonSociale.localeCompare(b.client.raisonSociale);
       else if (colonneTri === "statut") comp = a.statut.localeCompare(b.statut);
 
       return directionTri === "asc" ? comp : -comp;
     });
-  }, [bonsLivraisonInitiaux, clientIdFiltre, statutFiltre, colonneTri, directionTri]);
+  }, [
+    bonsLivraisonInitiaux,
+    clientIdFiltre,
+    statutFiltre,
+    colonneTri,
+    directionTri,
+  ]);
 
   // Cohérence client unique
   const clientUniqueSelection = useMemo(() => {
     if (blSelectionnes.length === 0) return null;
-    const selection = bonsLivraisonInitiaux.filter((b) => blSelectionnes.includes(b.id));
+    const selection = bonsLivraisonInitiaux.filter((b) =>
+      blSelectionnes.includes(b.id),
+    );
     const clientIds = Array.from(new Set(selection.map((b) => b.clientId)));
     return clientIds.length === 1 ? clientIds[0] : "multiple";
   }, [blSelectionnes, bonsLivraisonInitiaux]);
 
   function basculerSelection(id: number) {
     setBlSelectionnes((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   }
 
   function basculerTout() {
     const idsEligibles = bonsFiltresEtTries
-      .filter((bl) => bl.statut === "livre")
+      .filter((bl) => bl.statut === "livre" && !bl.estIncomplet)
       .map((bl) => bl.id);
 
     if (blSelectionnes.length === idsEligibles.length) {
@@ -110,21 +127,33 @@ export default function BonsLivraisonClient({
 
   function lancerVerificationConversion() {
     if (clientUniqueSelection === "multiple") {
-      alert("Tous les bons de livraison sélectionnés doivent appartenir au même client.");
+      alert(
+        "Tous les bons de livraison sélectionnés doivent appartenir au même client.",
+      );
       return;
     }
     if (!clientUniqueSelection) return;
 
-    // Détecter s'il existe d'autres BL livrés non cochés pour ce même client
-    const autresBlDuClient = bonsLivraisonInitiaux.filter(
+    // 1. Détecter les BL livrés complets non cochés
+    const completsOublies = bonsLivraisonInitiaux.filter(
       (b) =>
         b.clientId === clientUniqueSelection &&
         b.statut === "livre" &&
-        !blSelectionnes.includes(b.id)
+        !b.estIncomplet &&
+        !blSelectionnes.includes(b.id),
     );
 
-    if (autresBlDuClient.length > 0) {
-      setBlOublies(autresBlDuClient);
+    // 2. Détecter les BL livrés INCOMPLETS en attente pour ce même client
+    const incomplets = bonsLivraisonInitiaux.filter(
+      (b) =>
+        b.clientId === clientUniqueSelection &&
+        b.statut === "livre" &&
+        b.estIncomplet,
+    );
+
+    if (completsOublies.length > 0 || incomplets.length > 0) {
+      setBlOublies(completsOublies);
+      setBlIncompletsEnAttente(incomplets);
       setModaleAvertissementOuverte(true);
     } else {
       poursuivreConversion(blSelectionnes);
@@ -153,7 +182,9 @@ export default function BonsLivraisonClient({
       {/* En-tête */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Bons de livraison</h1>
+          <h1 className="text-xl font-bold text-slate-800">
+            Bons de livraison
+          </h1>
           <p className="text-xs text-slate-500">
             Gestion des livraisons terrain et conversion groupée en factures
           </p>
@@ -163,8 +194,18 @@ export default function BonsLivraisonClient({
           href="/bl/nouveau"
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold shadow-sm transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           Nouveau BL
         </Link>
@@ -222,7 +263,10 @@ export default function BonsLivraisonClient({
           <button
             type="button"
             onClick={lancerVerificationConversion}
-            disabled={blSelectionnes.length === 0 || clientUniqueSelection === "multiple"}
+            disabled={
+              blSelectionnes.length === 0 ||
+              clientUniqueSelection === "multiple"
+            }
             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-lg text-sm font-semibold shadow-sm transition-colors"
           >
             Convertir en facture
@@ -232,7 +276,8 @@ export default function BonsLivraisonClient({
 
       {clientUniqueSelection === "multiple" && (
         <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs">
-          Attention : vous avez sélectionné des BL de clients différents. Veuillez ne cocher que des BL d'un même client.
+          Attention : vous avez sélectionné des BL de clients différents.
+          Veuillez ne cocher que des BL d'un même client.
         </div>
       )}
 
@@ -248,9 +293,11 @@ export default function BonsLivraisonClient({
                     onChange={basculerTout}
                     checked={
                       bonsFiltresEtTries.length > 0 &&
-                      bonsFiltresEtTries.filter((b) => b.statut === "livre").length > 0 &&
+                      bonsFiltresEtTries.filter((b) => b.statut === "livre")
+                        .length > 0 &&
                       blSelectionnes.length ===
-                        bonsFiltresEtTries.filter((b) => b.statut === "livre").length
+                        bonsFiltresEtTries.filter((b) => b.statut === "livre")
+                          .length
                     }
                     className="h-4 w-4 rounded"
                   />
@@ -261,7 +308,8 @@ export default function BonsLivraisonClient({
                 >
                   <div className="flex items-center gap-1">
                     <span>N° BL</span>
-                    {colonneTri === "numeroBl" && (directionTri === "asc" ? " ↑" : " ↓")}
+                    {colonneTri === "numeroBl" &&
+                      (directionTri === "asc" ? " ↑" : " ↓")}
                   </div>
                 </th>
                 <th
@@ -270,7 +318,8 @@ export default function BonsLivraisonClient({
                 >
                   <div className="flex items-center gap-1">
                     <span>Date</span>
-                    {colonneTri === "dateLivraison" && (directionTri === "asc" ? " ↑" : " ↓")}
+                    {colonneTri === "dateLivraison" &&
+                      (directionTri === "asc" ? " ↑" : " ↓")}
                   </div>
                 </th>
                 <th
@@ -279,7 +328,8 @@ export default function BonsLivraisonClient({
                 >
                   <div className="flex items-center gap-1">
                     <span>Client</span>
-                    {colonneTri === "client" && (directionTri === "asc" ? " ↑" : " ↓")}
+                    {colonneTri === "client" &&
+                      (directionTri === "asc" ? " ↑" : " ↓")}
                   </div>
                 </th>
                 <th className="px-3 py-2 text-left">Articles livrés</th>
@@ -289,7 +339,8 @@ export default function BonsLivraisonClient({
                 >
                   <div className="flex items-center justify-center gap-1">
                     <span>Statut</span>
-                    {colonneTri === "statut" && (directionTri === "asc" ? " ↑" : " ↓")}
+                    {colonneTri === "statut" &&
+                      (directionTri === "asc" ? " ↑" : " ↓")}
                   </div>
                 </th>
                 <th className="px-3 py-2 text-left">Facture</th>
@@ -299,28 +350,40 @@ export default function BonsLivraisonClient({
             <tbody className="divide-y divide-slate-100">
               {bonsFiltresEtTries.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-slate-400">
+                  <td
+                    colSpan={8}
+                    className="px-3 py-8 text-center text-slate-400"
+                  >
                     Aucun bon de livraison trouvé.
                   </td>
                 </tr>
               ) : (
                 bonsFiltresEtTries.map((bl) => {
                   const estLivre = bl.statut === "livre";
+                  const peutEtreFacture = estLivre && !bl.estIncomplet;
+
                   return (
                     <tr
                       key={bl.id}
                       className={`hover:bg-slate-50 ${
                         blSelectionnes.includes(bl.id) ? "bg-indigo-50/50" : ""
-                      }`}
+                      } ${bl.estIncomplet && estLivre ? "bg-amber-50/40" : ""}`}
                     >
                       <td className="px-3 py-2 text-center">
-                        {estLivre ? (
+                        {peutEtreFacture ? (
                           <input
                             type="checkbox"
                             checked={blSelectionnes.includes(bl.id)}
                             onChange={() => basculerSelection(bl.id)}
                             className="h-4 w-4 rounded"
                           />
+                        ) : bl.estIncomplet && estLivre ? (
+                          <span
+                            className="inline-flex items-center justify-center text-amber-600 font-bold text-sm cursor-help"
+                            title={`BL Incomplet : ${bl.articlesManquants || "Articles non référencés"}`}
+                          >
+                            ⚠️
+                          </span>
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
                         )}
@@ -335,15 +398,37 @@ export default function BonsLivraisonClient({
                         {bl.client.raisonSociale}
                       </td>
                       <td className="px-3 py-2 text-slate-600">
-                        <div className="max-w-md truncate text-xs">
-                          {bl.lignes.map((l) => `${l.quantite}x ${l.designation}`).join(", ")}
+                        <div className="max-w-md text-xs">
+                          <div className="truncate">
+                            {bl.lignes
+                              .map((l) => `${l.quantite}x ${l.designation}`)
+                              .join(", ")}
+                          </div>
+                          {bl.estIncomplet && bl.articlesManquants && (
+                            <div className="text-amber-700 font-medium truncate mt-0.5 flex items-center gap-1">
+                              <span>⚠️ Manquant(s) :</span>
+                              <span className="italic">
+                                {bl.articlesManquants}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center">
                         {estLivre ? (
-                          <span className="badge badge-warning text-xs">À facturer</span>
+                          bl.estIncomplet ? (
+                            <span className="badge bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold">
+                              Incomplet
+                            </span>
+                          ) : (
+                            <span className="badge badge-warning text-xs">
+                              À facturer
+                            </span>
+                          )
                         ) : (
-                          <span className="badge badge-success text-xs">Facturé</span>
+                          <span className="badge badge-success text-xs">
+                            Facturé
+                          </span>
                         )}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">
@@ -366,14 +451,37 @@ export default function BonsLivraisonClient({
                             className="text-slate-500 hover:text-indigo-600 p-1 inline-block"
                             title="Modifier le BL"
                           >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                              />
                             </svg>
                           </Link>
                         ) : (
-                          <span className="text-slate-300 p-1 inline-block cursor-not-allowed" title="Facturé : modifiez directement la facture">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          <span
+                            className="text-slate-300 p-1 inline-block cursor-not-allowed"
+                            title="Facturé : modifiez directement la facture"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                              />
                             </svg>
                           </span>
                         )}
@@ -392,7 +500,10 @@ export default function BonsLivraisonClient({
         {bonsFiltresEtTries.map((bl) => {
           const estLivre = bl.statut === "livre";
           return (
-            <div key={bl.id} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2">
+            <div
+              key={bl.id}
+              className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {estLivre && (
@@ -403,22 +514,31 @@ export default function BonsLivraisonClient({
                       className="h-5 w-5 rounded"
                     />
                   )}
-                  <span className="font-mono font-bold text-sm text-slate-800">{bl.numeroBl}</span>
+                  <span className="font-mono font-bold text-sm text-slate-800">
+                    {bl.numeroBl}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   {estLivre ? (
-                    <Link href={`/bl/${bl.id}`} className="text-xs text-indigo-600 font-medium">
+                    <Link
+                      href={`/bl/${bl.id}`}
+                      className="text-xs text-indigo-600 font-medium"
+                    >
                       Modifier
                     </Link>
                   ) : null}
-                  <span className={`badge text-[11px] ${estLivre ? "badge-warning" : "badge-success"}`}>
+                  <span
+                    className={`badge text-[11px] ${estLivre ? "badge-warning" : "badge-success"}`}
+                  >
                     {estLivre ? "À facturer" : "Facturé"}
                   </span>
                 </div>
               </div>
 
               <div className="flex justify-between items-center text-xs text-slate-500">
-                <span className="font-medium text-slate-700">{bl.client.raisonSociale}</span>
+                <span className="font-medium text-slate-700">
+                  {bl.client.raisonSociale}
+                </span>
                 <span>{formaterDate(bl.dateLivraison)}</span>
               </div>
 
@@ -426,7 +546,9 @@ export default function BonsLivraisonClient({
                 {bl.lignes.map((l) => (
                   <div key={l.id} className="py-1 flex justify-between">
                     <span className="truncate pr-2">{l.designation}</span>
-                    <span className="font-semibold shrink-0">Qté : {l.quantite}</span>
+                    <span className="font-semibold shrink-0">
+                      Qté : {l.quantite}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -434,7 +556,10 @@ export default function BonsLivraisonClient({
               {bl.facture && bl.factureId && (
                 <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100">
                   Facture :{" "}
-                  <Link href={`/factures/${bl.factureId}`} className="font-mono font-bold text-indigo-600 underline">
+                  <Link
+                    href={`/factures/${bl.factureId}`}
+                    className="font-mono font-bold text-indigo-600 underline"
+                  >
                     {bl.facture.numeroFacture}
                   </Link>
                 </div>
@@ -444,49 +569,102 @@ export default function BonsLivraisonClient({
         })}
       </div>
 
-      {/* Modale d'alerte pour les BL non cochés du même client */}
+      {/* Modale d'avertissement intelligente (BL incomplets & BL oubliés) */}
       {modaleAvertissementOuverte && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl">
-            <h3 className="text-base font-bold text-slate-800">
-              Bons de livraison non sélectionnés
-            </h3>
-            <p className="text-sm text-slate-600">
-              Ce client possède d'autres BL livrés non encore facturés :
-            </p>
-            <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-slate-50 p-2 text-xs">
-              {blOublies.map((b) => (
-                <div key={b.id} className="py-1.5 flex justify-between">
-                  <span className="font-mono font-semibold">{b.numeroBl}</span>
-                  <span>{formaterDate(b.dateLivraison)}</span>
-                  <span>{b.lignes.length} article(s)</span>
-                </div>
-              ))}
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                ⚠️
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">
+                  Attention : d'autres bons de livraison existent pour ce client
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Vérifiez la situation avant de lancer la facturation.
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-slate-500">
-              Souhaitez-vous inclure également ces bons de livraison dans la facture ?
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
+
+            {/* Avertissement spécifique : BL Incomplets */}
+            {blIncompletsEnAttente.length > 0 && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-wide">
+                  <span>BL incomplets en cours ({blIncompletsEnAttente.length}) :</span>
+                </div>
+                <div className="max-h-36 overflow-y-auto divide-y divide-amber-200/60 text-xs">
+                  {blIncompletsEnAttente.map((b) => (
+                    <div key={b.id} className="py-1.5 flex flex-col gap-0.5">
+                      <div className="flex justify-between font-medium text-amber-950">
+                        <span className="font-mono font-semibold">{b.numeroBl}</span>
+                        <span>{formaterDate(b.dateLivraison)}</span>
+                      </div>
+                      {b.articlesManquants && (
+                        <p className="text-[11px] text-amber-800 italic">
+                          Manquants : {b.articlesManquants}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-amber-700">
+                  Ces bons ne peuvent pas être facturés en l'état. Vous pouvez les compléter d'abord ou continuer la facturation sans eux.
+                </p>
+              </div>
+            )}
+
+            {/* Avertissement : BL Complets non sélectionnés */}
+            {blOublies.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-slate-600">
+                  BL prêts à facturer non cochés ({blOublies.length}) :
+                </p>
+                <div className="max-h-28 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-slate-50 p-2 text-xs">
+                  {blOublies.map((b) => (
+                    <div key={b.id} className="py-1 flex justify-between">
+                      <span className="font-mono font-semibold text-slate-700">{b.numeroBl}</span>
+                      <span className="text-slate-500">{formaterDate(b.dateLivraison)}</span>
+                      <span className="text-slate-500">{b.lignes.length} article(s)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Boutons d'action clairs */}
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setModaleAvertissementOuverte(false)}
+                className="w-full sm:w-auto px-4 py-2 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Revenir et compléter les BL
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   setModaleAvertissementOuverte(false);
                   poursuivreConversion(blSelectionnes);
                 }}
-                className="btn-ghost btn-sm text-slate-600"
+                className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold transition-colors"
               >
-                Garder ma sélection
+                Continuer sans les BL incomplets
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setModaleAvertissementOuverte(false);
-                  inclureToutEtConvertir();
-                }}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold"
-              >
-                Inclure tous les BL
-              </button>
+
+              {blOublies.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModaleAvertissementOuverte(false);
+                    inclureToutEtConvertir();
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
+                >
+                  Inclure les BL prêts
+                </button>
+              )}
             </div>
           </div>
         </div>

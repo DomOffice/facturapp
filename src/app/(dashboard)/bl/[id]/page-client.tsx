@@ -38,6 +38,8 @@ export default function FormEditionBl({
   const [rechercheClient, setRechercheClient] = useState("");
   const [dateLivraison, setDateLivraison] = useState(blInitial.dateLivraison);
   const [remarque, setRemarque] = useState(blInitial.remarque || "");
+  const [estIncomplet, setEstIncomplet] = useState<boolean>(blInitial.estIncomplet ?? false);
+  const [articlesManquants, setArticlesManquants] = useState<string>(blInitial.articlesManquants || "");
   const [lignes, setLignes] = useState<LigneBlForm[]>(() =>
     blInitial.lignes.map((l: any) => ({
       idTemp: String(l.id),
@@ -199,6 +201,8 @@ export default function FormEditionBl({
           clientId,
           dateLivraison,
           remarque: remarque.trim() || undefined,
+          estIncomplet,
+          articlesManquants: estIncomplet ? (articlesManquants.trim() || undefined) : undefined,
           lignes,
         }),
       });
@@ -446,6 +450,38 @@ export default function FormEditionBl({
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Section Statut Incomplet */}
+        <div className={`p-4 rounded-xl border border-slate-200 shadow-sm space-y-3 ${estFacture ? "bg-slate-50 opacity-80" : "bg-white"}`}>
+          <label className={`flex items-start gap-3 ${estFacture ? "cursor-not-allowed" : "cursor-pointer"}`}>
+            <div className="flex items-center h-5">
+              <input
+                type="checkbox"
+                disabled={estFacture}
+                checked={estIncomplet}
+                onChange={(e) => setEstIncomplet(e.target.checked)}
+                className="w-5 h-5 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-slate-800">Signaler comme incomplet</span>
+              <span className="text-xs text-slate-500">
+                Articles manquants ou non référencés. Le BL ne pourra pas être facturé tant que cette case reste cochée.
+              </span>
+            </div>
+          </label>
+
+          {estIncomplet && (
+            <textarea
+              disabled={estFacture}
+              placeholder="Listez les articles manquants (ex: 2x Toner compatible HP W1106A sans puce)..."
+              value={articlesManquants}
+              onChange={(e) => setArticlesManquants(e.target.value)}
+              className="form-input w-full text-sm p-3 rounded-xl border-amber-200 bg-amber-50 focus:border-amber-400 focus:ring-amber-400 text-slate-800"
+              rows={3}
+            />
+          )}
         </div>
 
         <div>
